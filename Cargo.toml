@@ -1,0 +1,12 @@
+[package]
+name = "lspresso-shot"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anstyle = "1.0.10"
+anyhow = "1.0.95"
+rand = "0.8.5"
+serde = { version = "1.0.217", features = ["derive"] }
+thiserror = "2.0.11"
+toml = "0.8.19"
