@@ -2,6 +2,12 @@
 name = "lspresso-shot"
 version = "0.1.0"
 edition = "2021"
+description = "Integration testing library for language servers#"
+readme = "README.md"
+keywords = ["language-server", "lsp", "tooling", "testing"]
+categories = ["development-tools"]
+repository = "https://github.com/WillLillis/lspresso-shot"
+license = "MIT"
 
 [dependencies]
 anstyle = "1.0.10"
