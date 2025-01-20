@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::{env::temp_dir, fmt::Write};
@@ -251,6 +252,8 @@ pub enum TestError {
     HoverMismatch(#[from] HoverMismatchError),
     #[error(transparent)]
     DiagnosticMismatch(#[from] DiagnosticMismatchError),
+    #[error(transparent)]
+    CompletionMismatch(#[from] CompletionMismatchError),
     #[error(transparent)]
     Setup(#[from] TestSetupError),
     #[error("{0}")]
@@ -545,6 +548,339 @@ impl std::fmt::Display for DiagnosticSeverity {
                 Self::Hint => "hint",
             }
         )?;
+        Ok(())
+    }
+}
+
+// Completion Types
+#[derive(Debug, Clone)]
+pub enum CompletionResult {
+    /// Expect less than this many completion results, ignoring their contents
+    LessThan(usize),
+    /// Expect exactly this many completion results, ignoring their contents
+    Exactly(usize),
+    /// Expect more than  this many completion results, ignoring their contents
+    MoreThan(usize),
+    /// Expect this exact set of completion results, ignoring their order
+    Contains(HashSet<CompletionInfo>),
+    /// Expect this exact set of completion results in a specific order
+    Exact(Vec<CompletionInfo>),
+}
+
+impl CompletionResult {
+    /// Compares the expected results in `self` to the `actual` results, respecting
+    /// the intended behavior for each enum variant of `Self`
+    ///
+    /// Returns true if the two are considered equal, false otherwise
+    #[must_use]
+    pub fn compare_results(&self, actual: &Vec<CompletionInfo>) -> bool {
+        match self {
+            Self::LessThan(n_expected) => *n_expected > actual.len(),
+            Self::Exactly(n_expected) => *n_expected == actual.len(),
+            Self::MoreThan(n_expected) => *n_expected < actual.len(),
+            Self::Contains(expected) => {
+                let mut remaining = expected.clone();
+                for result in actual {
+                    if remaining.is_empty() {
+                        return false;
+                    }
+                    if remaining.contains(result) {
+                        remaining.remove(result);
+                    }
+                }
+                remaining.is_empty()
+            }
+            Self::Exact(results) => {
+                if results.len() != actual.len() {
+                    return false;
+                }
+
+                for (expected, actual) in results.iter().zip(actual.iter()) {
+                    if expected != actual {
+                        return false;
+                    }
+                }
+                true
+            }
+        }
+    }
+}
+
+// NOTE: There are a *lot* of optional fields in the completion response item
+// For now we'll add a few basic ones, and then come back to later
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct CompletionInfo {
+    label: String,
+    #[serde(flatten)]
+    documentation: CompletionDocumentation,
+    kind: CompletionItemKind,
+}
+
+impl std::fmt::Display for CompletionInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "label: '{}'", self.label)?;
+        writeln!(f, "documentation:\n'{}'", self.documentation)?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct CompletionDocumentation {
+    #[serde(rename = "documentation_kind")]
+    kind: String,
+    #[serde(rename = "documentation_value")]
+    value: String,
+}
+
+impl std::fmt::Display for CompletionDocumentation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "kind: {}", self.kind)?;
+        let separator =
+            if self.value.lines().count() > 1 || matches!(self.value.chars().last(), Some('\n')) {
+                "\n"
+            } else {
+                " "
+            };
+        writeln!(f, "value:{separator}'{}'", self.value)?;
+        Ok(())
+    }
+}
+
+// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub enum CompletionItemKind {
+    #[serde(rename = "1")]
+    Text = 1,
+    #[serde(rename = "2")]
+    Method = 2,
+    #[serde(rename = "3")]
+    Function = 3,
+    #[serde(rename = "4")]
+    Constructor = 4,
+    #[serde(rename = "5")]
+    Field = 5,
+    #[serde(rename = "6")]
+    Variable = 6,
+    #[serde(rename = "7")]
+    Class = 7,
+    #[serde(rename = "8")]
+    Interface = 8,
+    #[serde(rename = "9")]
+    Module = 9,
+    #[serde(rename = "10")]
+    Property = 10,
+    #[serde(rename = "11")]
+    Unit = 11,
+    #[serde(rename = "12")]
+    Value = 12,
+    #[serde(rename = "13")]
+    Enum = 13,
+    #[serde(rename = "14")]
+    Keyword = 14,
+    #[serde(rename = "15")]
+    Snippet = 15,
+    #[serde(rename = "16")]
+    Color = 16,
+    #[serde(rename = "17")]
+    File = 17,
+    #[serde(rename = "18")]
+    Reference = 18,
+    #[serde(rename = "19")]
+    Folder = 19,
+    #[serde(rename = "20")]
+    EnumMember = 20,
+    #[serde(rename = "21")]
+    Constant = 21,
+    #[serde(rename = "22")]
+    Struct = 22,
+    #[serde(rename = "23")]
+    Event = 23,
+    #[serde(rename = "24")]
+    Operator = 24,
+    #[serde(rename = "25")]
+    TypeParameter = 25,
+}
+
+impl std::fmt::Display for CompletionItemKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{}",
+            match self {
+                Self::Text => "Text",
+                Self::Method => "Method",
+                Self::Function => "Function",
+                Self::Constructor => "Constructor",
+                Self::Field => "Field",
+                Self::Variable => "Variable",
+                Self::Class => "Class",
+                Self::Interface => "Interface",
+                Self::Module => "Module",
+                Self::Property => "Property",
+                Self::Unit => "Unit",
+                Self::Value => "Value",
+                Self::Enum => "Enum",
+                Self::Keyword => "Keyword",
+                Self::Snippet => "Snippet",
+                Self::Color => "Color",
+                Self::File => "File",
+                Self::Reference => "Reference",
+                Self::Folder => "Folder",
+                Self::EnumMember => "EnumMember",
+                Self::Constant => "Constant",
+                Self::Struct => "Struct",
+                Self::Event => "Event",
+                Self::Operator => "Operator",
+                Self::TypeParameter => "TypeParameter",
+            }
+        )?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct CompletionMismatchError {
+    pub expected: CompletionResult,
+    pub actual: Vec<CompletionInfo>,
+}
+
+impl std::fmt::Display for CompletionMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.expected {
+            CompletionResult::LessThan(n_results) => writeln!(
+                f,
+                "{}",
+                &paint(
+                    RED,
+                    &format!(
+                        "Expected less than {n_results} completion results, got {}",
+                        self.actual.len()
+                    )
+                ),
+            )?,
+            CompletionResult::Exactly(n_results) => writeln!(
+                f,
+                "{}",
+                &paint(
+                    RED,
+                    &format!(
+                        "Expected exactly {n_results} completion results, got {}",
+                        self.actual.len()
+                    )
+                )
+            )?,
+            CompletionResult::MoreThan(n_results) => writeln!(
+                f,
+                "{}",
+                &paint(
+                    RED,
+                    &format!(
+                        "Expected more than {n_results} completion results, got {}",
+                        self.actual.len()
+                    ),
+                ),
+            )?,
+            CompletionResult::Contains(results) => {
+                let mut remaining = results.clone();
+                let mut remaining_count: Option<usize> = None;
+                for (i, result) in self.actual.iter().enumerate() {
+                    if remaining.is_empty() {
+                        remaining_count = Some(i + 1);
+                        break;
+                    }
+                    if remaining.contains(result) {
+                        remaining.remove(result);
+                    }
+                }
+                if !remaining.is_empty() {
+                    writeln!(
+                        f,
+                        "{}",
+                        &paint(RED, "Didn't recieve all of the expected completion results:")
+                    )?;
+                    for result in remaining {
+                        writeln!(f, "Completion Result:\n{result}\n",)?;
+                    }
+                } else if let Some(count) = remaining_count {
+                    writeln!(f, "{}", paint(RED, "Got unexpected completion results:"))?;
+                    for result in self.actual.iter().skip(count) {
+                        writeln!(f, "Completion Result:\n{result}\n",)?;
+                    }
+                }
+            }
+            CompletionResult::Exact(results) => {
+                let render_diff = |f: &mut std::fmt::Formatter<'_>,
+                                   expected: &CompletionInfo,
+                                   actual: &CompletionInfo|
+                 -> std::fmt::Result {
+                    write!(
+                        f,
+                        "{}",
+                        render_field_comparison(
+                            "label",
+                            Some(&expected.label),
+                            Some(&actual.label)
+                        )?
+                    )?;
+                    write!(
+                        f,
+                        "{}",
+                        render_field_comparison(
+                            "documentation",
+                            Some(&expected.documentation),
+                            Some(&actual.documentation)
+                        )?
+                    )?;
+                    write!(
+                        f,
+                        "{}",
+                        render_field_comparison("kind", Some(&expected.kind), Some(&actual.kind))?
+                    )?;
+
+                    Ok(())
+                };
+                let render_completion = |f: &mut std::fmt::Formatter<'_>,
+                                         completion: &CompletionInfo|
+                 -> std::fmt::Result {
+                    write!(f, "label: '{}'", paint(RED, &completion.label.to_string()))?;
+                    write!(
+                        f,
+                        "documentation:\n'{}'",
+                        paint(RED, &format!("{}", completion.documentation))
+                    )?;
+                    write!(f, "kind: '{}'", paint(RED, &format!("{}", completion.kind)))?;
+
+                    Ok(())
+                };
+                for (expected, actual) in results.iter().zip(self.actual.iter()) {
+                    if expected != actual {
+                        render_diff(f, expected, actual)?;
+                    }
+                }
+                let expected_len = results.len();
+                let actual_len = self.actual.len();
+                match expected_len.cmp(&actual_len) {
+                    std::cmp::Ordering::Equal => {}
+                    std::cmp::Ordering::Less => {
+                        for (i, completion) in self.actual.iter().enumerate().skip(expected_len) {
+                            writeln!(f, "Completion {i}:")?;
+                            writeln!(f, "Expected: nil")?;
+                            writeln!(f, "Got:")?;
+                            render_completion(f, completion)?;
+                        }
+                    }
+                    std::cmp::Ordering::Greater => {
+                        for (i, completion) in results.iter().enumerate().skip(actual_len) {
+                            writeln!(f, "Completion {i}:")?;
+                            writeln!(f, "Expected:")?;
+                            render_completion(f, completion)?;
+                            writeln!(f, "Got: nil")?;
+                        }
+                    }
+                }
+            }
+        }
         Ok(())
     }
 }

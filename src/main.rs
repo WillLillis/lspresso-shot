@@ -2,9 +2,10 @@
 use std::path::PathBuf;
 
 use lspresso_shot::{
-    lspresso_shot, test_diagnostics, test_hover,
+    lspresso_shot, test_completions, test_diagnostics, test_hover,
     types::{
-        CursorPosition, DiagnosticInfo, DiagnosticResult, DiagnosticSeverity, HoverResult, TestCase,
+        CompletionResult, CursorPosition, DiagnosticInfo, DiagnosticResult, DiagnosticSeverity,
+        HoverResult, TestCase,
     },
 };
 
@@ -21,12 +22,12 @@ pub fn main() {
         HoverResult {
             kind: "markdown".to_string(),
             value: "RBP [x86-64]
-Base Pointer (meant for stack frames)
+    Base Pointer (meant for stack frames)
 
 
-Type: General Purpose Register
-Width: 64 bits
-"
+    Type: General Purpose Register
+    Width: 64 bits
+    "
             .to_string(),
         },
         &lsp_path
@@ -41,16 +42,16 @@ Width: 64 bits
     .other_file(
         ".asm-lsp.toml",
         r#"
-        [default_config]
-version = "0.9.0"
-assembler = "gas"
-instruction_set = "x86-64"
+            [default_config]
+    version = "0.9.0"
+    assembler = "gas"
+    instruction_set = "x86-64"
 
-[default_config.opts]
-compiler = "zig"
-compile_flags_txt = ["cc"]
-diagnostics = true
-default_diagnostics = true"#,
+    [default_config.opts]
+    compiler = "zig"
+    compile_flags_txt = ["cc"]
+    diagnostics = true
+    default_diagnostics = true"#,
     );
     lspresso_shot!(test_diagnostics(
         &diagnostic_test_case,
@@ -64,6 +65,16 @@ default_diagnostics = true"#,
                 severity: Some(DiagnosticSeverity::Error)
             }],
         },
+        &lsp_path
+    ));
+    let completion_test_case = TestCase::new(
+        "gas.s",
+        include_str!("../../asm-lsp/samples/gas.s"),
+        CursorPosition::new(20, 10),
+    );
+    lspresso_shot!(test_completions(
+        &completion_test_case,
+        &CompletionResult::MoreThan(1),
         &lsp_path
     ));
 }

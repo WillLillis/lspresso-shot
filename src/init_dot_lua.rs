@@ -4,6 +4,7 @@ use std::path::Path;
 pub enum InitType {
     Hover,
     Diagnostic,
+    Completion,
 }
 
 /// Construct the contents of an init.lua file to test an lsp request corresponding
@@ -18,8 +19,9 @@ pub fn get_init_dot_lua(
 ) -> String {
     let mut raw_init = format!("{ERROR_REPORT}{FILETYPE_ADD}{FILETYPE_AUTOCMD}");
     raw_init.push_str(match init_type {
-        InitType::Hover => HOVER_INIT_DOT_LUA,
-        InitType::Diagnostic => DIAGNOSTIC_INIT_DOT_LUA,
+        InitType::Hover => HOVER_AUTCMD,
+        InitType::Diagnostic => DIAGNOSTIC_AUTOCMD,
+        InitType::Completion => COMPLETION_AUTOCMD,
     });
     raw_init
         .replace("RESULTS_FILE", results_path.to_str().unwrap())
@@ -70,7 +72,7 @@ vim.api.nvim_create_autocmd('FileType', {
 
 /// Invoke a 'textDocument/hover' request when the LSP starts, gather the results
 /// and write them to a file in TOML format
-const HOVER_INIT_DOT_LUA: &str = r#"
+const HOVER_AUTCMD: &str = r#"
 vim.api.nvim_create_autocmd('LspAttach', {
     callback = function(_)
         local pos = { CURSOR_LINE, CURSOR_COLUMN }
@@ -79,14 +81,12 @@ vim.api.nvim_create_autocmd('LspAttach', {
             textDocument = vim.lsp.util.make_text_document_params(0),
             position = { line = pos[1] - 1, character = pos[2] },
         }, 1000)
-        if hover_result then
-            -- Write the results in a TOML format for easy deserialization
-            local file = io.open('RESULTS_FILE', 'w')
-            if file then
-                file:write('kind = "' .. tostring(hover_result[1].result.contents.kind .. '"\n'))
-                file:write('value = """\n' .. tostring(hover_result[1].result.contents.value .. '\n"""'))
-                file:close()
-            end
+        -- Write the results in a TOML format for easy deserialization
+        local file = io.open('RESULTS_FILE', 'w')
+        if hover_result and file then
+            file:write('kind = "' .. tostring(hover_result[1].result.contents.kind .. '"\n'))
+            file:write('value = """\n' .. tostring(hover_result[1].result.contents.value .. '\n"""'))
+            file:close()
         else 
             report_error('No hover result returned')
         end
@@ -97,33 +97,63 @@ vim.api.nvim_create_autocmd('LspAttach', {
 
 /// Invoke a 'textDocument/publishDiagnostics' request when the LSP starts, gather the results
 /// and write them to a file in TOML format
-const DIAGNOSTIC_INIT_DOT_LUA: &str = r#"
+const DIAGNOSTIC_AUTOCMD: &str = r#"
 vim.api.nvim_create_autocmd('DiagnosticChanged', {
     callback = function(_)
         local diagnostics_result = vim.diagnostic.get(0, {})
-        if diagnostics_result then
-            local file = io.open('RESULTS_FILE', 'w')
-            if file then
-                for _, diagnostic in pairs(diagnostics_result) do
-                    file:write('[[diagnostics]]\n' )
-                    file:write('start_line = ' .. tostring(diagnostic.lnum) .. '\n')
-                    file:write('start_character = ' .. tostring(diagnostic.col) .. '\n')
-                    file:write('message = """\n' .. diagnostic.message .. '\n"""\n')
-                    if diagnostic.end_lnum then
-                        file:write('end_line = ' .. tostring(diagnostic.end_lnum) .. '\n')
-                    end
-                    if diagnostic.end_col then
-                        file:write('end_character = ' .. tostring(diagnostic.col) .. '\n')
-                    end
-                    if diagnostic.severity then
-                        file:write('severity = "' .. tostring(diagnostic.severity) .. '"\n')
-                    end
-                    file:write('\n')
+        local file = io.open('RESULTS_FILE', 'w')
+        if diagnostics_result and file then
+            for _, diagnostic in pairs(diagnostics_result) do
+                file:write('[[diagnostics]]\n' )
+                file:write('start_line = ' .. tostring(diagnostic.lnum) .. '\n')
+                file:write('start_character = ' .. tostring(diagnostic.col) .. '\n')
+                file:write('message = """\n' .. diagnostic.message .. '\n"""\n')
+                if diagnostic.end_lnum then
+                    file:write('end_line = ' .. tostring(diagnostic.end_lnum) .. '\n')
                 end
-                file:close()
+                if diagnostic.end_col then
+                    file:write('end_character = ' .. tostring(diagnostic.col) .. '\n')
+                end
+                if diagnostic.severity then
+                    file:write('severity = "' .. tostring(diagnostic.severity) .. '"\n')
+                end
+                file:write('\n')
             end
+            file:close()
         else
             report_error('No diagnostic result returned')
+        end
+        vim.cmd('qa!')
+    end,
+})
+"#;
+
+/// Invoke a 'textDocument/publishDiagnostics' request when the LSP starts, gather the results
+/// and write them to a file in TOML format
+const COMPLETION_AUTOCMD: &str = r#"
+vim.api.nvim_create_autocmd('LspAttach', {
+    callback = function(_)
+        local params = vim.lsp.util.make_position_params()
+        local completion_results = vim.lsp.buf_request_sync(0, "textDocument/completion", params, 1000)
+        local file = io.open('RESULTS_FILE', "w")
+        if completion_results and file then
+            for _, result in pairs(completion_results) do
+                if result.result and result.result.items then
+                    for _, item in ipairs(result.result.items) do
+                        file:write('[[completions]]\n')
+                        local label = string.gsub(item.label, "\\", "\\\\") -- serde fails to parse, interpreting slashes as escape sequences
+                        file:write('label = "' .. label .. '"\n')
+                        file:write('kind = "' .. tostring(item.kind) .. '"\n')
+                        file:write('documentation_kind = "' .. item.documentation.kind .. '"\n')
+                        local raw_value = tostring(item.documentation.value)
+                        local value = string.gsub(raw_value, "\\", "\\\\") -- serde fails to parse, interpreting slashes as escape sequences
+                        file:write('documentation_value = """\n' .. value .. '\n"""\n\n')
+                    end
+                end
+            end
+            file:close()
+        else
+            report_error('No completion result returned')
         end
         vim.cmd('qa!')
     end,
