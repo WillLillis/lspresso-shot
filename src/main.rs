@@ -12,36 +12,29 @@ use lspresso_shot::{
 pub fn main() {
     let lsp_path = PathBuf::from("/home/lillis/projects/asm-lsp/target/debug/asm-lsp");
     // Only add a source file to the case, test the default config
-    let hover_test_case = TestCase::new(
-        "gas.s",
-        include_str!("../../asm-lsp/samples/gas.s"),
-        CursorPosition::new(20, 10),
-    );
+    let hover_test_case = TestCase::new("gas.s", include_str!("../../asm-lsp/samples/gas.s"))
+        .cursor_pos(Some(CursorPosition::new(20, 10)));
     lspresso_shot!(test_hover(
         &hover_test_case,
         HoverResult {
             kind: "markdown".to_string(),
             value: "RBP [x86-64]
-    Base Pointer (meant for stack frames)
+Base Pointer (meant for stack frames)
 
 
-    Type: General Purpose Register
-    Width: 64 bits
-    "
+Type: General Purpose Register
+Width: 64 bits
+"
             .to_string(),
         },
         &lsp_path
     ));
 
     // Add a source and config file to the case case!
-    let diagnostic_test_case = TestCase::new(
-        "gas.s",
-        include_str!("../../asm-lsp/samples/gas.s"),
-        CursorPosition::new(20, 10),
-    )
-    .other_file(
-        ".asm-lsp.toml",
-        r#"
+    let diagnostic_test_case = TestCase::new("gas.s", include_str!("../../asm-lsp/samples/gas.s"))
+        .other_file(
+            ".asm-lsp.toml",
+            r#"
             [default_config]
     version = "0.9.0"
     assembler = "gas"
@@ -52,7 +45,7 @@ pub fn main() {
     compile_flags_txt = ["cc"]
     diagnostics = true
     default_diagnostics = true"#,
-    );
+        );
     lspresso_shot!(test_diagnostics(
         &diagnostic_test_case,
         &DiagnosticResult {
@@ -67,11 +60,8 @@ pub fn main() {
         },
         &lsp_path
     ));
-    let completion_test_case = TestCase::new(
-        "gas.s",
-        include_str!("../../asm-lsp/samples/gas.s"),
-        CursorPosition::new(20, 10),
-    );
+    let completion_test_case = TestCase::new("gas.s", include_str!("../../asm-lsp/samples/gas.s"))
+        .cursor_pos(Some(CursorPosition::new(1, 4)));
     lspresso_shot!(test_completions(
         &completion_test_case,
         &CompletionResult::MoreThan(1),

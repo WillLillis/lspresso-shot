@@ -13,6 +13,7 @@ use std::{
 use types::{
     CompletionInfo, CompletionMismatchError, CompletionResult, DiagnosticMismatchError,
     DiagnosticResult, HoverMismatchError, HoverResult, TestCase, TestError, TestResult,
+    TestSetupError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -51,6 +52,11 @@ fn test_hover_inner(
     executable_path: &Path,
     test_id: &str,
 ) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(
+            "Cursor position must be specified for hover tests".to_string(),
+        ))?;
+    }
     let source_path = test_case.create_test(test_id, executable_path, InitType::Hover)?;
     let init_dot_lua_path = TestCase::get_init_lua_file_path(test_id)?;
 
@@ -148,6 +154,11 @@ fn test_completions_inner(
     executable_path: &Path,
     test_id: &str,
 ) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(
+            "Cursor position must be specified for completion tests".to_string(),
+        ))?;
+    }
     let source_path = test_case.create_test(test_id, executable_path, InitType::Completion)?;
     let init_dot_lua_path = TestCase::get_init_lua_file_path(test_id)?;
 
@@ -167,9 +178,13 @@ fn test_completions_inner(
     }
     let raw_results = String::from_utf8(fs::read(&results_file_path)?)
         .map_err(|e| TestError::Utf8(e.to_string()))?;
-    let actual: Vec<CompletionInfo> = toml::from_str::<CompletionFile>(&raw_results)
-        .map_err(|e| TestError::Serialization(e.to_string()))?
-        .completions;
+    let actual: Vec<CompletionInfo> = if raw_results.is_empty() {
+        Vec::new()
+    } else {
+        toml::from_str::<CompletionFile>(&raw_results)
+            .map_err(|e| TestError::Serialization(e.to_string()))?
+            .completions
+    };
 
     if !expected.compare_results(&actual) {
         Err(CompletionMismatchError {

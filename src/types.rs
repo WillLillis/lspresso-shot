@@ -25,7 +25,7 @@ use crate::init_dot_lua::{get_init_dot_lua, InitType};
 pub struct TestCase {
     pub source_path: PathBuf,
     pub source_contents: String,
-    pub cursor_pos: CursorPosition,
+    pub cursor_pos: Option<CursorPosition>,
     pub other_files: Vec<(PathBuf, String)>,
     pub cleanup: bool,
 }
@@ -39,15 +39,21 @@ impl TestCase {
     pub fn new<P: Into<PathBuf>>(
         source_path: P,
         source_contents: &str,
-        cursor_pos: CursorPosition,
     ) -> Self {
         Self {
             source_path: source_path.into(),
             source_contents: source_contents.to_string(),
-            cursor_pos,
+            cursor_pos: None,
             other_files: Vec::new(),
             cleanup: false,
         }
+    }
+
+    /// Set the cursor position in the source file
+    #[must_use]
+    pub fn cursor_pos(mut self, cursor_pos: Option<CursorPosition>) -> Self {
+        self.cursor_pos = cursor_pos;
+        self
     }
 
     /// Change the source file used in the test case
@@ -155,8 +161,12 @@ impl TestCase {
         executable_path: &Path,
         test_type: InitType,
     ) -> TestResult<PathBuf> {
-        if self.cursor_pos.line == 0 {
-            Err(TestSetupError::InvalidCursorPosition)?;
+        if let Some(cursor_pos) = self.cursor_pos {
+            if cursor_pos.line == 0 {
+                Err(TestSetupError::InvalidCursorPosition(
+                    "Cursor line position is 1-based".to_string(),
+                ))?;
+            }
         }
         let results_file_path = Self::get_results_file_path(test_id)?;
         let init_dot_lua_path = Self::get_init_lua_file_path(test_id)?;
@@ -181,9 +191,8 @@ impl TestCase {
                 &error_path,
                 executable_path,
                 extension,
-            )
-            .replace("CURSOR_LINE", &self.cursor_pos.line.to_string())
-            .replace("CURSOR_COLUMN", &self.cursor_pos.column.to_string());
+                self.cursor_pos,
+            );
             fs::File::create(&init_dot_lua_path)?;
             fs::write(&init_dot_lua_path, &nvim_config)?;
         }
@@ -226,8 +235,8 @@ pub enum TestSetupError {
     InvalidFileExtension(String),
     #[error("Source file path \"{0}\" is invalid")]
     InvalidFilePath(String),
-    #[error("Cursor line position is 1-based")]
-    InvalidCursorPosition,
+    #[error("{0}")]
+    InvalidCursorPosition(String),
 }
 
 impl From<std::io::Error> for TestError {
@@ -797,7 +806,10 @@ impl std::fmt::Display for CompletionMismatchError {
                     writeln!(
                         f,
                         "{}",
-                        &paint(RED, "Didn't recieve all of the expected completion results:")
+                        &paint(
+                            RED,
+                            "Didn't recieve all of the expected completion results:"
+                        )
                     )?;
                     for result in remaining {
                         writeln!(f, "Completion Result:\n{result}\n",)?;

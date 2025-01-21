@@ -1,5 +1,7 @@
 use std::path::Path;
 
+use crate::types::CursorPosition;
+
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum InitType {
     Hover,
@@ -16,6 +18,7 @@ pub fn get_init_dot_lua(
     error_path: &Path,
     executable_path: &Path,
     source_extension: &str,
+    cursor_position: Option<CursorPosition>,
 ) -> String {
     let mut raw_init = format!("{ERROR_REPORT}{FILETYPE_ADD}{FILETYPE_AUTOCMD}");
     raw_init.push_str(match init_type {
@@ -23,12 +26,21 @@ pub fn get_init_dot_lua(
         InitType::Diagnostic => DIAGNOSTIC_AUTOCMD,
         InitType::Completion => COMPLETION_AUTOCMD,
     });
+    let set_cursor_position = if let Some(cursor_pos) = cursor_position {
+        format!(
+            "position = {{ line = {} - 1, character = {} }},",
+            cursor_pos.line, cursor_pos.column
+        )
+    } else {
+        String::new()
+    };
     raw_init
         .replace("RESULTS_FILE", results_path.to_str().unwrap())
         .replace("EXECUTABLE_PATH", executable_path.to_str().unwrap())
         .replace("ROOT_PATH", root_path.to_str().unwrap())
         .replace("ERROR_PATH", error_path.to_str().unwrap())
         .replace("FILE_EXTENSION", source_extension)
+        .replace("SET_CURSOR_POSITION", &set_cursor_position)
 }
 
 /// Helper to write any errors that occurred to `ERROR_PATH`
@@ -75,11 +87,9 @@ vim.api.nvim_create_autocmd('FileType', {
 const HOVER_AUTCMD: &str = r#"
 vim.api.nvim_create_autocmd('LspAttach', {
     callback = function(_)
-        local pos = { CURSOR_LINE, CURSOR_COLUMN }
-        vim.api.nvim_win_set_cursor(0, pos)
         local hover_result = vim.lsp.buf_request_sync(0, 'textDocument/hover', {
             textDocument = vim.lsp.util.make_text_document_params(0),
-            position = { line = pos[1] - 1, character = pos[2] },
+            SET_CURSOR_POSITION
         }, 1000)
         -- Write the results in a TOML format for easy deserialization
         local file = io.open('RESULTS_FILE', 'w')
@@ -133,8 +143,10 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
 const COMPLETION_AUTOCMD: &str = r#"
 vim.api.nvim_create_autocmd('LspAttach', {
     callback = function(_)
-        local params = vim.lsp.util.make_position_params()
-        local completion_results = vim.lsp.buf_request_sync(0, "textDocument/completion", params, 1000)
+        local completion_results = vim.lsp.buf_request_sync(0, "textDocument/completion", {
+            textDocument = vim.lsp.util.make_text_document_params(0),
+            SET_CURSOR_POSITION
+        }, 1000)
         local file = io.open('RESULTS_FILE', "w")
         if completion_results and file then
             for _, result in pairs(completion_results) do
