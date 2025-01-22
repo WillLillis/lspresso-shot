@@ -2,10 +2,10 @@
 use std::path::PathBuf;
 
 use lspresso_shot::{
-    lspresso_shot, test_completions, test_diagnostics, test_hover,
+    lspresso_shot, test_completions, test_definition, test_diagnostics, test_hover,
     types::{
-        CompletionResult, CursorPosition, DiagnosticInfo, DiagnosticResult, DiagnosticSeverity,
-        HoverResult, TestCase,
+        CompletionResult, CursorPosition, DefinitionResult, DiagnosticInfo, DiagnosticResult,
+        DiagnosticSeverity, HoverResult, TestCase,
     },
 };
 
@@ -60,11 +60,24 @@ Width: 64 bits
         },
         &lsp_path
     ));
+
     let completion_test_case = TestCase::new("gas.s", include_str!("../../asm-lsp/samples/gas.s"))
         .cursor_pos(Some(CursorPosition::new(1, 4)));
     lspresso_shot!(test_completions(
         &completion_test_case,
         &CompletionResult::MoreThan(1),
+        &lsp_path
+    ));
+
+    let definition_test_case = TestCase::new("gas.s", include_str!("../../asm-lsp/samples/gas.s"))
+        .cursor_pos(Some(CursorPosition::new(15, 8)));
+    lspresso_shot!(test_definition(
+        &definition_test_case,
+        &DefinitionResult {
+            start_pos: CursorPosition::new(16, 0),
+            end_pos: Some(CursorPosition::new(16, 5)),
+            path: PathBuf::from("src/gas.s"),
+        },
         &lsp_path
     ));
 }

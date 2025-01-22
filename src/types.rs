@@ -9,6 +9,9 @@ use thiserror::Error;
 
 use crate::init_dot_lua::{get_init_dot_lua, InitType};
 
+// TODO: Don't special case printing of strings if they're a single/multiline
+// Just stick them on the line below the field name
+
 // Common Types
 
 /// Describes a test case to be passed to be used in an lspresso-shot test.
@@ -36,10 +39,7 @@ pub struct TestCase {
 // error if converting a path would exceed it. What should this upper bound be?
 
 impl TestCase {
-    pub fn new<P: Into<PathBuf>>(
-        source_path: P,
-        source_contents: &str,
-    ) -> Self {
+    pub fn new<P: Into<PathBuf>>(source_path: P, source_contents: &str) -> Self {
         Self {
             source_path: source_path.into(),
             source_contents: source_contents.to_string(),
@@ -51,7 +51,7 @@ impl TestCase {
 
     /// Set the cursor position in the source file
     #[must_use]
-    pub fn cursor_pos(mut self, cursor_pos: Option<CursorPosition>) -> Self {
+    pub const fn cursor_pos(mut self, cursor_pos: Option<CursorPosition>) -> Self {
         self.cursor_pos = cursor_pos;
         self
     }
@@ -214,7 +214,7 @@ impl TestCase {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub struct CursorPosition {
     pub line: usize,
     pub column: usize,
@@ -264,6 +264,8 @@ pub enum TestError {
     #[error(transparent)]
     CompletionMismatch(#[from] CompletionMismatchError),
     #[error(transparent)]
+    DefinitionMismatch(#[from] Box<DefinitionMismatchError>), // NOTE: `Box`ed because large
+    #[error(transparent)]
     Setup(#[from] TestSetupError),
     #[error("{0}")]
     Neovim(String),
@@ -284,6 +286,7 @@ pub struct HoverMismatchError {
 const GREEN: Option<Color> = Some(anstyle::Color::Ansi(AnsiColor::Green));
 const RED: Option<Color> = Some(anstyle::Color::Ansi(AnsiColor::Red));
 
+// TODO: Just make this write directly?
 fn render_field_comparison<T: Eq + std::fmt::Display>(
     field_name: &str,
     expected: Option<&T>,
@@ -368,6 +371,7 @@ pub struct DiagnosticMismatchError {
     pub actual: DiagnosticResult,
 }
 
+// TODO: Do something clever with closures/macros to reduce duplicate code
 impl std::fmt::Display for DiagnosticMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         for (i, (expected, actual)) in self
@@ -893,6 +897,99 @@ impl std::fmt::Display for CompletionMismatchError {
                 }
             }
         }
+        Ok(())
+    }
+}
+
+// Definition Types
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub struct DefinitionResult {
+    pub start_pos: CursorPosition,
+    pub end_pos: Option<CursorPosition>,
+    // this is actually returned as a uri ("file:/./..."), but the uri crate's
+    // type doesn't support serde. As such, we'll just grab the path
+    pub path: PathBuf,
+}
+
+impl std::fmt::Display for DefinitionResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "start_line: '{}'", self.start_pos.line)?;
+        writeln!(f, "start_column: '{}'", self.start_pos.column)?;
+        if let Some(end) = self.end_pos {
+            writeln!(f, "end_line: '{}'", end.line)?;
+            writeln!(f, "end_column: '{}'", end.column)?;
+        } else {
+            writeln!(f, "end_line: 'nil'")?;
+            writeln!(f, "end_column: 'nil'")?;
+        }
+        writeln!(f, "path: '{}'", self.path.display())?;
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct DefinitionMismatchError {
+    pub expected: DefinitionResult,
+    pub actual: DefinitionResult,
+}
+
+impl std::fmt::Display for DefinitionMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{}",
+            render_field_comparison(
+                "start_line",
+                Some(&self.expected.start_pos.line),
+                Some(&self.actual.start_pos.line),
+            )?
+        )?;
+        writeln!(
+            f,
+            "{}",
+            render_field_comparison(
+                "start_column",
+                Some(&self.expected.start_pos.column),
+                Some(&self.actual.start_pos.column),
+            )?
+        )?;
+        let (expected_end_line, expected_end_column) = self
+            .expected
+            .end_pos
+            .map_or((None, None), |p| (Some(p.line), Some(p.column)));
+        let (actual_end_line, actual_end_column) = self
+            .actual
+            .end_pos
+            .map_or((None, None), |p| (Some(p.line), Some(p.column)));
+        writeln!(
+            f,
+            "{}",
+            render_field_comparison(
+                "end_line",
+                expected_end_line.as_ref(),
+                actual_end_line.as_ref(),
+            )?
+        )?;
+        writeln!(
+            f,
+            "{}",
+            render_field_comparison(
+                "end_column",
+                expected_end_column.as_ref(),
+                actual_end_column.as_ref(),
+            )?
+        )?;
+        writeln!(
+            f,
+            "{}",
+            render_field_comparison(
+                "path",
+                Some(&self.expected.path.to_string_lossy()),
+                Some(&self.actual.path.to_string_lossy()),
+            )?
+        )?;
+
         Ok(())
     }
 }

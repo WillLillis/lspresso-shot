@@ -1,12 +1,13 @@
 use std::path::Path;
 
-use crate::types::CursorPosition;
+use crate::types::{CursorPosition, TestCase};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum InitType {
     Hover,
     Diagnostic,
     Completion,
+    Definition,
 }
 
 /// Construct the contents of an init.lua file to test an lsp request corresponding
@@ -25,6 +26,7 @@ pub fn get_init_dot_lua(
         InitType::Hover => HOVER_AUTCMD,
         InitType::Diagnostic => DIAGNOSTIC_AUTOCMD,
         InitType::Completion => COMPLETION_AUTOCMD,
+        InitType::Definition => DEFINITION_AUTOCMD,
     });
     let set_cursor_position = if let Some(cursor_pos) = cursor_position {
         format!(
@@ -41,6 +43,13 @@ pub fn get_init_dot_lua(
         .replace("ERROR_PATH", error_path.to_str().unwrap())
         .replace("FILE_EXTENSION", source_extension)
         .replace("SET_CURSOR_POSITION", &set_cursor_position)
+        .replace(
+            "PARENT_PATH",
+            TestCase::get_lspresso_dir(root_path.to_str().unwrap())
+                .unwrap()
+                .to_str()
+                .unwrap(),
+        )
 }
 
 /// Helper to write any errors that occurred to `ERROR_PATH`
@@ -97,7 +106,7 @@ vim.api.nvim_create_autocmd('LspAttach', {
             file:write('kind = "' .. tostring(hover_result[1].result.contents.kind .. '"\n'))
             file:write('value = """\n' .. tostring(hover_result[1].result.contents.value .. '\n"""'))
             file:close()
-        else 
+        else
             report_error('No hover result returned')
         end
         vim.cmd('qa!')
@@ -166,6 +175,37 @@ vim.api.nvim_create_autocmd('LspAttach', {
             file:close()
         else
             report_error('No completion result returned')
+        end
+        vim.cmd('qa!')
+    end,
+})
+"#;
+
+/// Invoke a 'textDocument/publishDiagnostics' request when the LSP starts, gather the results
+/// and write them to a file in TOML format
+const DEFINITION_AUTOCMD: &str = r#"
+vim.api.nvim_create_autocmd('LspAttach', {
+    callback = function(_)
+        local definition_results = vim.lsp.buf_request_sync(0, "textDocument/definition", {
+            textDocument = vim.lsp.util.make_text_document_params(0),
+            SET_CURSOR_POSITION
+        }, 1000)
+        local file = io.open('RESULTS_FILE', "w")
+        if definition_results and #definition_results == 1 and file then
+            local range = definition_results[1].result.range
+            local path = string.gsub(definition_results[1].result.uri, 'file://', '')
+            -- +1 bc lua, +2 because trailing slash isn't present in `PARENT_PATH`
+            local relative_path = string.sub(path, string.len('PARENT_PATH') + 2, string.len(path))
+            file:write('path = "' .. relative_path .. '"\n\n')
+            file:write('start_line = ' .. tostring(range.start.line) .. '\n')
+            file:write('start_column = ' .. tostring(range.start.character) .. '\n')
+            if range['end'] then
+                file:write('end_line = ' .. tostring(range['end'].line) .. '\n')
+                file:write('end_column = ' .. tostring(range['end'].character) .. '\n')
+            end
+            file:close()
+        else
+            report_error('No definition result returned')
         end
         vim.cmd('qa!')
     end,

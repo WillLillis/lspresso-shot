@@ -6,14 +6,14 @@ use rand::random;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    path::Path,
+    path::{Path, PathBuf},
     process::{Command, Stdio},
 };
 
 use types::{
-    CompletionInfo, CompletionMismatchError, CompletionResult, DiagnosticMismatchError,
-    DiagnosticResult, HoverMismatchError, HoverResult, TestCase, TestError, TestResult,
-    TestSetupError,
+    CompletionInfo, CompletionMismatchError, CompletionResult, CursorPosition,
+    DefinitionMismatchError, DefinitionResult, DiagnosticMismatchError, DiagnosticResult,
+    HoverMismatchError, HoverResult, TestCase, TestError, TestResult, TestSetupError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -28,6 +28,8 @@ macro_rules! lspresso_shot {
         }
     };
 }
+
+// TODO: Move some more common functionality into `run_test`
 
 /// Tests the server's response to a 'textDocument/hover' request
 pub fn test_hover(
@@ -191,6 +193,77 @@ fn test_completions_inner(
             expected: expected.clone(),
             actual,
         })?;
+    }
+    Ok(())
+}
+
+/// Tests the server's response to a 'textDocument/definition' request
+pub fn test_definition(
+    test_case: &TestCase,
+    expected_results: &DefinitionResult,
+    executable_path: &Path,
+) -> TestResult<()> {
+    test_case.validate()?;
+    let test_id = random::<usize>().to_string();
+    let test_result = test_definition_inner(test_case, expected_results, executable_path, &test_id);
+    let test_dir = TestCase::get_lspresso_dir(&test_id)?;
+    if test_case.cleanup && test_dir.exists() {
+        fs::remove_dir_all(test_dir)?;
+    }
+
+    test_result
+}
+
+fn test_definition_inner(
+    test_case: &TestCase,
+    expected: &DefinitionResult,
+    executable_path: &Path,
+    test_id: &str,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(
+            "Cursor position must be specified for definition tests".to_string(),
+        ))?;
+    }
+    let source_path = test_case.create_test(test_id, executable_path, InitType::Definition)?;
+    let init_dot_lua_path = TestCase::get_init_lua_file_path(test_id)?;
+
+    run_test(&init_dot_lua_path, &source_path)?;
+
+    let error_path = TestCase::get_error_file_path(test_id)?;
+    if error_path.exists() {
+        let error = fs::read_to_string(&error_path)?;
+        Err(TestError::Neovim(error))?;
+    }
+    let results_file_path = TestCase::get_results_file_path(test_id)?;
+    // little anon struct to make parsing the results more straightforward
+    #[derive(Debug, Clone, Serialize, Deserialize)]
+    struct DefinitionFile {
+        pub start_line: usize,
+        pub start_column: usize,
+        pub end_line: Option<usize>,
+        pub end_column: Option<usize>,
+        pub path: PathBuf,
+    }
+    let raw_results = String::from_utf8(fs::read(&results_file_path)?)
+        .map_err(|e| TestError::Utf8(e.to_string()))?;
+    let actual_raw: DefinitionFile = toml::from_str::<DefinitionFile>(&raw_results)
+        .map_err(|e| TestError::Serialization(e.to_string()))?;
+    let actual = DefinitionResult {
+        start_pos: CursorPosition::new(actual_raw.start_line, actual_raw.start_column),
+        end_pos: if let (Some(line), Some(col)) = (actual_raw.end_line, actual_raw.end_column) {
+            Some(CursorPosition::new(line, col))
+        } else {
+            None
+        },
+        path: actual_raw.path,
+    };
+
+    if *expected != actual {
+        Err(Box::new(DefinitionMismatchError {
+            expected: expected.clone(),
+            actual,
+        }))?;
     }
     Ok(())
 }
