@@ -57,6 +57,7 @@ local function report_error(msg)
     local error_file = io.open('ERROR_PATH', 'a')
     if error_file then
         error_file:write(msg)
+        error_file:flush()
         error_file:close()
     end
 end
@@ -104,6 +105,7 @@ vim.api.nvim_create_autocmd('LspAttach', {
         if hover_result and file then
             file:write('kind = "' .. tostring(hover_result[1].result.contents.kind .. '"\n'))
             file:write('value = """\n' .. tostring(hover_result[1].result.contents.value .. '\n"""'))
+            file:flush()
             file:close()
         else
             report_error('No hover result returned')
@@ -137,6 +139,7 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
                 end
                 file:write('\n')
             end
+            file:flush()
             file:close()
         else
             report_error('No diagnostic result returned')
@@ -174,6 +177,7 @@ vim.api.nvim_create_autocmd('LspAttach', {
             end
             local completions = table.concat(t, '\n')
             file:write(completions)
+            file:flush()
             file:close()
         else
             report_error('No completion result returned')
@@ -205,6 +209,7 @@ vim.api.nvim_create_autocmd('LspAttach', {
                 file:write('end_line = ' .. tostring(range['end'].line) .. '\n')
                 file:write('end_column = ' .. tostring(range['end'].character) .. '\n')
             end
+            file:flush()
             file:close()
         else
             report_error('No definition result returned')

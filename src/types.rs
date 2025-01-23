@@ -1,7 +1,8 @@
 use std::collections::HashSet;
+use std::env::temp_dir;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::{env::temp_dir, fmt::Write};
+use std::time::Duration;
 
 use anstyle::{AnsiColor, Color, Style};
 use serde::{Deserialize, Serialize};
@@ -9,16 +10,13 @@ use thiserror::Error;
 
 use crate::init_dot_lua::{get_init_dot_lua, TestType};
 
-// TODO: Don't special case printing of strings if they're a single/multiline
-// Just stick them on the line below the field name
-
 // Common Types
 
-/// Describes a test case to be passed to be used in an lspresso-shot test.
+/// Describes a test case to be used in an lspresso-shot test.
 ///
 /// - `test_id`: internal identifier for a single run of a test case, *not* to be
-///    set by the user
-/// - `executable_path`: path to the language server's executable
+///    set by the user.
+/// - `executable_path`: path to the language server's executable.
 /// - `source_path`: gives the test project-relative path for the file to be opened
 ///    in Neovim.
 /// - `source_contents`: the contents of the source file to be opened by Neovim.
@@ -26,6 +24,7 @@ use crate::init_dot_lua::{get_init_dot_lua, TestType};
 ///    lsp request being tested is executed.
 /// - `other_files`: other files to be placed in the mock directory (e.g. other source
 ///    files, server configuration, etc.).
+/// - `timeout`: timeout for the test's run in Neovim. The default is 1000ms.
 /// - `cleanup`: whether to delete the temporary directory on test completion.
 #[derive(Debug, Clone)]
 pub struct TestCase {
@@ -35,6 +34,7 @@ pub struct TestCase {
     pub source_contents: String,
     pub cursor_pos: Option<CursorPosition>,
     pub other_files: Vec<(PathBuf, String)>,
+    pub timeout: Duration,
     pub cleanup: bool,
 }
 // TODO: Add some sort of `from_path` method for `TestCase`. Allows a user to point
@@ -56,6 +56,7 @@ impl TestCase {
             source_contents: source_contents.to_string(),
             cursor_pos: None,
             other_files: Vec::new(),
+            timeout: Duration::from_millis(2000),
             cleanup: false,
         }
     }
@@ -93,6 +94,13 @@ impl TestCase {
     #[must_use]
     pub const fn cleanup(mut self, cleanup: bool) -> Self {
         self.cleanup = cleanup;
+        self
+    }
+
+    /// Change whether the temporary directory is cleaned up on test completion
+    #[must_use]
+    pub fn timeout<T: Into<Duration>>(mut self, timeout: T) -> Self {
+        self.timeout = timeout.into();
         self
     }
 
@@ -173,10 +181,7 @@ impl TestCase {
     }
 
     /// Creates a test directory for `test_id` based on `self`
-    pub fn create_test(
-        &self,
-        test_type: TestType,
-    ) -> TestResult<PathBuf> {
+    pub fn create_test(&self, test_type: TestType) -> TestResult<PathBuf> {
         if let Some(cursor_pos) = self.cursor_pos {
             if cursor_pos.line == 0 {
                 Err(TestSetupError::InvalidCursorPosition(
@@ -252,6 +257,8 @@ pub enum TestSetupError {
     InvalidFilePath(String),
     #[error("{0}")]
     InvalidCursorPosition(String),
+    #[error("Test timout exceeded")]
+    TimeoutExceeded,
 }
 
 impl From<std::io::Error> for TestError {
@@ -301,79 +308,58 @@ pub struct HoverMismatchError {
 const GREEN: Option<Color> = Some(anstyle::Color::Ansi(AnsiColor::Green));
 const RED: Option<Color> = Some(anstyle::Color::Ansi(AnsiColor::Red));
 
-// TODO: Just make this write directly?
-fn render_field_comparison<T: Eq + std::fmt::Display>(
+fn write_field_comparison<T: Eq + std::fmt::Display>(
+    f: &mut std::fmt::Formatter<'_>,
     field_name: &str,
     expected: Option<&T>,
     actual: Option<&T>,
-) -> Result<String, std::fmt::Error> {
-    let mut out = String::new();
+) -> std::fmt::Result {
     match (expected, actual) {
-        (None, None) => writeln!(&mut out, "{field_name}: nil")?,
+        (None, None) => writeln!(f, "{field_name}: nil")?,
         (Some(expected), Some(actual)) => {
             let rendered_expected = expected.to_string();
             let rendered_actual = actual.to_string();
             let separate_lines =
                 rendered_expected.lines().count() > 1 || rendered_actual.lines().count() > 1;
             if expected != actual {
-                writeln!(&mut out, "{}:", paint(RED, field_name))?;
+                writeln!(f, "{}:", paint(RED, field_name))?;
                 if separate_lines {
-                    writeln!(
-                        &mut out,
-                        "    Expected:\n'{expected}'\n    Got:\n'{actual}'",
-                    )?;
+                    writeln!(f, "    Expected:\n'{expected}'\n    Got:\n'{actual}'",)?;
                 } else {
-                    writeln!(
-                        &mut out,
-                        "    Expected: '{expected}'\n    Got:      '{actual}'",
-                    )?;
+                    writeln!(f, "    Expected: '{expected}'\n    Got:      '{actual}'",)?;
                 }
             } else {
-                let rendered_field = expected.to_string();
-                let separator = if rendered_field.lines().count() > 1
-                    || matches!(rendered_field.chars().last(), Some('\n'))
-                {
-                    "\n"
-                } else {
-                    " "
-                };
-                writeln!(
-                    &mut out,
-                    "{}:{separator}'{}'",
-                    paint(GREEN, field_name),
-                    expected
-                )?;
+                let separator = if separate_lines { "\n" } else { " " };
+                writeln!(f, "{}:{separator}'{}'", paint(GREEN, field_name), expected)?;
             }
         }
         (Some(expected), None) => {
-            writeln!(&mut out, "{}:", paint(RED, field_name))?;
-            writeln!(&mut out, "    Expected: '{expected}'\n    Got:      nil",)?;
+            writeln!(f, "{}:", paint(RED, field_name))?;
+            writeln!(f, "    Expected: '{expected}'\n    Got:      nil",)?;
         }
         (None, Some(actual)) => {
-            writeln!(&mut out, "{}:", paint(RED, field_name))?;
-            writeln!(&mut out, "    Expected: nil\n    Got:      '{actual}'",)?;
+            writeln!(f, "{}:", paint(RED, field_name))?;
+            writeln!(f, "    Expected: nil\n    Got:      '{actual}'",)?;
         }
     }
 
-    Ok(out)
+    Ok(())
 }
 
 impl std::fmt::Display for HoverMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
+        write_field_comparison(
             f,
-            "{}",
-            render_field_comparison("kind", Some(&self.expected.kind), Some(&self.actual.kind))?
+            "kind",
+            Some(&self.expected.kind),
+            Some(&self.actual.kind),
         )?;
 
-        write!(
+        write_field_comparison(
             f,
-            "{}",
-            render_field_comparison(
-                "value",
-                Some(&self.expected.value),
-                Some(&self.actual.value)
-            )?
+            "value",
+            Some(&self.expected.value),
+            Some(&self.actual.value),
         )?;
 
         Ok(())
@@ -397,55 +383,36 @@ impl std::fmt::Display for DiagnosticMismatchError {
             .enumerate()
         {
             writeln!(f, "Diagnostic {i}:")?;
-            write!(
+            write_field_comparison(
                 f,
-                "{}",
-                render_field_comparison(
-                    "start_line",
-                    Some(&expected.start_line),
-                    Some(&actual.start_line)
-                )?
+                "start_line",
+                Some(&expected.start_line),
+                Some(&actual.start_line),
             )?;
-            write!(
+            write_field_comparison(
                 f,
-                "{}",
-                render_field_comparison(
-                    "start_character",
-                    Some(&expected.start_character),
-                    Some(&actual.start_character)
-                )?
+                "start_character",
+                Some(&expected.start_character),
+                Some(&actual.start_character),
             )?;
-            write!(
+            write_field_comparison(
                 f,
-                "{}",
-                render_field_comparison(
-                    "end_line",
-                    expected.end_line.as_ref(),
-                    actual.end_line.as_ref()
-                )?
+                "end_line",
+                expected.end_line.as_ref(),
+                actual.end_line.as_ref(),
             )?;
-            write!(
+            write_field_comparison(
                 f,
-                "{}",
-                render_field_comparison(
-                    "end_character",
-                    expected.end_character.as_ref(),
-                    actual.end_character.as_ref()
-                )?
+                "end_character",
+                expected.end_character.as_ref(),
+                actual.end_character.as_ref(),
             )?;
-            write!(
+            write_field_comparison(f, "message", Some(&expected.message), Some(&actual.message))?;
+            write_field_comparison(
                 f,
-                "{}",
-                render_field_comparison("message", Some(&expected.message), Some(&actual.message))?
-            )?;
-            write!(
-                f,
-                "{}",
-                render_field_comparison(
-                    "severity",
-                    expected.severity.as_ref(),
-                    actual.severity.as_ref()
-                )?
+                "severity",
+                expected.severity.as_ref(),
+                actual.severity.as_ref(),
             )?;
             write!(f, "\n\n")?;
         }
@@ -845,29 +812,14 @@ impl std::fmt::Display for CompletionMismatchError {
                                    expected: &CompletionInfo,
                                    actual: &CompletionInfo|
                  -> std::fmt::Result {
-                    write!(
+                    write_field_comparison(f, "label", Some(&expected.label), Some(&actual.label))?;
+                    write_field_comparison(
                         f,
-                        "{}",
-                        render_field_comparison(
-                            "label",
-                            Some(&expected.label),
-                            Some(&actual.label)
-                        )?
+                        "documentation",
+                        Some(&expected.documentation),
+                        Some(&actual.documentation),
                     )?;
-                    write!(
-                        f,
-                        "{}",
-                        render_field_comparison(
-                            "documentation",
-                            Some(&expected.documentation),
-                            Some(&actual.documentation)
-                        )?
-                    )?;
-                    write!(
-                        f,
-                        "{}",
-                        render_field_comparison("kind", Some(&expected.kind), Some(&actual.kind))?
-                    )?;
+                    write_field_comparison(f, "kind", Some(&expected.kind), Some(&actual.kind))?;
 
                     Ok(())
                 };
@@ -951,23 +903,17 @@ pub struct DefinitionMismatchError {
 
 impl std::fmt::Display for DefinitionMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
+        write_field_comparison(
             f,
-            "{}",
-            render_field_comparison(
-                "start_line",
-                Some(&self.expected.start_pos.line),
-                Some(&self.actual.start_pos.line),
-            )?
+            "start_line",
+            Some(&self.expected.start_pos.line),
+            Some(&self.actual.start_pos.line),
         )?;
-        writeln!(
+        write_field_comparison(
             f,
-            "{}",
-            render_field_comparison(
-                "start_column",
-                Some(&self.expected.start_pos.column),
-                Some(&self.actual.start_pos.column),
-            )?
+            "start_column",
+            Some(&self.expected.start_pos.column),
+            Some(&self.actual.start_pos.column),
         )?;
         let (expected_end_line, expected_end_column) = self
             .expected
@@ -977,32 +923,23 @@ impl std::fmt::Display for DefinitionMismatchError {
             .actual
             .end_pos
             .map_or((None, None), |p| (Some(p.line), Some(p.column)));
-        writeln!(
+        write_field_comparison(
             f,
-            "{}",
-            render_field_comparison(
-                "end_line",
-                expected_end_line.as_ref(),
-                actual_end_line.as_ref(),
-            )?
+            "end_line",
+            expected_end_line.as_ref(),
+            actual_end_line.as_ref(),
         )?;
-        writeln!(
+        write_field_comparison(
             f,
-            "{}",
-            render_field_comparison(
-                "end_column",
-                expected_end_column.as_ref(),
-                actual_end_column.as_ref(),
-            )?
+            "end_column",
+            expected_end_column.as_ref(),
+            actual_end_column.as_ref(),
         )?;
-        writeln!(
+        write_field_comparison(
             f,
-            "{}",
-            render_field_comparison(
-                "path",
-                Some(&self.expected.path.to_string_lossy()),
-                Some(&self.actual.path.to_string_lossy()),
-            )?
+            "path",
+            Some(&self.expected.path.to_string_lossy()),
+            Some(&self.actual.path.to_string_lossy()),
         )?;
 
         Ok(())

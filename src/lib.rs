@@ -232,7 +232,8 @@ fn run_test(test_case: &TestCase, test_type: TestType) -> TestResult<()> {
     let source_path = test_case.create_test(test_type)?;
     let init_dot_lua_path = test_case.get_init_lua_file_path()?;
 
-    Command::new("nvim")
+    let start = std::time::Instant::now();
+    let mut child = Command::new("nvim")
         .arg("-u")
         .arg(init_dot_lua_path)
         .arg("--noplugin")
@@ -242,9 +243,14 @@ fn run_test(test_case: &TestCase, test_type: TestType) -> TestResult<()> {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .map_err(|e| TestError::Neovim(e.to_string()))?
-        .wait()
         .map_err(|e| TestError::Neovim(e.to_string()))?;
+    while start.elapsed() < test_case.timeout {
+        match child.try_wait() {
+            Ok(Some(_)) => return Ok(()),
+            Ok(None) => {} // still running
+            Err(e) => Err(TestError::Neovim(e.to_string()))?,
+        }
+    }
 
-    Ok(())
+    Err(TestSetupError::TimeoutExceeded)?
 }
