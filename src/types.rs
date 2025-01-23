@@ -7,7 +7,7 @@ use anstyle::{AnsiColor, Color, Style};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::init_dot_lua::{get_init_dot_lua, InitType};
+use crate::init_dot_lua::{get_init_dot_lua, TestType};
 
 // TODO: Don't special case printing of strings if they're a single/multiline
 // Just stick them on the line below the field name
@@ -16,7 +16,10 @@ use crate::init_dot_lua::{get_init_dot_lua, InitType};
 
 /// Describes a test case to be passed to be used in an lspresso-shot test.
 ///
-/// - `source_path`: gives the test proejct-relative path for the file to be opened
+/// - `test_id`: internal identifier for a single run of a test case, *not* to be
+///    set by the user
+/// - `executable_path`: path to the language server's executable
+/// - `source_path`: gives the test project-relative path for the file to be opened
 ///    in Neovim.
 /// - `source_contents`: the contents of the source file to be opened by Neovim.
 /// - `cursor_pos`: the position of the cursor within `source_contents` when the
@@ -26,6 +29,8 @@ use crate::init_dot_lua::{get_init_dot_lua, InitType};
 /// - `cleanup`: whether to delete the temporary directory on test completion.
 #[derive(Debug, Clone)]
 pub struct TestCase {
+    pub test_id: String,
+    pub executable_path: PathBuf,
     pub source_path: PathBuf,
     pub source_contents: String,
     pub cursor_pos: Option<CursorPosition>,
@@ -39,8 +44,14 @@ pub struct TestCase {
 // error if converting a path would exceed it. What should this upper bound be?
 
 impl TestCase {
-    pub fn new<P: Into<PathBuf>>(source_path: P, source_contents: &str) -> Self {
+    pub fn new<P1: Into<PathBuf>, P2: Into<PathBuf>>(
+        source_path: P1,
+        executable_path: P2,
+        source_contents: &str,
+    ) -> Self {
         Self {
+            test_id: String::new(),
+            executable_path: executable_path.into(),
             source_path: source_path.into(),
             source_contents: source_contents.to_string(),
             cursor_pos: None,
@@ -53,6 +64,13 @@ impl TestCase {
     #[must_use]
     pub const fn cursor_pos(mut self, cursor_pos: Option<CursorPosition>) -> Self {
         self.cursor_pos = cursor_pos;
+        self
+    }
+
+    /// Change the executable path used in the test case
+    #[must_use]
+    pub fn exeutable_path<P: Into<PathBuf>>(mut self, path: P) -> Self {
+        self.executable_path = path.into();
         self
     }
 
@@ -100,20 +118,20 @@ impl TestCase {
     /// creating parent directories along the way
     ///
     /// /tmp/lspresso-shot/`test_id`/
-    pub fn get_lspresso_dir(test_id: &str) -> std::io::Result<PathBuf> {
+    pub fn get_lspresso_dir(&self) -> std::io::Result<PathBuf> {
         let mut tmp_dir = temp_dir();
         tmp_dir.push("lspresso-shot");
-        tmp_dir.push(test_id);
+        tmp_dir.push(&self.test_id);
         fs::create_dir_all(&tmp_dir)?;
         Ok(tmp_dir)
     }
 
-    /// Returns the path to the result file for test `test_id`,
+    /// Returns the path to the result file for test `self.test_id`,
     /// creating parent directories along the way
     ///
     /// /tmp/lspresso-shot/`test_id`/results.toml
-    pub fn get_results_file_path(test_id: &str) -> std::io::Result<PathBuf> {
-        let mut lspresso_dir = Self::get_lspresso_dir(test_id)?;
+    pub fn get_results_file_path(&self) -> std::io::Result<PathBuf> {
+        let mut lspresso_dir = self.get_lspresso_dir()?;
         fs::create_dir_all(&lspresso_dir)?;
         lspresso_dir.push("results.toml");
         Ok(lspresso_dir)
@@ -123,8 +141,8 @@ impl TestCase {
     /// creating parent directories along the way
     ///
     /// /tmp/lspresso-shot/`test_id`/src/`file_path`
-    pub fn get_source_file_path(test_id: &str, file_path: &Path) -> std::io::Result<PathBuf> {
-        let mut lspresso_dir = Self::get_lspresso_dir(test_id)?;
+    pub fn get_source_file_path(&self, file_path: &Path) -> std::io::Result<PathBuf> {
+        let mut lspresso_dir = self.get_lspresso_dir()?;
         lspresso_dir.push("src");
         fs::create_dir_all(&lspresso_dir)?;
         lspresso_dir.push(file_path);
@@ -135,8 +153,8 @@ impl TestCase {
     /// creating parent directories along the way
     ///
     /// /tmp/lspresso-shot/`test_id`/init.lua
-    pub fn get_init_lua_file_path(test_id: &str) -> std::io::Result<PathBuf> {
-        let mut lspresso_dir = Self::get_lspresso_dir(test_id)?;
+    pub fn get_init_lua_file_path(&self) -> std::io::Result<PathBuf> {
+        let mut lspresso_dir = self.get_lspresso_dir()?;
         fs::create_dir_all(&lspresso_dir)?;
         lspresso_dir.push("init.lua");
         Ok(lspresso_dir)
@@ -147,8 +165,8 @@ impl TestCase {
     /// encounted by the config's lua code will be recorded here
     ///
     /// /tmp/lspresso-shot/`test_id`/init.lua
-    pub fn get_error_file_path(test_id: &str) -> std::io::Result<PathBuf> {
-        let mut lspresso_dir = Self::get_lspresso_dir(test_id)?;
+    pub fn get_error_file_path(&self) -> std::io::Result<PathBuf> {
+        let mut lspresso_dir = self.get_lspresso_dir()?;
         fs::create_dir_all(&lspresso_dir)?;
         lspresso_dir.push("error.txt");
         Ok(lspresso_dir)
@@ -157,9 +175,7 @@ impl TestCase {
     /// Creates a test directory for `test_id` based on `self`
     pub fn create_test(
         &self,
-        test_id: &str,
-        executable_path: &Path,
-        test_type: InitType,
+        test_type: TestType,
     ) -> TestResult<PathBuf> {
         if let Some(cursor_pos) = self.cursor_pos {
             if cursor_pos.line == 0 {
@@ -168,10 +184,10 @@ impl TestCase {
                 ))?;
             }
         }
-        let results_file_path = Self::get_results_file_path(test_id)?;
-        let init_dot_lua_path = Self::get_init_lua_file_path(test_id)?;
-        let root_path = Self::get_lspresso_dir(test_id)?;
-        let error_path = Self::get_error_file_path(test_id)?;
+        let results_file_path = self.get_results_file_path()?;
+        let init_dot_lua_path = self.get_init_lua_file_path()?;
+        let root_path = self.get_lspresso_dir()?;
+        let error_path = self.get_error_file_path()?;
         let extension = self
             .source_path
             .extension()
@@ -185,26 +201,25 @@ impl TestCase {
 
         {
             let nvim_config = get_init_dot_lua(
+                self,
                 test_type,
                 &root_path,
                 &results_file_path,
                 &error_path,
-                executable_path,
                 extension,
-                self.cursor_pos,
             );
             fs::File::create(&init_dot_lua_path)?;
             fs::write(&init_dot_lua_path, &nvim_config)?;
         }
 
-        let source_path = Self::get_source_file_path(test_id, &self.source_path)?;
+        let source_path = self.get_source_file_path(&self.source_path)?;
         // Source file paths should always have a parent directory
         fs::create_dir_all(source_path.parent().unwrap())?;
         fs::File::create(&source_path)?;
         fs::write(&source_path, &self.source_contents)?;
 
         for (path, contents) in &self.other_files {
-            let source_file_path = Self::get_source_file_path(test_id, path)?;
+            let source_file_path = self.get_source_file_path(path)?;
             // Source file paths should always have a parent directory
             fs::create_dir_all(source_file_path.parent().unwrap())?;
             fs::File::create(&source_file_path)?;

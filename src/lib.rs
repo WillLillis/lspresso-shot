@@ -1,12 +1,12 @@
 mod init_dot_lua;
 pub mod types;
 
-use init_dot_lua::InitType;
+use init_dot_lua::TestType;
 use rand::random;
 use serde::{Deserialize, Serialize};
 use std::{
     fs,
-    path::{Path, PathBuf},
+    path::PathBuf,
     process::{Command, Stdio},
 };
 
@@ -29,18 +29,12 @@ macro_rules! lspresso_shot {
     };
 }
 
-// TODO: Move some more common functionality into `run_test`
-
 /// Tests the server's response to a 'textDocument/hover' request
-pub fn test_hover(
-    test_case: &TestCase,
-    expected_results: HoverResult,
-    executable_path: &Path,
-) -> TestResult<()> {
+pub fn test_hover(mut test_case: TestCase, expected_results: HoverResult) -> TestResult<()> {
     test_case.validate()?;
-    let test_id = random::<usize>().to_string();
-    let test_result = test_hover_inner(test_case, expected_results, executable_path, &test_id);
-    let test_dir = TestCase::get_lspresso_dir(&test_id)?;
+    test_case.test_id = random::<usize>().to_string();
+    let test_result = test_hover_inner(&test_case, expected_results);
+    let test_dir = test_case.get_lspresso_dir()?;
     if test_case.cleanup && test_dir.exists() {
         fs::remove_dir_all(test_dir)?;
     }
@@ -48,29 +42,22 @@ pub fn test_hover(
     test_result
 }
 
-fn test_hover_inner(
-    test_case: &TestCase,
-    expected: HoverResult,
-    executable_path: &Path,
-    test_id: &str,
-) -> TestResult<()> {
+fn test_hover_inner(test_case: &TestCase, expected: HoverResult) -> TestResult<()> {
     if test_case.cursor_pos.is_none() {
         Err(TestSetupError::InvalidCursorPosition(
             "Cursor position must be specified for hover tests".to_string(),
         ))?;
     }
-    let source_path = test_case.create_test(test_id, executable_path, InitType::Hover)?;
-    let init_dot_lua_path = TestCase::get_init_lua_file_path(test_id)?;
 
-    run_test(&init_dot_lua_path, &source_path)?;
+    run_test(test_case, TestType::Hover)?;
 
-    let error_path = TestCase::get_error_file_path(test_id)?;
+    let error_path = test_case.get_error_file_path()?;
     if error_path.exists() {
         let error = fs::read_to_string(&error_path)?;
         Err(TestError::Neovim(error))?;
     }
 
-    let results_file_path = TestCase::get_results_file_path(test_id)?;
+    let results_file_path = test_case.get_results_file_path()?;
     let raw_results = String::from_utf8(fs::read(&results_file_path)?)
         .map_err(|e| TestError::Utf8(e.to_string()))?;
     let actual: HoverResult =
@@ -84,15 +71,13 @@ fn test_hover_inner(
 
 /// Tests the server's response to a 'textDocument/publishDiagnostics' request
 pub fn test_diagnostics(
-    test_case: &TestCase,
+    mut test_case: TestCase,
     expected_results: &DiagnosticResult,
-    executable_path: &Path,
 ) -> TestResult<()> {
     test_case.validate()?;
-    let test_id = random::<usize>().to_string();
-    let test_result =
-        test_diagnostics_inner(test_case, expected_results, executable_path, &test_id);
-    let test_dir = TestCase::get_lspresso_dir(&test_id)?;
+    test_case.test_id = random::<usize>().to_string();
+    let test_result = test_diagnostics_inner(&test_case, expected_results);
+    let test_dir = test_case.get_lspresso_dir()?;
     if test_case.cleanup && test_dir.exists() {
         fs::remove_dir_all(test_dir)?;
     }
@@ -100,24 +85,16 @@ pub fn test_diagnostics(
     test_result
 }
 
-fn test_diagnostics_inner(
-    test_case: &TestCase,
-    expected: &DiagnosticResult,
-    executable_path: &Path,
-    test_id: &str,
-) -> TestResult<()> {
-    let source_path = test_case.create_test(test_id, executable_path, InitType::Diagnostic)?;
-    let init_dot_lua_path = TestCase::get_init_lua_file_path(test_id)?;
+fn test_diagnostics_inner(test_case: &TestCase, expected: &DiagnosticResult) -> TestResult<()> {
+    run_test(test_case, TestType::Diagnostic)?;
 
-    run_test(&init_dot_lua_path, &source_path)?;
-
-    let error_path = TestCase::get_error_file_path(test_id)?;
+    let error_path = test_case.get_error_file_path()?;
     if error_path.exists() {
         let error = fs::read_to_string(&error_path)?;
         Err(TestError::Neovim(error))?;
     }
 
-    let results_file_path = TestCase::get_results_file_path(test_id)?;
+    let results_file_path = test_case.get_results_file_path()?;
     let raw_results = String::from_utf8(fs::read(&results_file_path)?)
         .map_err(|e| TestError::Utf8(e.to_string()))?;
     let actual: DiagnosticResult =
@@ -134,15 +111,13 @@ fn test_diagnostics_inner(
 
 /// Tests the server's response to a 'textDocument/publishDiagnostics' request
 pub fn test_completions(
-    test_case: &TestCase,
+    mut test_case: TestCase,
     expected_results: &CompletionResult,
-    executable_path: &Path,
 ) -> TestResult<()> {
     test_case.validate()?;
-    let test_id = random::<usize>().to_string();
-    let test_result =
-        test_completions_inner(test_case, expected_results, executable_path, &test_id);
-    let test_dir = TestCase::get_lspresso_dir(&test_id)?;
+    test_case.test_id = random::<usize>().to_string();
+    let test_result = test_completions_inner(&test_case, expected_results);
+    let test_dir = test_case.get_lspresso_dir()?;
     if test_case.cleanup && test_dir.exists() {
         fs::remove_dir_all(test_dir)?;
     }
@@ -150,30 +125,22 @@ pub fn test_completions(
     test_result
 }
 
-fn test_completions_inner(
-    test_case: &TestCase,
-    expected: &CompletionResult,
-    executable_path: &Path,
-    test_id: &str,
-) -> TestResult<()> {
+fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> TestResult<()> {
     if test_case.cursor_pos.is_none() {
         Err(TestSetupError::InvalidCursorPosition(
             "Cursor position must be specified for completion tests".to_string(),
         ))?;
     }
-    let source_path = test_case.create_test(test_id, executable_path, InitType::Completion)?;
-    let init_dot_lua_path = TestCase::get_init_lua_file_path(test_id)?;
+    run_test(test_case, TestType::Completion)?;
 
-    run_test(&init_dot_lua_path, &source_path)?;
-
-    let error_path = TestCase::get_error_file_path(test_id)?;
+    let error_path = test_case.get_error_file_path()?;
     if error_path.exists() {
         let error = fs::read_to_string(&error_path)?;
         Err(TestError::Neovim(error))?;
     }
 
-    let results_file_path = TestCase::get_results_file_path(test_id)?;
-    // little anon struct to make parsing the results more straightforward
+    let results_file_path = test_case.get_results_file_path()?;
+    // temporary struct just to make parsing the results more straightforward
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct CompletionFile {
         pub completions: Vec<CompletionInfo>,
@@ -199,14 +166,13 @@ fn test_completions_inner(
 
 /// Tests the server's response to a 'textDocument/definition' request
 pub fn test_definition(
-    test_case: &TestCase,
+    mut test_case: TestCase,
     expected_results: &DefinitionResult,
-    executable_path: &Path,
 ) -> TestResult<()> {
     test_case.validate()?;
-    let test_id = random::<usize>().to_string();
-    let test_result = test_definition_inner(test_case, expected_results, executable_path, &test_id);
-    let test_dir = TestCase::get_lspresso_dir(&test_id)?;
+    test_case.test_id = random::<usize>().to_string();
+    let test_result = test_definition_inner(&test_case, expected_results);
+    let test_dir = test_case.get_lspresso_dir()?;
     if test_case.cleanup && test_dir.exists() {
         fs::remove_dir_all(test_dir)?;
     }
@@ -214,29 +180,21 @@ pub fn test_definition(
     test_result
 }
 
-fn test_definition_inner(
-    test_case: &TestCase,
-    expected: &DefinitionResult,
-    executable_path: &Path,
-    test_id: &str,
-) -> TestResult<()> {
+fn test_definition_inner(test_case: &TestCase, expected: &DefinitionResult) -> TestResult<()> {
     if test_case.cursor_pos.is_none() {
         Err(TestSetupError::InvalidCursorPosition(
             "Cursor position must be specified for definition tests".to_string(),
         ))?;
     }
-    let source_path = test_case.create_test(test_id, executable_path, InitType::Definition)?;
-    let init_dot_lua_path = TestCase::get_init_lua_file_path(test_id)?;
+    run_test(test_case, TestType::Definition)?;
 
-    run_test(&init_dot_lua_path, &source_path)?;
-
-    let error_path = TestCase::get_error_file_path(test_id)?;
+    let error_path = test_case.get_error_file_path()?;
     if error_path.exists() {
         let error = fs::read_to_string(&error_path)?;
         Err(TestError::Neovim(error))?;
     }
-    let results_file_path = TestCase::get_results_file_path(test_id)?;
-    // little anon struct to make parsing the results more straightforward
+    let results_file_path = test_case.get_results_file_path()?;
+    // temporary struct just to make parsing the results more straightforward
     #[derive(Debug, Clone, Serialize, Deserialize)]
     struct DefinitionFile {
         pub start_line: usize,
@@ -270,7 +228,10 @@ fn test_definition_inner(
 
 /// Invokes Neovim to run the test associated with the file stored at `init_dot_lua_path`,
 /// opening `source_path`
-fn run_test(init_dot_lua_path: &Path, source_path: &Path) -> TestResult<()> {
+fn run_test(test_case: &TestCase, test_type: TestType) -> TestResult<()> {
+    let source_path = test_case.create_test(test_type)?;
+    let init_dot_lua_path = test_case.get_init_lua_file_path()?;
+
     Command::new("nvim")
         .arg("-u")
         .arg(init_dot_lua_path)

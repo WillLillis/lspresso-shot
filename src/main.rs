@@ -12,10 +12,14 @@ use lspresso_shot::{
 pub fn main() {
     let lsp_path = PathBuf::from("/home/lillis/projects/asm-lsp/target/debug/asm-lsp");
     // Only add a source file to the case, test the default config
-    let hover_test_case = TestCase::new("gas.s", include_str!("../../asm-lsp/samples/gas.s"))
-        .cursor_pos(Some(CursorPosition::new(20, 10)));
+    let hover_test_case = TestCase::new(
+        "gas.s",
+        &lsp_path,
+        include_str!("../../asm-lsp/samples/gas.s"),
+    )
+    .cursor_pos(Some(CursorPosition::new(20, 10)));
     lspresso_shot!(test_hover(
-        &hover_test_case,
+        hover_test_case,
         HoverResult {
             kind: "markdown".to_string(),
             value: "RBP [x86-64]
@@ -27,14 +31,17 @@ Width: 64 bits
 "
             .to_string(),
         },
-        &lsp_path
     ));
 
     // Add a source and config file to the case case!
-    let diagnostic_test_case = TestCase::new("gas.s", include_str!("../../asm-lsp/samples/gas.s"))
-        .other_file(
-            ".asm-lsp.toml",
-            r#"
+    let diagnostic_test_case = TestCase::new(
+        "gas.s",
+        &lsp_path,
+        include_str!("../../asm-lsp/samples/gas.s"),
+    )
+    .other_file(
+        ".asm-lsp.toml",
+        r#"
             [default_config]
     version = "0.9.0"
     assembler = "gas"
@@ -45,9 +52,9 @@ Width: 64 bits
     compile_flags_txt = ["cc"]
     diagnostics = true
     default_diagnostics = true"#,
-        );
+    );
     lspresso_shot!(test_diagnostics(
-        &diagnostic_test_case,
+        diagnostic_test_case,
         &DiagnosticResult {
             diagnostics: vec![DiagnosticInfo {
                 start_line: 25,
@@ -58,26 +65,31 @@ Width: 64 bits
                 severity: Some(DiagnosticSeverity::Error)
             }],
         },
-        &lsp_path
     ));
 
-    let completion_test_case = TestCase::new("gas.s", include_str!("../../asm-lsp/samples/gas.s"))
-        .cursor_pos(Some(CursorPosition::new(1, 4)));
+    let completion_test_case = TestCase::new(
+        "gas.s",
+        &lsp_path,
+        include_str!("../../asm-lsp/samples/gas.s"),
+    )
+    .cursor_pos(Some(CursorPosition::new(1, 4)));
     lspresso_shot!(test_completions(
-        &completion_test_case,
+        completion_test_case,
         &CompletionResult::MoreThan(1),
-        &lsp_path
     ));
 
-    let definition_test_case = TestCase::new("gas.s", include_str!("../../asm-lsp/samples/gas.s"))
-        .cursor_pos(Some(CursorPosition::new(15, 8)));
+    let definition_test_case = TestCase::new(
+        "gas.s",
+        &lsp_path,
+        include_str!("../../asm-lsp/samples/gas.s"),
+    )
+    .cursor_pos(Some(CursorPosition::new(15, 8)));
     lspresso_shot!(test_definition(
-        &definition_test_case,
+        definition_test_case,
         &DefinitionResult {
             start_pos: CursorPosition::new(16, 0),
             end_pos: Some(CursorPosition::new(16, 5)),
             path: PathBuf::from("src/gas.s"),
         },
-        &lsp_path
     ));
 }

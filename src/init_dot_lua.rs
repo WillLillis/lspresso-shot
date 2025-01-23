@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use crate::types::{CursorPosition, TestCase};
+use crate::types::TestCase;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum InitType {
+pub enum TestType {
     Hover,
     Diagnostic,
     Completion,
@@ -13,22 +13,21 @@ pub enum InitType {
 /// Construct the contents of an init.lua file to test an lsp request corresponding
 /// to `init_type` using the given parameters
 pub fn get_init_dot_lua(
-    init_type: InitType,
+    test_case: &TestCase,
+    init_type: TestType,
     root_path: &Path,
     results_path: &Path,
     error_path: &Path,
-    executable_path: &Path,
     source_extension: &str,
-    cursor_position: Option<CursorPosition>,
 ) -> String {
     let mut raw_init = format!("{ERROR_REPORT}{FILETYPE_ADD}{FILETYPE_AUTOCMD}");
     raw_init.push_str(match init_type {
-        InitType::Hover => HOVER_AUTCMD,
-        InitType::Diagnostic => DIAGNOSTIC_AUTOCMD,
-        InitType::Completion => COMPLETION_AUTOCMD,
-        InitType::Definition => DEFINITION_AUTOCMD,
+        TestType::Hover => HOVER_AUTCMD,
+        TestType::Diagnostic => DIAGNOSTIC_AUTOCMD,
+        TestType::Completion => COMPLETION_AUTOCMD,
+        TestType::Definition => DEFINITION_AUTOCMD,
     });
-    let set_cursor_position = if let Some(cursor_pos) = cursor_position {
+    let set_cursor_position = if let Some(cursor_pos) = test_case.cursor_pos {
         format!(
             "position = {{ line = {} - 1, character = {} }},",
             cursor_pos.line, cursor_pos.column
@@ -38,17 +37,17 @@ pub fn get_init_dot_lua(
     };
     raw_init
         .replace("RESULTS_FILE", results_path.to_str().unwrap())
-        .replace("EXECUTABLE_PATH", executable_path.to_str().unwrap())
+        .replace(
+            "EXECUTABLE_PATH",
+            test_case.executable_path.to_str().unwrap(),
+        )
         .replace("ROOT_PATH", root_path.to_str().unwrap())
         .replace("ERROR_PATH", error_path.to_str().unwrap())
         .replace("FILE_EXTENSION", source_extension)
         .replace("SET_CURSOR_POSITION", &set_cursor_position)
         .replace(
             "PARENT_PATH",
-            TestCase::get_lspresso_dir(root_path.to_str().unwrap())
-                .unwrap()
-                .to_str()
-                .unwrap(),
+            test_case.get_lspresso_dir().unwrap().to_str().unwrap(),
         )
 }
 
@@ -158,20 +157,23 @@ vim.api.nvim_create_autocmd('LspAttach', {
         }, 1000)
         local file = io.open('RESULTS_FILE', "w")
         if completion_results and file then
+            local t = { }
             for _, result in pairs(completion_results) do
                 if result.result and result.result.items then
                     for _, item in ipairs(result.result.items) do
-                        file:write('[[completions]]\n')
+                        t[#t+1] = '[[completions]]\n'
                         local label = string.gsub(item.label, "\\", "\\\\") -- serde fails to parse, interpreting slashes as escape sequences
-                        file:write('label = "' .. label .. '"\n')
-                        file:write('kind = "' .. tostring(item.kind) .. '"\n')
-                        file:write('documentation_kind = "' .. item.documentation.kind .. '"\n')
+                        t[#t+1] = 'label = "' .. label .. '"'
+                        t[#t+1] = 'kind = "' .. tostring(item.kind) .. '"'
+                        t[#t+1] = 'documentation_kind = "' .. item.documentation.kind .. '"'
                         local raw_value = tostring(item.documentation.value)
                         local value = string.gsub(raw_value, "\\", "\\\\") -- serde fails to parse, interpreting slashes as escape sequences
-                        file:write('documentation_value = """\n' .. value .. '\n"""\n\n')
+                        t[#t+1] = 'documentation_value = """\n' .. value .. '\n"""\n'
                     end
                 end
             end
+            local completions = table.concat(t, '\n')
+            file:write(completions)
             file:close()
         else
             report_error('No completion result returned')
