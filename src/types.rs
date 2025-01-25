@@ -24,6 +24,7 @@ use crate::init_dot_lua::{get_init_dot_lua, TestType};
 ///    lsp request being tested is executed.
 /// - `other_files`: other files to be placed in the mock directory (e.g. other source
 ///    files, server configuration, etc.).
+/// - `start_type`: indicates when the server is ready to service requests
 /// - `timeout`: timeout for the test's run in Neovim. The default is 1000ms.
 /// - `cleanup`: whether to delete the temporary directory on test completion.
 #[derive(Debug, Clone)]
@@ -34,6 +35,7 @@ pub struct TestCase {
     pub source_contents: String,
     pub cursor_pos: Option<CursorPosition>,
     pub other_files: Vec<(PathBuf, String)>,
+    pub start_type: ServerStartType,
     pub timeout: Duration,
     pub cleanup: bool,
 }
@@ -56,6 +58,7 @@ impl TestCase {
             source_contents: source_contents.to_string(),
             cursor_pos: None,
             other_files: Vec::new(),
+            start_type: ServerStartType::Simple,
             timeout: Duration::from_millis(2000),
             cleanup: false,
         }
@@ -213,6 +216,7 @@ impl TestCase {
                 &error_path,
                 extension,
             );
+            println!("{nvim_config}");
             fs::File::create(&init_dot_lua_path)?;
             fs::write(&init_dot_lua_path, &nvim_config)?;
         }
@@ -232,6 +236,17 @@ impl TestCase {
         }
         Ok(source_path)
     }
+}
+
+/// Indicates how the server initializes itself before it is ready to service
+/// requests
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+pub enum ServerStartType {
+    /// The server is ready to serve requests immediately after attaching
+    Simple,
+    /// The server needs to undergo some indexing-like process reported via `$/progress`
+    /// before servicing requests
+    Progress,
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]

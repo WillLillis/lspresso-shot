@@ -20,6 +20,7 @@ pub fn get_init_dot_lua(
     error_path: &Path,
     source_extension: &str,
 ) -> String {
+    // TODO: Refactor this to match on init type and construct them separately
     let mut raw_init = format!("{ERROR_REPORT}{FILETYPE_ADD}{FILETYPE_AUTOCMD}");
     raw_init.push_str(match init_type {
         TestType::Hover => HOVER_AUTCMD,
