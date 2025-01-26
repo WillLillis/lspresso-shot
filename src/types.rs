@@ -8,9 +8,17 @@ use anstyle::{AnsiColor, Color, Style};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::init_dot_lua::{get_init_dot_lua, TestType};
+use crate::init_dot_lua::get_init_dot_lua;
 
 // Common Types
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum TestType {
+    Hover,
+    Diagnostic,
+    Completion,
+    Definition,
+}
 
 /// Describes a test case to be used in an lspresso-shot test.
 ///
@@ -100,6 +108,13 @@ impl TestCase {
         self
     }
 
+    /// Change the expected start type of the server
+    #[must_use]
+    pub fn start_type(mut self, start_type: ServerStartType) -> Self {
+        self.start_type = start_type;
+        self
+    }
+
     /// Change whether the temporary directory is cleaned up on test completion
     #[must_use]
     pub fn timeout<T: Into<Duration>>(mut self, timeout: T) -> Self {
@@ -175,7 +190,7 @@ impl TestCase {
     /// creating parent directories along the way. Any errors
     /// encounted by the config's lua code will be recorded here
     ///
-    /// /tmp/lspresso-shot/`test_id`/init.lua
+    /// /tmp/lspresso-shot/`test_id`/error.txt
     pub fn get_error_file_path(&self) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
         fs::create_dir_all(&lspresso_dir)?;
@@ -183,19 +198,25 @@ impl TestCase {
         Ok(lspresso_dir)
     }
 
+    /// Returns the path to the log file for test `test_id`,
+    /// creating parent directories along the way. Any logs
+    /// created by the config's lua code will be recorded here
+    ///
+    /// /tmp/lspresso-shot/`test_id`/log.txt
+    pub fn get_log_file_path(&self) -> std::io::Result<PathBuf> {
+        let mut lspresso_dir = self.get_lspresso_dir()?;
+        fs::create_dir_all(&lspresso_dir)?;
+        lspresso_dir.push("log.txt");
+        Ok(lspresso_dir)
+    }
+
     /// Creates a test directory for `test_id` based on `self`
     pub fn create_test(&self, test_type: TestType) -> TestResult<PathBuf> {
-        if let Some(cursor_pos) = self.cursor_pos {
-            if cursor_pos.line == 0 {
-                Err(TestSetupError::InvalidCursorPosition(
-                    "Cursor line position is 1-based".to_string(),
-                ))?;
-            }
-        }
         let results_file_path = self.get_results_file_path()?;
         let init_dot_lua_path = self.get_init_lua_file_path()?;
         let root_path = self.get_lspresso_dir()?;
         let error_path = self.get_error_file_path()?;
+        let log_path = self.get_log_file_path()?;
         let extension = self
             .source_path
             .extension()
@@ -214,9 +235,9 @@ impl TestCase {
                 &root_path,
                 &results_file_path,
                 &error_path,
+                &log_path,
                 extension,
             );
-            println!("{nvim_config}");
             fs::File::create(&init_dot_lua_path)?;
             fs::write(&init_dot_lua_path, &nvim_config)?;
         }
@@ -240,13 +261,14 @@ impl TestCase {
 
 /// Indicates how the server initializes itself before it is ready to service
 /// requests
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
 pub enum ServerStartType {
     /// The server is ready to serve requests immediately after attaching
     Simple,
     /// The server needs to undergo some indexing-like process reported via `$/progress`
-    /// before servicing requests
-    Progress,
+    /// before servicing requests. The inner `String` type contains the text of the relevant
+    /// progress token
+    Progress(String),
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]

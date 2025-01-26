@@ -1,7 +1,7 @@
 mod init_dot_lua;
+mod test;
 pub mod types;
 
-use init_dot_lua::TestType;
 use rand::random;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -13,7 +13,7 @@ use std::{
 use types::{
     CompletionInfo, CompletionMismatchError, CompletionResult, CursorPosition,
     DefinitionMismatchError, DefinitionResult, DiagnosticMismatchError, DiagnosticResult,
-    HoverMismatchError, HoverResult, TestCase, TestError, TestResult, TestSetupError,
+    HoverMismatchError, HoverResult, TestCase, TestError, TestResult, TestSetupError, TestType,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -28,6 +28,13 @@ macro_rules! lspresso_shot {
         }
     };
 }
+
+// TODO: We'll need some separate handling for negative cases, e.g. where it's
+// expected for *no* results to be returned. This is tricky because for servers
+// with a `$/progress` style startup, we need to basically poll the server for valid
+// results until we find something. There's no way (that I can tell) to distinguish
+// between an empty "not ready" and a true empty response -- the lua table just looks
+// like this: `{ {} }`
 
 /// Tests the server's response to a 'textDocument/hover' request
 pub fn test_hover(mut test_case: TestCase, expected_results: HoverResult) -> TestResult<()> {

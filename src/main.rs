@@ -9,61 +9,6 @@ use lspresso_shot::{
     },
 };
 
-#[test]
-fn rust_analyzer_hover() {
-    let hover_test_case = TestCase::new(
-        "src/main.rs",
-        "rust-analyzer",
-        r#"pub fn main() {
-    println!("Hello, world!");
-}"#,
-    )
-    .cursor_pos(Some(CursorPosition::new(2, 5)))
-    .other_file(
-        "Cargo.toml",
-        r#"
-[package]
-name = "src"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-
-[[bin]]
-name = "src"
-path = "src/main.rs"
-"#,
-    );
-    lspresso_shot!(test_hover(
-        hover_test_case,
-        HoverResult {
-            kind: "markdown".to_string(),
-            value: r#"
-                \n```rust\nstd::macros\n```\n\n```rust\nmacro_rules! println
- // matched arm #1\n```\n\n---\n\nPrints to the standard output, with a newli
-ne.\n\nOn all platforms, the newline is the LINE FEED character (`\\n`/`U+000
-A`) alone\n(no additional CARRIAGE RETURN (`\\r`/`U+000D`)).\n\nThis macro us
-es the same syntax as [`format`](https://doc.rust-lang.org/stable/alloc/macro
-s/macro.format.html), but writes to the standard output instead.\nSee [`std::
-fmt`] for more information.\n\nThe `println!` macro will lock the standard ou
-tput on each call. If you call\n`println!` within a hot loop, this behavior m
-ay be the bottleneck of the loop.\nTo avoid this, lock stdout with [`io::stdo
-ut().lock`](https://doc.rust-lang.org/stable/std/io/stdio/struct.Stdout.html)
-:\n\n```rust\nuse std::io::{stdout, Write};\n\nlet mut lock = stdout().lock()
-;\nwriteln!(lock, "hello world").unwrap();\n```\n\nUse `println!` only for th
-e primary output of your program. Use\n[`eprintln`] instead to print error an
-d progress messages.\n\nSee [the formatting documentation in `std::fmt`](http
-s://doc.rust-lang.org/stable/std/std/fmt/index.html)\nfor details of the macr
-o argument syntax.\n\n# Panics\n\nPanics if writing to [`io::stdout`] fails.\
-n\nWriting to non-blocking stdout can cause an error, which will lead\nthis m
-acro to panic.\n\n# Examples\n\n```rust\nprintln!(); // prints just a newline
-\nprintln!("hello there!");\nprintln!("format {} arguments", "some");\nlet lo
-cal_variable = "some";\nprintln!("format {local_variable} arguments");\n```"#
-                .to_string()
-        }
-    ))
-}
-
 pub fn main() {
     let lsp_path = PathBuf::from("/home/lillis/projects/asm-lsp/target/debug/asm-lsp");
     // Only add a source file to the case, test the default config
@@ -72,7 +17,7 @@ pub fn main() {
         &lsp_path,
         include_str!("../../asm-lsp/samples/gas.s"),
     )
-    .cursor_pos(Some(CursorPosition::new(20, 10)));
+    .cursor_pos(Some(CursorPosition::new(19, 10)));
     lspresso_shot!(test_hover(
         hover_test_case,
         HoverResult {
@@ -127,7 +72,7 @@ Width: 64 bits
         &lsp_path,
         include_str!("../../asm-lsp/samples/gas.s"),
     )
-    .cursor_pos(Some(CursorPosition::new(1, 4)));
+    .cursor_pos(Some(CursorPosition::new(0, 4)));
     lspresso_shot!(test_completions(
         completion_test_case,
         &CompletionResult::MoreThan(1),
@@ -138,7 +83,7 @@ Width: 64 bits
         &lsp_path,
         include_str!("../../asm-lsp/samples/gas.s"),
     )
-    .cursor_pos(Some(CursorPosition::new(15, 8)));
+    .cursor_pos(Some(CursorPosition::new(14, 8)));
     lspresso_shot!(test_definition(
         definition_test_case,
         &DefinitionResult {
