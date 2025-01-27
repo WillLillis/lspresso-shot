@@ -55,7 +55,11 @@ pub fn get_init_dot_lua(
         .replace("SET_CURSOR_POSITION", &set_cursor_position)
         .replace(
             "PARENT_PATH",
-            test_case.get_lspresso_dir().unwrap().to_str().unwrap(),
+            test_case
+                .get_source_file_path("")
+                .unwrap()
+                .to_str()
+                .unwrap(),
         );
     final_init
 }
@@ -176,11 +180,13 @@ end
 /// Invoke a 'textDocument/publishDiagnostics' request, gather the results, and
 /// write them to a file in TOML format
 const DIAGNOSTIC_AUTOCMD: &str = r#"
+local progress_count = 0 -- track how many times we've tried for the logs
+
 vim.api.nvim_create_autocmd('DiagnosticChanged', {
     callback = function(_)
         local diagnostics_result = vim.diagnostic.get(0, {})
         local file = io.open('RESULTS_FILE', 'w')
-        if diagnostics_result and file then
+        if diagnostics_result and #diagnostics_result >= 1 and file then
             for _, diagnostic in pairs(diagnostics_result) do
                 file:write('[[diagnostics]]\n' )
                 file:write('start_line = ' .. tostring(diagnostic.lnum) .. '\n')
@@ -198,10 +204,11 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
                 file:write('\n')
             end
             file:close()
+            vim.cmd('qa!')
         else
-            report_error('No diagnostic result returned')
+            report_log('No diagnostic result returned (Attempt ' .. tostring(progress_count) .. ')\n')
         end
-        vim.cmd('qa!')
+        progress_count = progress_count + 1
     end,
 })
 "#;
@@ -209,13 +216,15 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
 /// Invoke a 'textDocument/publishDiagnostics' request, gather the results, and
 /// write them to a file in TOML format
 const COMPLETION_ACTION: &str = r#"
+local progress_count = 0 -- track how many times we've tried for the logs
+
 local function check_progress_result()
     local completion_results = vim.lsp.buf_request_sync(0, "textDocument/completion", {
         textDocument = vim.lsp.util.make_text_document_params(0),
         SET_CURSOR_POSITION
     }, 1000)
     local file = io.open('RESULTS_FILE', "w")
-    if completion_results and file then
+    if completion_results and #completion_results > 1 and completion_results[1].result and completion_results[1].result.items and file then
         local t = { }
         for _, result in pairs(completion_results) do
             if result.result and result.result.items then
@@ -234,27 +243,44 @@ local function check_progress_result()
         local completions = table.concat(t, '\n')
         file:write(completions)
         file:close()
+        vim.cmd('qa!')
     else
-        report_error('No completion result returned')
+        report_log('No completion result returned (Attempt ' .. tostring(progress_count) .. ')\n')
     end
-    vim.cmd('qa!')
+    progress_count = progress_count + 1
 end
 "#;
 
+// TODO: Need to handle both cases, one where a simple definition result is returned,
+// and the other where a list of definition results is returned
 /// Invoke a 'textDocument/publishDiagnostics' request, gather the results, and
 /// write them to a file in TOML format
 const DEFINITION_ACTION: &str = r#"
+local progress_count = 0 -- track how many times we've tried for the logs
+
 local function check_progress_result()
     local definition_results = vim.lsp.buf_request_sync(0, "textDocument/definition", {
         textDocument = vim.lsp.util.make_text_document_params(0),
         SET_CURSOR_POSITION
     }, 1000)
     local file = io.open('RESULTS_FILE', "w")
-    if definition_results and #definition_results == 1 and file then
-        local range = definition_results[1].result.range
-        local path = string.gsub(definition_results[1].result.uri, 'file://', '')
-        -- +1 bc lua, +2 because trailing slash isn't present in `PARENT_PATH`
-        local relative_path = string.sub(path, string.len('PARENT_PATH') + 2, string.len(path))
+    if definition_results and #definition_results >= 1 and definition_results[1].result and #definition_results[1].result >= 1 and file then
+        local result = definition_results[1].result[1]
+        -- local range = definition_results[1].result.range
+        local range = result.targetRange
+        -- local path = string.gsub(definition_results[1].result.uri, 'file://', '')
+        local path = nil
+        if result.targetUri then
+            path = string.gsub(result.targetUri, 'file://', '')
+        elseif result.uri  then
+            path = string.gsub(result.uri, 'file://', '')
+        else
+            report_error('No path found in definition result\n')
+            progress_count = progress_count + 1
+            return
+        end
+
+        local relative_path = string.sub(path, string.len('PARENT_PATH') + 1, string.len(path))
         file:write('path = "' .. relative_path .. '"\n\n')
         file:write('start_line = ' .. tostring(range.start.line) .. '\n')
         file:write('start_column = ' .. tostring(range.start.character) .. '\n')
@@ -263,9 +289,10 @@ local function check_progress_result()
             file:write('end_column = ' .. tostring(range['end'].character) .. '\n')
         end
         file:close()
+        vim.cmd('qa!')
     else
-        report_error('No definition result returned')
+        report_log('No definition result returned (Attempt ' .. tostring(progress_count) .. ')\n')
     end
-    vim.cmd('qa!')
+    progress_count = progress_count + 1
 end
 "#;

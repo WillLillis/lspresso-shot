@@ -167,7 +167,7 @@ impl TestCase {
     /// creating parent directories along the way
     ///
     /// /tmp/lspresso-shot/`test_id`/src/`file_path`
-    pub fn get_source_file_path(&self, file_path: &Path) -> std::io::Result<PathBuf> {
+    pub fn get_source_file_path<P: AsRef<Path>>(&self, file_path: P) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
         lspresso_dir.push("src");
         fs::create_dir_all(&lspresso_dir)?;
@@ -238,6 +238,7 @@ impl TestCase {
                 &log_path,
                 extension,
             );
+            println!("{nvim_config}");
             fs::File::create(&init_dot_lua_path)?;
             fs::write(&init_dot_lua_path, &nvim_config)?;
         }

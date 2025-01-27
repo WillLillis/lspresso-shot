@@ -3,9 +3,98 @@ mod tests {
     use std::time::Duration;
 
     use crate::{
-        lspresso_shot, test_hover,
-        types::{CursorPosition, HoverResult, ServerStartType, TestCase},
+        lspresso_shot, /*test_completions,*/ test_definition, test_diagnostics, test_hover,
+        types::{
+            /*CompletionResult,*/ CursorPosition, DefinitionResult, DiagnosticInfo,
+            DiagnosticResult, DiagnosticSeverity, HoverResult, ServerStartType, TestCase,
+        },
     };
+
+    #[test]
+    fn rust_analyzer_definition() {
+        let definition_test_case = TestCase::new(
+            "src/main.rs",
+            "rust-analyzer",
+            "pub fn main() {
+    let mut foo = 5;
+    foo = 10;
+}",
+        )
+        .start_type(ServerStartType::Progress(
+            "rustAnalyzer/Indexing".to_string(),
+        ))
+        .cursor_pos(Some(CursorPosition::new(2, 5)))
+        .timeout(Duration::from_secs(10)) // rust-analyzer is *slow* to startup cold
+        .other_file(
+            "Cargo.toml",
+            r#"
+[package]
+name = "test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[[bin]]
+name = "test"
+path = "src/main.rs"
+"#,
+        );
+
+        lspresso_shot!(test_definition(
+            definition_test_case,
+            &DefinitionResult {
+                start_pos: CursorPosition::new(1, 8),
+                end_pos: Some(CursorPosition::new(1, 15)),
+                path: "src/main.rs".into(),
+            },
+        ));
+    }
+
+    #[test]
+    fn rust_analyzer_diagnostics() {
+        // Add a source and config file to the case case!
+        let diagnostic_test_case = TestCase::new(
+            "src/main.rs",
+            "rust-analyzer",
+            r#"pub fn main() {
+    println!("Hello, world!
+}"#,
+        )
+        .start_type(ServerStartType::Progress(
+            "rustAnalyzer/Indexing".to_string(),
+        ))
+        .timeout(Duration::from_secs(5)) // rust-analyzer is *slow* to startup cold
+        .other_file(
+            "Cargo.toml",
+            r#"
+[package]
+name = "test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[[bin]]
+name = "test"
+path = "src/main.rs"
+"#,
+        );
+
+        lspresso_shot!(test_diagnostics(
+            diagnostic_test_case,
+            &DiagnosticResult {
+                diagnostics: vec![DiagnosticInfo {
+                    start_line: 1,
+                    start_character: 13,
+                    end_line: Some(2),
+                    end_character: Some(13),
+                    message: "unterminated double quote string\n".to_string(),
+                    severity: Some(DiagnosticSeverity::Error)
+                }],
+            },
+        ));
+    }
 
     #[test]
     fn rust_analyzer_hover() {
@@ -25,14 +114,14 @@ mod tests {
             "Cargo.toml",
             r#"
 [package]
-name = "src"
+name = "test"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
 
 [[bin]]
-name = "src"
+name = "test"
 path = "src/main.rs"
 "#,
         );
@@ -98,4 +187,40 @@ println!(\"format {local_variable} arguments\");
         }
     ));
     }
+
+    // TODO: Need to rethink how to test completions
+    //     #[test]
+    //     fn rust_analyzer_completion() {
+    //         let completion_test_case = TestCase::new(
+    //             "src/main.rs",
+    //             "rust-analyzer",
+    //             r#"pub fn main() {
+    //     prin
+    // }"#,
+    //         )
+    //         .start_type(ServerStartType::Progress(
+    //             "rustAnalyzer/Indexing".to_string(),
+    //         ))
+    //         .timeout(Duration::from_secs(10)) // rust-analyzer is *slow* to startup cold
+    //         .cursor_pos(Some(CursorPosition::new(1, 8)))
+    //         .other_file(
+    //             "Cargo.toml",
+    //             r#"
+    // [package]
+    // name = "test"
+    // version = "0.1.0"
+    // edition = "2021"
+    //
+    // [dependencies]
+    //
+    // [[bin]]
+    // name = "test"
+    // path = "src/main.rs"
+    // "#,
+    //         );
+    //         lspresso_shot!(test_completions(
+    //             completion_test_case,
+    //             &CompletionResult::MoreThan(1),
+    //         ));
+    //     }
 }
