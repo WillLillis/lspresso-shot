@@ -2,18 +2,16 @@ mod init_dot_lua;
 mod test;
 pub mod types;
 
-use rand::random;
-use serde::{Deserialize, Serialize};
+use lsp_types::{CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover};
+use rand::distr::Distribution;
 use std::{
     fs,
-    path::PathBuf,
     process::{Command, Stdio},
 };
 
 use types::{
-    CompletionInfo, CompletionMismatchError, CompletionResult, CursorPosition,
-    DefinitionMismatchError, DefinitionResult, DiagnosticMismatchError, DiagnosticResult,
-    HoverMismatchError, HoverResult, TestCase, TestError, TestResult, TestSetupError, TestType,
+    CompletionResult, DefinitionMismatchError, DiagnosticMismatchError, HoverMismatchError,
+    TestCase, TestError, TestResult, TestSetupError, TestType,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -35,11 +33,12 @@ macro_rules! lspresso_shot {
 // results until we find something. There's no way (that I can tell) to distinguish
 // between an empty "not ready" and a true empty response -- the lua table just looks
 // like this: `{ {} }`
+// Do we even need to cover this use case?
 
 /// Tests the server's response to a 'textDocument/hover' request
-pub fn test_hover(mut test_case: TestCase, expected_results: HoverResult) -> TestResult<()> {
+pub fn test_hover(mut test_case: TestCase, expected_results: Hover) -> TestResult<()> {
     test_case.validate()?;
-    test_case.test_id = random::<usize>().to_string();
+    test_case.test_id = get_test_id();
     let test_result = test_hover_inner(&test_case, expected_results);
     let test_dir = test_case.get_lspresso_dir()?;
     if test_case.cleanup && test_dir.exists() {
@@ -49,7 +48,7 @@ pub fn test_hover(mut test_case: TestCase, expected_results: HoverResult) -> Tes
     test_result
 }
 
-fn test_hover_inner(test_case: &TestCase, expected: HoverResult) -> TestResult<()> {
+fn test_hover_inner(test_case: &TestCase, expected: Hover) -> TestResult<()> {
     if test_case.cursor_pos.is_none() {
         Err(TestSetupError::InvalidCursorPosition(
             "Cursor position must be specified for hover tests".to_string(),
@@ -67,11 +66,11 @@ fn test_hover_inner(test_case: &TestCase, expected: HoverResult) -> TestResult<(
     let results_file_path = test_case.get_results_file_path()?;
     let raw_results = String::from_utf8(fs::read(&results_file_path)?)
         .map_err(|e| TestError::Utf8(e.to_string()))?;
-    let actual: HoverResult =
-        toml::from_str(&raw_results).map_err(|e| TestError::Serialization(e.to_string()))?;
+    let actual: Hover = serde_json::from_str(&raw_results)
+        .map_err(|e| TestError::Serialization(format!("Results file -- {e}")))?;
 
     if expected != actual {
-        Err(HoverMismatchError { expected, actual })?;
+        Err(Box::new(HoverMismatchError { expected, actual }))?;
     }
     Ok(())
 }
@@ -79,10 +78,10 @@ fn test_hover_inner(test_case: &TestCase, expected: HoverResult) -> TestResult<(
 /// Tests the server's response to a 'textDocument/publishDiagnostics' request
 pub fn test_diagnostics(
     mut test_case: TestCase,
-    expected_results: &DiagnosticResult,
+    expected_results: &[Diagnostic],
 ) -> TestResult<()> {
     test_case.validate()?;
-    test_case.test_id = random::<usize>().to_string();
+    test_case.test_id = get_test_id();
     let test_result = test_diagnostics_inner(&test_case, expected_results);
     let test_dir = test_case.get_lspresso_dir()?;
     if test_case.cleanup && test_dir.exists() {
@@ -92,7 +91,7 @@ pub fn test_diagnostics(
     test_result
 }
 
-fn test_diagnostics_inner(test_case: &TestCase, expected: &DiagnosticResult) -> TestResult<()> {
+fn test_diagnostics_inner(test_case: &TestCase, expected: &[Diagnostic]) -> TestResult<()> {
     run_test(test_case, TestType::Diagnostic)?;
 
     let error_path = test_case.get_error_file_path()?;
@@ -104,12 +103,12 @@ fn test_diagnostics_inner(test_case: &TestCase, expected: &DiagnosticResult) -> 
     let results_file_path = test_case.get_results_file_path()?;
     let raw_results = String::from_utf8(fs::read(&results_file_path)?)
         .map_err(|e| TestError::Utf8(e.to_string()))?;
-    let actual: DiagnosticResult =
-        toml::from_str(&raw_results).map_err(|e| TestError::Serialization(e.to_string()))?;
+    let actual = serde_json::from_str::<Vec<Diagnostic>>(&raw_results)
+        .map_err(|e| TestError::Serialization(e.to_string()))?;
 
-    if *expected != actual {
+    if expected != actual {
         Err(DiagnosticMismatchError {
-            expected: expected.clone(),
+            expected: expected.to_vec(),
             actual,
         })?;
     }
@@ -122,7 +121,7 @@ pub fn test_completions(
     expected_results: &CompletionResult,
 ) -> TestResult<()> {
     test_case.validate()?;
-    test_case.test_id = random::<usize>().to_string();
+    test_case.test_id = get_test_id();
     let test_result = test_completions_inner(&test_case, expected_results);
     let test_dir = test_case.get_lspresso_dir()?;
     if test_case.cleanup && test_dir.exists() {
@@ -148,36 +147,31 @@ fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> 
 
     let results_file_path = test_case.get_results_file_path()?;
     // temporary struct just to make parsing the results more straightforward
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    struct CompletionFile {
-        pub completions: Vec<CompletionInfo>,
-    }
     let raw_results = String::from_utf8(fs::read(&results_file_path)?)
         .map_err(|e| TestError::Utf8(e.to_string()))?;
-    let actual: Vec<CompletionInfo> = if raw_results.is_empty() {
-        Vec::new()
-    } else {
-        toml::from_str::<CompletionFile>(&raw_results)
-            .map_err(|e| TestError::Serialization(e.to_string()))?
-            .completions
-    };
+    let actual = toml::from_str::<CompletionResponse>(&raw_results)
+        .map_err(|e| TestError::Serialization(e.to_string()))?;
+    _ = actual;
+    _ = expected;
 
-    if !expected.compare_results(&actual) {
-        Err(CompletionMismatchError {
-            expected: expected.clone(),
-            actual,
-        })?;
-    }
-    Ok(())
+    unimplemented!();
+    // TODO: Rework completions comparisons
+    // if !expected.compare_results(&actual) {
+    //     Err(CompletionMismatchError {
+    //         expected: expected.clone(),
+    //         actual,
+    //     })?;
+    // }
+    // Ok(())
 }
 
 /// Tests the server's response to a 'textDocument/definition' request
 pub fn test_definition(
     mut test_case: TestCase,
-    expected_results: &DefinitionResult,
+    expected_results: &GotoDefinitionResponse,
 ) -> TestResult<()> {
     test_case.validate()?;
-    test_case.test_id = random::<usize>().to_string();
+    test_case.test_id = get_test_id();
     let test_result = test_definition_inner(&test_case, expected_results);
     let test_dir = test_case.get_lspresso_dir()?;
     if test_case.cleanup && test_dir.exists() {
@@ -187,7 +181,10 @@ pub fn test_definition(
     test_result
 }
 
-fn test_definition_inner(test_case: &TestCase, expected: &DefinitionResult) -> TestResult<()> {
+fn test_definition_inner(
+    test_case: &TestCase,
+    expected: &GotoDefinitionResponse,
+) -> TestResult<()> {
     if test_case.cursor_pos.is_none() {
         Err(TestSetupError::InvalidCursorPosition(
             "Cursor position must be specified for definition tests".to_string(),
@@ -201,28 +198,10 @@ fn test_definition_inner(test_case: &TestCase, expected: &DefinitionResult) -> T
         Err(TestError::Neovim(error))?;
     }
     let results_file_path = test_case.get_results_file_path()?;
-    // temporary struct just to make parsing the results more straightforward
-    #[derive(Debug, Clone, Serialize, Deserialize)]
-    struct DefinitionFile {
-        pub start_line: usize,
-        pub start_column: usize,
-        pub end_line: Option<usize>,
-        pub end_column: Option<usize>,
-        pub path: PathBuf,
-    }
     let raw_results = String::from_utf8(fs::read(&results_file_path)?)
         .map_err(|e| TestError::Utf8(e.to_string()))?;
-    let actual_raw: DefinitionFile = toml::from_str::<DefinitionFile>(&raw_results)
+    let actual = serde_json::from_str::<GotoDefinitionResponse>(&raw_results)
         .map_err(|e| TestError::Serialization(e.to_string()))?;
-    let actual = DefinitionResult {
-        start_pos: CursorPosition::new(actual_raw.start_line, actual_raw.start_column),
-        end_pos: if let (Some(line), Some(col)) = (actual_raw.end_line, actual_raw.end_column) {
-            Some(CursorPosition::new(line, col))
-        } else {
-            None
-        },
-        path: actual_raw.path,
-    };
 
     if *expected != actual {
         Err(Box::new(DefinitionMismatchError {
@@ -231,6 +210,13 @@ fn test_definition_inner(test_case: &TestCase, expected: &DefinitionResult) -> T
         }))?;
     }
     Ok(())
+}
+
+/// Generates a new random test ID
+fn get_test_id() -> String {
+    let range = rand::distr::Uniform::new(0, usize::MAX).unwrap();
+    let mut rng = rand::rng();
+    range.sample(&mut rng).to_string()
 }
 
 /// Invokes Neovim to run the test associated with the file stored at `init_dot_lua_path`,
@@ -251,6 +237,7 @@ fn run_test(test_case: &TestCase, test_type: TestType) -> TestResult<()> {
         .stderr(Stdio::null())
         .spawn()
         .map_err(|e| TestError::Neovim(e.to_string()))?;
+
     while start.elapsed() < test_case.timeout {
         match child.try_wait() {
             Ok(Some(_)) => return Ok(()),

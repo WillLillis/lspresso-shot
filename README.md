@@ -36,13 +36,13 @@ for installation instructions.
 
 ## Checklist/TODOs:
 
-- [ ] Refactor to use the type definitions from the [lsp-types](https://github.com/gluon-lang/lsp-types)
+- [x] Refactor to use the type definitions from the [lsp-types](https://github.com/gluon-lang/lsp-types)
 crate
-- [ ] Use neovim's builtin api to serialize lsp responses into JSON rather than
+- [x] Use neovim's builtin api to serialize lsp responses into JSON rather than
 hand-encoding information to TOML
 - [ ] Try to find a better way to determine when a `$/progress`-style server has
 fully started up, rather than the current polling approach
-- [ ] Place Lua logic into dedicated files rather than as strings within the Rust
+- [x] Place Lua logic into dedicated files rather than as strings within the Rust
 files
 - [ ] Clean up Lua logic (I'm unfamiliar with the neovim API)
 - [ ] Add CI and whatnot

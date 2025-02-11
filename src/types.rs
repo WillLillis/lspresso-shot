@@ -5,13 +5,13 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anstyle::{AnsiColor, Color, Style};
+use lsp_types::{CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover, Position};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::init_dot_lua::get_init_dot_lua;
 
-// Common Types
-
+/// Specifies the type of test to run
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TestType {
     Hover,
@@ -41,17 +41,19 @@ pub struct TestCase {
     pub executable_path: PathBuf,
     pub source_path: PathBuf,
     pub source_contents: String,
-    pub cursor_pos: Option<CursorPosition>,
+    pub cursor_pos: Option<Position>,
     pub other_files: Vec<(PathBuf, String)>,
     pub start_type: ServerStartType,
     pub timeout: Duration,
     pub cleanup: bool,
 }
+
 // TODO: Add some sort of `from_path` method for `TestCase`. Allows a user to point
 // to a file or directory and automatically convert it into a `TestCase` instance.
 // We need to be *very* careful in the case of directories, as the size could blow
 // up easily. Might be smart to set some sort of limit on total capacity and return an
 // error if converting a path would exceed it. What should this upper bound be?
+// Maybe just add it for files, return Err otherwise
 
 impl TestCase {
     pub fn new<P1: Into<PathBuf>, P2: Into<PathBuf>>(
@@ -74,7 +76,7 @@ impl TestCase {
 
     /// Set the cursor position in the source file
     #[must_use]
-    pub const fn cursor_pos(mut self, cursor_pos: Option<CursorPosition>) -> Self {
+    pub const fn cursor_pos(mut self, cursor_pos: Option<Position>) -> Self {
         self.cursor_pos = cursor_pos;
         self
     }
@@ -115,7 +117,7 @@ impl TestCase {
         self
     }
 
-    /// Change whether the temporary directory is cleaned up on test completion
+    /// Set the timeout for a test
     #[must_use]
     pub fn timeout<T: Into<Duration>>(mut self, timeout: T) -> Self {
         self.timeout = timeout.into();
@@ -124,6 +126,14 @@ impl TestCase {
 
     /// Validate the data contained within `self`
     pub fn validate(&self) -> Result<(), TestSetupError> {
+        if !is_executable(&PathBuf::from("nvim")) {
+            Err(TestSetupError::InvalidNeovim)?;
+        }
+        if !is_executable(&self.executable_path) {
+            Err(TestSetupError::InvalidServerCommand(
+                self.executable_path.clone(),
+            ))?;
+        }
         if self.source_path.to_string_lossy().is_empty() {
             Err(TestSetupError::InvalidFilePath(
                 self.source_path.to_string_lossy().to_string(),
@@ -155,11 +165,11 @@ impl TestCase {
     /// Returns the path to the result file for test `self.test_id`,
     /// creating parent directories along the way
     ///
-    /// /tmp/lspresso-shot/`test_id`/results.toml
+    /// /tmp/lspresso-shot/`test_id`/results.json
     pub fn get_results_file_path(&self) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
         fs::create_dir_all(&lspresso_dir)?;
-        lspresso_dir.push("results.toml");
+        lspresso_dir.push("results.json");
         Ok(lspresso_dir)
     }
 
@@ -221,6 +231,7 @@ impl TestCase {
             .source_path
             .extension()
             .ok_or_else(|| {
+                // NOTE: use `.unwrap_or("*")` here instead?
                 TestSetupError::MissingFileExtension(self.source_path.to_string_lossy().to_string())
             })?
             .to_str()
@@ -238,7 +249,6 @@ impl TestCase {
                 &log_path,
                 extension,
             );
-            println!("{nvim_config}");
             fs::File::create(&init_dot_lua_path)?;
             fs::write(&init_dot_lua_path, &nvim_config)?;
         }
@@ -251,7 +261,7 @@ impl TestCase {
 
         for (path, contents) in &self.other_files {
             let source_file_path = self.get_source_file_path(path)?;
-            // Source file paths should always have a parent directory
+            // Invariant: test source file paths should always have a parent directory
             fs::create_dir_all(source_file_path.parent().unwrap())?;
             fs::File::create(&source_file_path)?;
             fs::write(&source_file_path, contents)?;
@@ -260,6 +270,70 @@ impl TestCase {
     }
 }
 
+/// Check if a path points to an executable file
+fn is_executable(server_path: &Path) -> bool {
+    let exec_check = |path: &Path| -> bool {
+        if path.is_file() {
+            #[cfg(unix)]
+            {
+                // On Unix, check the `x` bit
+                use std::fs;
+                use std::os::unix::fs::PermissionsExt;
+                let metadata = fs::metadata(path).unwrap();
+                metadata.permissions().mode() & 0o111 != 0
+            }
+            #[cfg(windows)]
+            {
+                // On Windows, check for common executable extensions
+                let extensions = ["exe", "cmd", "bat", "com"];
+                if let Some(ext) = path.extension().and_then(|s| s.to_str()) {
+                    return extensions.contains(&ext);
+                }
+                false
+            }
+        } else {
+            #[cfg(windows)]
+            {
+                // On Windows, it's valid to omit file extensions, i.e. `gcc` can be
+                // used to designate `gcc.exe`. However, this will cause `.is_file()`
+                // to return `false`, so we need to check for this case here rather
+                // than above
+                let extensions = ["exe", "cmd", "bat", "com"];
+                for ext in &extensions {
+                    let Some(path) = path.to_str() else {
+                        continue;
+                    };
+                    let ext_path = PathBuf::from(format!("{path}.{ext}"));
+                    if ext_path.exists() && ext_path.is_file() {
+                        return true;
+                    }
+                }
+            }
+            false
+        }
+    };
+
+    if exec_check(server_path) {
+        return true;
+    }
+
+    use std::env;
+    // Get the PATH environment variable
+    let path_var = env::var_os("PATH").unwrap();
+    for path in env::split_paths(&path_var) {
+        let full_path = path.join(server_path);
+        if exec_check(&full_path) {
+            return true;
+        }
+    }
+
+    false
+}
+
+// TODO: Need to find a good way to test `Simple` server setup. rust-analyzer doesn't
+// support this obviously, so we can't use that. Expecting contributors to have
+// asm-lsp or some other simple non-`$/progress` installed isn't great, but maybe
+// that's the only way to do it...
 /// Indicates how the server initializes itself before it is ready to service
 /// requests
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -272,23 +346,14 @@ pub enum ServerStartType {
     Progress(String),
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct CursorPosition {
-    pub line: usize,
-    pub column: usize,
-}
-
-impl CursorPosition {
-    #[must_use]
-    pub const fn new(line: usize, column: usize) -> Self {
-        Self { line, column }
-    }
-}
-
 #[derive(Debug, Error)]
 pub enum TestSetupError {
     #[error("Source file \"{0}\" must have an extension")]
     MissingFileExtension(String),
+    #[error("The server command \"{}\" is not executable", ._0.display())]
+    InvalidServerCommand(PathBuf),
+    #[error("The command \"nvim\" is not executable")]
+    InvalidNeovim,
     #[error("The extension of source file \"{0}\" is invalid")]
     InvalidFileExtension(String),
     #[error("Source file path \"{0}\" is invalid")]
@@ -305,20 +370,12 @@ impl From<std::io::Error> for TestError {
     }
 }
 
-// Hover types
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct HoverResult {
-    // TODO: turn this into an enum? What are the possible values besides 'markdown'?
-    pub kind: String,
-    pub value: String,
-}
-
 pub type TestResult<T> = Result<T, TestError>;
 
 #[derive(Debug, Error)]
 pub enum TestError {
     #[error(transparent)]
-    HoverMismatch(#[from] HoverMismatchError),
+    HoverMismatch(#[from] Box<HoverMismatchError>), // NOTE: `Box`ed because large
     #[error(transparent)]
     DiagnosticMismatch(#[from] DiagnosticMismatchError),
     #[error(transparent)]
@@ -337,250 +394,129 @@ pub enum TestError {
     Serialization(String),
 }
 
-#[derive(Debug, Error)]
-pub struct HoverMismatchError {
-    pub expected: HoverResult,
-    pub actual: HoverResult,
-}
-
 const GREEN: Option<Color> = Some(anstyle::Color::Ansi(AnsiColor::Green));
 const RED: Option<Color> = Some(anstyle::Color::Ansi(AnsiColor::Red));
-
-fn write_field_comparison<T: Eq + std::fmt::Display>(
-    f: &mut std::fmt::Formatter<'_>,
-    field_name: &str,
-    expected: Option<&T>,
-    actual: Option<&T>,
-) -> std::fmt::Result {
-    match (expected, actual) {
-        (None, None) => writeln!(f, "{field_name}: nil")?,
-        (Some(expected), Some(actual)) => {
-            let rendered_expected = expected.to_string();
-            let rendered_actual = actual.to_string();
-            let separate_lines =
-                rendered_expected.lines().count() > 1 || rendered_actual.lines().count() > 1;
-            if expected != actual {
-                writeln!(f, "{}:", paint(RED, field_name))?;
-                if separate_lines {
-                    writeln!(f, "    Expected:\n'{expected}'\n    Got:\n'{actual}'",)?;
-                } else {
-                    writeln!(f, "    Expected: '{expected}'\n    Got:      '{actual}'",)?;
-                }
-            } else {
-                let separator = if separate_lines { "\n" } else { " " };
-                writeln!(f, "{}:{separator}'{}'", paint(GREEN, field_name), expected)?;
-            }
-        }
-        (Some(expected), None) => {
-            writeln!(f, "{}:", paint(RED, field_name))?;
-            writeln!(f, "    Expected: '{expected}'\n    Got:      nil",)?;
-        }
-        (None, Some(actual)) => {
-            writeln!(f, "{}:", paint(RED, field_name))?;
-            writeln!(f, "    Expected: nil\n    Got:      '{actual}'",)?;
-        }
-    }
-
-    Ok(())
-}
-
-impl std::fmt::Display for HoverMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write_field_comparison(
-            f,
-            "kind",
-            Some(&self.expected.kind),
-            Some(&self.actual.kind),
-        )?;
-
-        write_field_comparison(
-            f,
-            "value",
-            Some(&self.expected.value),
-            Some(&self.actual.value),
-        )?;
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error)]
-pub struct DiagnosticMismatchError {
-    pub expected: DiagnosticResult,
-    pub actual: DiagnosticResult,
-}
-
-// TODO: Do something clever with closures/macros to reduce duplicate code
-impl std::fmt::Display for DiagnosticMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        for (i, (expected, actual)) in self
-            .expected
-            .diagnostics
-            .iter()
-            .zip(self.actual.diagnostics.iter())
-            .enumerate()
-        {
-            writeln!(f, "Diagnostic {i}:")?;
-            write_field_comparison(
-                f,
-                "start_line",
-                Some(&expected.start_line),
-                Some(&actual.start_line),
-            )?;
-            write_field_comparison(
-                f,
-                "start_character",
-                Some(&expected.start_character),
-                Some(&actual.start_character),
-            )?;
-            write_field_comparison(
-                f,
-                "end_line",
-                expected.end_line.as_ref(),
-                actual.end_line.as_ref(),
-            )?;
-            write_field_comparison(
-                f,
-                "end_character",
-                expected.end_character.as_ref(),
-                actual.end_character.as_ref(),
-            )?;
-            write_field_comparison(f, "message", Some(&expected.message), Some(&actual.message))?;
-            write_field_comparison(
-                f,
-                "severity",
-                expected.severity.as_ref(),
-                actual.severity.as_ref(),
-            )?;
-            write!(f, "\n\n")?;
-        }
-
-        let render_diagnostic =
-            |f: &mut std::fmt::Formatter<'_>, diagnostic: &DiagnosticInfo| -> std::fmt::Result {
-                writeln!(
-                    f,
-                    "{}: '{}'",
-                    paint(RED, "start_line"),
-                    diagnostic.start_line
-                )?;
-                writeln!(
-                    f,
-                    "{}: '{}'",
-                    paint(RED, "start_character"),
-                    diagnostic.start_character
-                )?;
-                writeln!(
-                    f,
-                    "{}: '{}'",
-                    paint(RED, "end_line"),
-                    diagnostic
-                        .end_line
-                        .map_or("'nil'".to_string(), |c| c.to_string())
-                )?;
-                writeln!(
-                    f,
-                    "{}: '{}'",
-                    paint(RED, "end_character"),
-                    diagnostic
-                        .end_character
-                        .map_or("'nil'".to_string(), |c| c.to_string())
-                )?;
-                writeln!(f, "{}:\n'{}'", paint(RED, "message"), diagnostic.message)?;
-                writeln!(
-                    f,
-                    "{}: '{}'",
-                    paint(RED, "severity"),
-                    diagnostic
-                        .severity
-                        .map_or("'nil'".to_string(), |s| s.to_string())
-                )?;
-                write!(f, "\n\n")?;
-                Ok(())
-            };
-
-        let expected_len = self.expected.diagnostics.len();
-        let actual_len = self.actual.diagnostics.len();
-        match expected_len.cmp(&actual_len) {
-            std::cmp::Ordering::Equal => {}
-            std::cmp::Ordering::Less => {
-                for (i, diagnostic) in self
-                    .actual
-                    .diagnostics
-                    .iter()
-                    .enumerate()
-                    .skip(expected_len)
-                {
-                    writeln!(f, "Diagnostic {i}:")?;
-                    writeln!(f, "Expected: nil")?;
-                    writeln!(f, "Got:")?;
-                    render_diagnostic(f, diagnostic)?;
-                }
-            }
-            std::cmp::Ordering::Greater => {
-                for (i, diagnostic) in self
-                    .expected
-                    .diagnostics
-                    .iter()
-                    .enumerate()
-                    .skip(actual_len)
-                {
-                    writeln!(f, "Diagnostic {i}:")?;
-                    writeln!(f, "Expected:")?;
-                    render_diagnostic(f, diagnostic)?;
-                    writeln!(f, "Got: nil")?;
-                }
-            }
-        };
-
-        Ok(())
-    }
-}
 
 fn paint(color: Option<impl Into<Color>>, text: &str) -> String {
     let style = Style::new().fg_color(color.map(Into::into));
     format!("{style}{text}{style:#}")
 }
 
-// Diagnostic Types
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct DiagnosticResult {
-    pub diagnostics: Vec<DiagnosticInfo>,
-}
+fn write_fields_comparison<T: Serialize>(
+    f: &mut std::fmt::Formatter<'_>,
+    name: &str,
+    expected: &T,
+    actual: &T,
+    indent: usize,
+) -> std::fmt::Result {
+    let compare_fields = |f: &mut std::fmt::Formatter<'_>,
+                          indent: usize,
+                          key: &str,
+                          expected: &serde_json::Value,
+                          actual: &serde_json::Value| {
+        let padding = "  ".repeat(indent);
+        let key_render = format!("{key}: ");
 
-#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct DiagnosticInfo {
-    pub start_line: u32,
-    pub start_character: u32,
-    pub end_line: Option<u32>,
-    pub end_character: Option<u32>,
-    pub message: String,
-    pub severity: Option<DiagnosticSeverity>,
-}
+        if expected == actual {
+            writeln!(
+                f,
+                "{}",
+                paint(GREEN, &format!("{padding}{key_render}{expected}"))
+            )?;
+        } else {
+            let expected_render = if expected.is_string() {
+                format!("\n{padding}    {expected}")
+            } else {
+                format!(" {expected}")
+            };
+            let actual_render = if actual.is_string() {
+                format!("\n{padding}    {actual}")
+            } else {
+                format!(" {actual}")
+            };
+            writeln!(
+                f,
+                "{}",
+                paint(
+                    RED,
+                    &format!("{padding}{key_render}\n{padding}  Expected:{expected_render}\n{padding}  Actual:{actual_render}")
+                )
+            )?;
+        }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub enum DiagnosticSeverity {
-    #[serde(rename = "1")]
-    Error,
-    #[serde(rename = "2")]
-    Warn,
-    #[serde(rename = "3")]
-    Info,
-    #[serde(rename = "4")]
-    Hint,
-}
+        std::fmt::Result::Ok(())
+    };
+    let mut expected_value = serde_json::to_value(expected).unwrap();
+    let actual_value = serde_json::to_value(actual).unwrap();
+    let padding = "  ".repeat(indent);
+    let key_render = if indent == 0 {
+        String::new()
+    } else {
+        format!("{name}: ")
+    };
 
-impl std::fmt::Display for DiagnosticSeverity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            match self {
-                Self::Error => "error",
-                Self::Warn => "warn",
-                Self::Info => "info",
-                Self::Hint => "hint",
+    match expected_value {
+        serde_json::Value::Object(ref mut map) => {
+            map.sort_keys(); // ensure a deterministic ordering
+            writeln!(f, "{padding}{key_render}{{",)?;
+            for (expected_key, expected_val) in map {
+                let actual_val = actual_value.get(expected_key).unwrap().to_owned();
+                match expected_val {
+                    serde_json::Value::Object(_) => {
+                        write_fields_comparison(
+                            f,
+                            expected_key,
+                            expected_val,
+                            &actual_val,
+                            indent + 1,
+                        )?;
+                    }
+                    _ => {
+                        compare_fields(f, indent + 1, expected_key, expected_val, &actual_val)?;
+                    }
+                }
             }
-        )?;
+            writeln!(f, "{padding}}},")?;
+        }
+        serde_json::Value::Array(ref array) => {
+            writeln!(f, "{padding}{key_render}[")?;
+            for (i, expected_val) in array.iter().enumerate() {
+                let actual_val = actual_value
+                    .get(i)
+                    .unwrap_or(&serde_json::Value::Null)
+                    .to_owned();
+                write_fields_comparison(f, name, expected_val, &actual_val, indent + 1)?;
+            }
+            writeln!(f, "{padding}],")?;
+        }
+        _ => compare_fields(f, indent + 1, name, &expected_value, &actual_value)?,
+    }
+
+    Ok(())
+}
+
+#[derive(Debug, Error)]
+pub struct HoverMismatchError {
+    pub expected: Hover,
+    pub actual: Hover,
+}
+
+impl std::fmt::Display for HoverMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write_fields_comparison(f, "Hover", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct DiagnosticMismatchError {
+    pub expected: Vec<Diagnostic>,
+    pub actual: Vec<Diagnostic>,
+}
+
+impl std::fmt::Display for DiagnosticMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write_fields_comparison(f, "Diagnostic", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }
@@ -595,390 +531,73 @@ pub enum CompletionResult {
     /// Expect more than  this many completion results, ignoring their contents
     MoreThan(usize),
     /// Expect this exact set of completion results, ignoring their order
-    Contains(HashSet<CompletionInfo>),
+    Contains(HashSet<CompletionResponse>),
     /// Expect this exact set of completion results in a specific order
-    Exact(Vec<CompletionInfo>),
+    Exact(Vec<CompletionResponse>),
 }
 
-impl CompletionResult {
-    /// Compares the expected results in `self` to the `actual` results, respecting
-    /// the intended behavior for each enum variant of `Self`
-    ///
-    /// Returns true if the two are considered equal, false otherwise
-    #[must_use]
-    pub fn compare_results(&self, actual: &Vec<CompletionInfo>) -> bool {
-        match self {
-            Self::LessThan(n_expected) => *n_expected > actual.len(),
-            Self::Exactly(n_expected) => *n_expected == actual.len(),
-            Self::MoreThan(n_expected) => *n_expected < actual.len(),
-            Self::Contains(expected) => {
-                let mut remaining = expected.clone();
-                for result in actual {
-                    if remaining.is_empty() {
-                        return false;
-                    }
-                    if remaining.contains(result) {
-                        remaining.remove(result);
-                    }
-                }
-                remaining.is_empty()
-            }
-            Self::Exact(results) => {
-                if results.len() != actual.len() {
-                    return false;
-                }
-
-                for (expected, actual) in results.iter().zip(actual.iter()) {
-                    if expected != actual {
-                        return false;
-                    }
-                }
-                true
-            }
-        }
-    }
-}
-
-// NOTE: There are a *lot* of optional fields in the completion response item
-// For now we'll add a few basic ones, and then come back to later
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct CompletionInfo {
-    label: String,
-    #[serde(flatten)]
-    documentation: CompletionDocumentation,
-    kind: CompletionItemKind,
-}
-
-impl std::fmt::Display for CompletionInfo {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "label: '{}'", self.label)?;
-        writeln!(f, "documentation:\n'{}'", self.documentation)?;
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct CompletionDocumentation {
-    #[serde(rename = "documentation_kind")]
-    kind: String,
-    #[serde(rename = "documentation_value")]
-    value: String,
-}
-
-impl std::fmt::Display for CompletionDocumentation {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "kind: {}", self.kind)?;
-        let separator =
-            if self.value.lines().count() > 1 || matches!(self.value.chars().last(), Some('\n')) {
-                "\n"
-            } else {
-                " "
-            };
-        writeln!(f, "value:{separator}'{}'", self.value)?;
-        Ok(())
-    }
-}
-
-// https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItemKind
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub enum CompletionItemKind {
-    #[serde(rename = "1")]
-    Text = 1,
-    #[serde(rename = "2")]
-    Method = 2,
-    #[serde(rename = "3")]
-    Function = 3,
-    #[serde(rename = "4")]
-    Constructor = 4,
-    #[serde(rename = "5")]
-    Field = 5,
-    #[serde(rename = "6")]
-    Variable = 6,
-    #[serde(rename = "7")]
-    Class = 7,
-    #[serde(rename = "8")]
-    Interface = 8,
-    #[serde(rename = "9")]
-    Module = 9,
-    #[serde(rename = "10")]
-    Property = 10,
-    #[serde(rename = "11")]
-    Unit = 11,
-    #[serde(rename = "12")]
-    Value = 12,
-    #[serde(rename = "13")]
-    Enum = 13,
-    #[serde(rename = "14")]
-    Keyword = 14,
-    #[serde(rename = "15")]
-    Snippet = 15,
-    #[serde(rename = "16")]
-    Color = 16,
-    #[serde(rename = "17")]
-    File = 17,
-    #[serde(rename = "18")]
-    Reference = 18,
-    #[serde(rename = "19")]
-    Folder = 19,
-    #[serde(rename = "20")]
-    EnumMember = 20,
-    #[serde(rename = "21")]
-    Constant = 21,
-    #[serde(rename = "22")]
-    Struct = 22,
-    #[serde(rename = "23")]
-    Event = 23,
-    #[serde(rename = "24")]
-    Operator = 24,
-    #[serde(rename = "25")]
-    TypeParameter = 25,
-}
-
-impl std::fmt::Display for CompletionItemKind {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{}",
-            match self {
-                Self::Text => "Text",
-                Self::Method => "Method",
-                Self::Function => "Function",
-                Self::Constructor => "Constructor",
-                Self::Field => "Field",
-                Self::Variable => "Variable",
-                Self::Class => "Class",
-                Self::Interface => "Interface",
-                Self::Module => "Module",
-                Self::Property => "Property",
-                Self::Unit => "Unit",
-                Self::Value => "Value",
-                Self::Enum => "Enum",
-                Self::Keyword => "Keyword",
-                Self::Snippet => "Snippet",
-                Self::Color => "Color",
-                Self::File => "File",
-                Self::Reference => "Reference",
-                Self::Folder => "Folder",
-                Self::EnumMember => "EnumMember",
-                Self::Constant => "Constant",
-                Self::Struct => "Struct",
-                Self::Event => "Event",
-                Self::Operator => "Operator",
-                Self::TypeParameter => "TypeParameter",
-            }
-        )?;
-        Ok(())
-    }
-}
+// impl CompletionResult {
+//     /// Compares the expected results in `self` to the `actual` results, respecting
+//     /// the intended behavior for each enum variant of `Self`
+//     ///
+//     /// Returns true if the two are considered equal, false otherwise
+//     #[must_use]
+//     pub fn compare_results(&self, actual: &CompletionResponse) -> bool {
+//         match self {
+//             Self::LessThan(n_expected) => *n_expected > actual.len(),
+//             Self::Exactly(n_expected) => *n_expected == actual.len(),
+//             Self::MoreThan(n_expected) => *n_expected < actual.len(),
+//             Self::Contains(expected) => {
+//                 let mut remaining = expected.clone();
+//                 for result in actual {
+//                     if remaining.is_empty() {
+//                         return false;
+//                     }
+//                     if remaining.contains(result) {
+//                         remaining.remove(result);
+//                     }
+//                 }
+//                 remaining.is_empty()
+//             }
+//             Self::Exact(results) => {
+//                 if results.len() != actual.len() {
+//                     return false;
+//                 }
+//
+//                 for (expected, actual) in results.iter().zip(actual.iter()) {
+//                     if expected != actual {
+//                         return false;
+//                     }
+//                 }
+//                 true
+//             }
+//         }
+//     }
+// }
 
 #[derive(Debug, Error)]
 pub struct CompletionMismatchError {
     pub expected: CompletionResult,
-    pub actual: Vec<CompletionInfo>,
+    pub actual: CompletionResponse,
 }
 
 impl std::fmt::Display for CompletionMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.expected {
-            CompletionResult::LessThan(n_results) => writeln!(
-                f,
-                "{}",
-                &paint(
-                    RED,
-                    &format!(
-                        "Expected less than {n_results} completion results, got {}",
-                        self.actual.len()
-                    )
-                ),
-            )?,
-            CompletionResult::Exactly(n_results) => writeln!(
-                f,
-                "{}",
-                &paint(
-                    RED,
-                    &format!(
-                        "Expected exactly {n_results} completion results, got {}",
-                        self.actual.len()
-                    )
-                )
-            )?,
-            CompletionResult::MoreThan(n_results) => writeln!(
-                f,
-                "{}",
-                &paint(
-                    RED,
-                    &format!(
-                        "Expected more than {n_results} completion results, got {}",
-                        self.actual.len()
-                    ),
-                ),
-            )?,
-            CompletionResult::Contains(results) => {
-                let mut remaining = results.clone();
-                let mut remaining_count: Option<usize> = None;
-                for (i, result) in self.actual.iter().enumerate() {
-                    if remaining.is_empty() {
-                        remaining_count = Some(i + 1);
-                        break;
-                    }
-                    if remaining.contains(result) {
-                        remaining.remove(result);
-                    }
-                }
-                if !remaining.is_empty() {
-                    writeln!(
-                        f,
-                        "{}",
-                        &paint(
-                            RED,
-                            "Didn't recieve all of the expected completion results:"
-                        )
-                    )?;
-                    for result in remaining {
-                        writeln!(f, "Completion Result:\n{result}\n",)?;
-                    }
-                } else if let Some(count) = remaining_count {
-                    writeln!(f, "{}", paint(RED, "Got unexpected completion results:"))?;
-                    for result in self.actual.iter().skip(count) {
-                        writeln!(f, "Completion Result:\n{result}\n",)?;
-                    }
-                }
-            }
-            CompletionResult::Exact(results) => {
-                let render_diff = |f: &mut std::fmt::Formatter<'_>,
-                                   expected: &CompletionInfo,
-                                   actual: &CompletionInfo|
-                 -> std::fmt::Result {
-                    write_field_comparison(f, "label", Some(&expected.label), Some(&actual.label))?;
-                    write_field_comparison(
-                        f,
-                        "documentation",
-                        Some(&expected.documentation),
-                        Some(&actual.documentation),
-                    )?;
-                    write_field_comparison(f, "kind", Some(&expected.kind), Some(&actual.kind))?;
-
-                    Ok(())
-                };
-                let render_completion = |f: &mut std::fmt::Formatter<'_>,
-                                         completion: &CompletionInfo|
-                 -> std::fmt::Result {
-                    write!(f, "label: '{}'", paint(RED, &completion.label.to_string()))?;
-                    write!(
-                        f,
-                        "documentation:\n'{}'",
-                        paint(RED, &format!("{}", completion.documentation))
-                    )?;
-                    write!(f, "kind: '{}'", paint(RED, &format!("{}", completion.kind)))?;
-
-                    Ok(())
-                };
-                for (expected, actual) in results.iter().zip(self.actual.iter()) {
-                    if expected != actual {
-                        render_diff(f, expected, actual)?;
-                    }
-                }
-                let expected_len = results.len();
-                let actual_len = self.actual.len();
-                match expected_len.cmp(&actual_len) {
-                    std::cmp::Ordering::Equal => {}
-                    std::cmp::Ordering::Less => {
-                        for (i, completion) in self.actual.iter().enumerate().skip(expected_len) {
-                            writeln!(f, "Completion {i}:")?;
-                            writeln!(f, "Expected: nil")?;
-                            writeln!(f, "Got:")?;
-                            render_completion(f, completion)?;
-                        }
-                    }
-                    std::cmp::Ordering::Greater => {
-                        for (i, completion) in results.iter().enumerate().skip(actual_len) {
-                            writeln!(f, "Completion {i}:")?;
-                            writeln!(f, "Expected:")?;
-                            render_completion(f, completion)?;
-                            writeln!(f, "Got: nil")?;
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-// Definition Types
-#[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
-pub struct DefinitionResult {
-    pub start_pos: CursorPosition,
-    pub end_pos: Option<CursorPosition>,
-    // this is actually returned as a uri ("file:/./..."), but the uri crate's
-    // type doesn't support serde. As such, we'll just grab the path
-    pub path: PathBuf,
-}
-
-impl std::fmt::Display for DefinitionResult {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "start_line: '{}'", self.start_pos.line)?;
-        writeln!(f, "start_column: '{}'", self.start_pos.column)?;
-        if let Some(end) = self.end_pos {
-            writeln!(f, "end_line: '{}'", end.line)?;
-            writeln!(f, "end_column: '{}'", end.column)?;
-        } else {
-            writeln!(f, "end_line: 'nil'")?;
-            writeln!(f, "end_column: 'nil'")?;
-        }
-        writeln!(f, "path: '{}'", self.path.display())?;
-
+        _ = f;
+        // TODO: Rework the different Eq. kinds
         Ok(())
     }
 }
 
 #[derive(Debug, Error)]
 pub struct DefinitionMismatchError {
-    pub expected: DefinitionResult,
-    pub actual: DefinitionResult,
+    pub expected: GotoDefinitionResponse,
+    pub actual: GotoDefinitionResponse,
 }
 
 impl std::fmt::Display for DefinitionMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write_field_comparison(
-            f,
-            "start_line",
-            Some(&self.expected.start_pos.line),
-            Some(&self.actual.start_pos.line),
-        )?;
-        write_field_comparison(
-            f,
-            "start_column",
-            Some(&self.expected.start_pos.column),
-            Some(&self.actual.start_pos.column),
-        )?;
-        let (expected_end_line, expected_end_column) = self
-            .expected
-            .end_pos
-            .map_or((None, None), |p| (Some(p.line), Some(p.column)));
-        let (actual_end_line, actual_end_column) = self
-            .actual
-            .end_pos
-            .map_or((None, None), |p| (Some(p.line), Some(p.column)));
-        write_field_comparison(
-            f,
-            "end_line",
-            expected_end_line.as_ref(),
-            actual_end_line.as_ref(),
-        )?;
-        write_field_comparison(
-            f,
-            "end_column",
-            expected_end_column.as_ref(),
-            actual_end_column.as_ref(),
-        )?;
-        write_field_comparison(
-            f,
-            "path",
-            Some(&self.expected.path.to_string_lossy()),
-            Some(&self.actual.path.to_string_lossy()),
-        )?;
+        write_fields_comparison(f, "GotoDefinition", &self.expected, &self.actual, 0)?;
 
         Ok(())
     }

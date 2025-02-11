@@ -1,13 +1,17 @@
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
+    use std::{str::FromStr, time::Duration};
+
+    use lsp_types::{
+        CodeDescription, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity,
+        DiagnosticTag, GotoDefinitionResponse, Hover, Location, LocationLink, MarkupContent,
+        NumberOrString, Position, Range, Uri,
+    };
+    use serde_json::Map;
 
     use crate::{
         lspresso_shot, /*test_completions,*/ test_definition, test_diagnostics, test_hover,
-        types::{
-            /*CompletionResult,*/ CursorPosition, DefinitionResult, DiagnosticInfo,
-            DiagnosticResult, DiagnosticSeverity, HoverResult, ServerStartType, TestCase,
-        },
+        types::{ServerStartType, TestCase},
     };
 
     #[test]
@@ -23,7 +27,7 @@ mod tests {
         .start_type(ServerStartType::Progress(
             "rustAnalyzer/Indexing".to_string(),
         ))
-        .cursor_pos(Some(CursorPosition::new(2, 5)))
+        .cursor_pos(Some(Position::new(2, 5)))
         .timeout(Duration::from_secs(10)) // rust-analyzer is *slow* to startup cold
         .other_file(
             "Cargo.toml",
@@ -41,13 +45,129 @@ path = "src/main.rs"
 "#,
         );
 
+        // TODO: Add test for multiple definitions returned
         lspresso_shot!(test_definition(
             definition_test_case,
-            &DefinitionResult {
-                start_pos: CursorPosition::new(1, 8),
-                end_pos: Some(CursorPosition::new(1, 15)),
-                path: "src/main.rs".into(),
+            &GotoDefinitionResponse::Link(vec![LocationLink {
+                target_uri: Uri::from_str("src/main.rs").unwrap(),
+                origin_selection_range: Some(Range {
+                    start: Position {
+                        line: 2,
+                        character: 4,
+                    },
+                    end: Position {
+                        line: 2,
+                        character: 7,
+                    },
+                }),
+                target_range: Range {
+                    start: Position {
+                        line: 1,
+                        character: 8,
+                    },
+                    end: Position {
+                        line: 1,
+                        character: 15,
+                    },
+                },
+                target_selection_range: Range {
+                    start: Position {
+                        line: 1,
+                        character: 12,
+                    },
+                    end: Position {
+                        line: 1,
+                        character: 15,
+                    },
+                },
+            }])
+        ));
+    }
+
+    #[test]
+    fn rust_analyzer_multi_diagnostics() {
+        // Add a source and config file to the case case!
+        let diagnostic_test_case = TestCase::new(
+            "src/main.rs",
+            "rust-analyzer",
+            "pub fn main() {
+    let bar = 1;
+}",
+        )
+        .start_type(ServerStartType::Progress(
+            "rustAnalyzer/Indexing".to_string(),
+        ))
+        .timeout(Duration::from_secs(5)) // rust-analyzer is *slow* to startup cold
+        .other_file(
+            "Cargo.toml",
+            r#"
+[package]
+name = "test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[[bin]]
+name = "test"
+path = "src/main.rs"
+"#,
+        );
+
+        let mut data_map = Map::new();
+        data_map.insert(
+            "rendered".to_string(),
+            serde_json::Value::String("warning: unused variable: `bar`\n --> src/main.rs:2:9\n  |\n2 |     let bar = 1;\n  |         ^^^ help: if this is intentional, prefix it with an underscore: `_bar`\n  |\n  = note: `#[warn(unused_variables)]` on by default\n\n".to_string()),
+        );
+        let uri = Uri::from_str("src/main.rs").unwrap();
+        let range = Range {
+            start: Position {
+                line: 1,
+                character: 8,
             },
+            end: Position {
+                line: 1,
+                character: 11,
+            },
+        };
+        lspresso_shot!(test_diagnostics(
+            diagnostic_test_case,
+            &vec![
+                Diagnostic {
+                    range,
+                    severity: Some(DiagnosticSeverity::WARNING),
+                    code: Some(NumberOrString::String("unused_variables".to_string())),
+                    code_description: None,
+                    source: Some("rustc".to_string()),
+                    message: "unused variable: `bar`\n`#[warn(unused_variables)]` on by default"
+                        .to_string(),
+                    related_information: Some(vec![DiagnosticRelatedInformation {
+                        location: Location {
+                            uri: uri.clone(),
+                            range,
+                        },
+                        message: "if this is intentional, prefix it with an underscore: `_bar`"
+                            .to_string(),
+                    }]),
+                    tags: Some(vec![DiagnosticTag::UNNECESSARY]),
+                    data: Some(serde_json::Value::Object(data_map)),
+                },
+                Diagnostic {
+                    range,
+                    severity: Some(DiagnosticSeverity::HINT),
+                    code: Some(NumberOrString::String("unused_variables".to_string())),
+                    code_description: None,
+                    source: Some("rustc".to_string()),
+                    message: "if this is intentional, prefix it with an underscore: `_bar`"
+                        .to_string(),
+                    related_information: Some(vec![DiagnosticRelatedInformation {
+                        location: Location { uri, range },
+                        message: "original diagnostic".to_string(),
+                    }]),
+                    tags: None,
+                    data: None,
+                }
+            ],
         ));
     }
 
@@ -81,18 +201,38 @@ path = "src/main.rs"
 "#,
         );
 
+        let mut data_map = Map::new();
+        _ = data_map.insert(
+            "rendered".to_string(),
+            serde_json::Value::String("error[E0765]: unterminated double quote string\n --> src/main.rs:2:14\n  |\n2 |       println!(\"Hello, world!\n  |  ______________^\n3 | | }\n  | |_^\n\n".to_string()),
+        );
         lspresso_shot!(test_diagnostics(
             diagnostic_test_case,
-            &DiagnosticResult {
-                diagnostics: vec![DiagnosticInfo {
-                    start_line: 1,
-                    start_character: 13,
-                    end_line: Some(2),
-                    end_character: Some(13),
-                    message: "unterminated double quote string\n".to_string(),
-                    severity: Some(DiagnosticSeverity::Error)
-                }],
-            },
+            &vec![Diagnostic {
+                range: Range {
+                    start: Position {
+                        line: 1,
+                        character: 13,
+                    },
+                    end: Position {
+                        line: 2,
+                        character: 1,
+                    },
+                },
+                severity: Some(DiagnosticSeverity::ERROR),
+                code: Some(NumberOrString::String("E0765".to_string())),
+                code_description: Some(CodeDescription {
+                    href: lsp_types::Uri::from_str(
+                        "https://doc.rust-lang.org/error-index.html#E0765"
+                    )
+                    .unwrap()
+                }),
+                source: Some("rustc".to_string()),
+                message: "unterminated double quote string".to_string(),
+                related_information: None,
+                tags: None,
+                data: Some(serde_json::Value::Object(data_map)),
+            }],
         ));
     }
 
@@ -109,7 +249,7 @@ path = "src/main.rs"
             "rustAnalyzer/Indexing".to_string(),
         ))
         .timeout(Duration::from_secs(10)) // rust-analyzer is *slow* to startup cold
-        .cursor_pos(Some(CursorPosition::new(1, 5)))
+        .cursor_pos(Some(Position::new(1, 5)))
         .other_file(
             "Cargo.toml",
             r#"
@@ -128,9 +268,20 @@ path = "src/main.rs"
 
         lspresso_shot!(test_hover(
         hover_test_case,
-        HoverResult {
-            kind: "markdown".to_string(),
-            value:
+        Hover {
+            range: Some(Range {
+                start: lsp_types::Position {
+                    line: 1,
+                    character: 4,
+                },
+                end: lsp_types::Position {
+                    line: 1,
+                    character: 11,
+                },
+            }),
+            contents: lsp_types::HoverContents::Markup(MarkupContent {
+                kind: lsp_types::MarkupKind::Markdown,
+                value:
                 "
 ```rust
 std::macros
@@ -182,8 +333,8 @@ println!(\"hello there!\");
 println!(\"format {} arguments\", \"some\");
 let local_variable = \"some\";
 println!(\"format {local_variable} arguments\");
-```
-".to_string()
+```".to_string()
+            })
         }
     ));
     }
