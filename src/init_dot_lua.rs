@@ -2,7 +2,7 @@ use std::path::Path;
 
 use crate::types::{ServerStartType, TestCase, TestType};
 
-/// Construct the contents of an init.lua file to test an lsp request corresponding
+/// Construct the contents of an `init.lua` file to test an lsp request corresponding
 /// to `init_type` using the given parameters
 pub fn get_init_dot_lua(
     test_case: &TestCase,
@@ -13,8 +13,9 @@ pub fn get_init_dot_lua(
     log_path: &Path,
     source_extension: &str,
 ) -> String {
-    // Start out with an error reporting utility, adding the relevant filetype, and the relevant
-    // `check_progress_result` function to invoke our request at the appropriate time
+    // Start out with some utilities, adding the relevant filetype and the attach
+    // logic, and the relevant `check_progress_result` function to invoke our request
+    // at the appropriate time
     let mut raw_init = format!(
         "{}{}{}",
         include_str!("lua_templates/helpers.lua"),
@@ -27,7 +28,7 @@ pub fn get_init_dot_lua(
             raw_init = raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type));
         }
         TestType::Diagnostic => {
-            // Diagnostics are handled via an autocommand, no need to handle $/progress
+            // Diagnostics are handled via an autocmd, no need to handle `$/progress`
             raw_init = raw_init.replace("LSP_ACTION", "");
             raw_init.push_str(include_str!("lua_templates/diagnostic_autocmd.lua"));
         }
@@ -58,6 +59,7 @@ pub fn get_init_dot_lua(
                 .to_str()
                 .unwrap(),
         );
+
     final_init
 }
 
@@ -73,8 +75,8 @@ fn get_attach_action(test_type: TestType) -> String {
 }
 
 /// In the simple case, the action is invoked immediately. If a server employs
-/// some sort of `$/progress` scheme, then we need to wait until it's completed
-/// before issuing a request
+/// some sort of `$/progress` scheme, then we need to issue a request every time
+/// it claims it's "done" until we get a real result
 fn invoke_lsp_action(start_type: &ServerStartType) -> String {
     match start_type {
         // Directly invoke the action

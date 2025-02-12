@@ -133,7 +133,7 @@ impl TestCase {
     /// # Errors
     ///
     /// Returns `TestSetupError` if `nvim` isn't executable, the provided server
-    /// isn't executable, or if an invalid test file path is found,
+    /// isn't executable, or if an invalid test file path is found
     pub fn validate(&self) -> Result<(), TestSetupError> {
         if !is_executable(&PathBuf::from("nvim")) {
             Err(TestSetupError::InvalidNeovim)?;
@@ -144,16 +144,12 @@ impl TestCase {
             ))?;
         }
         if self.source_path.to_string_lossy().is_empty() {
-            Err(TestSetupError::InvalidFilePath(
-                self.source_path.to_string_lossy().to_string(),
-            ))?;
+            Err(TestSetupError::InvalidFilePath(String::new()))?;
         }
 
         for (path, _) in &self.other_files {
             if path.to_string_lossy().is_empty() {
-                Err(TestSetupError::InvalidFilePath(
-                    path.to_string_lossy().to_string(),
-                ))?;
+                Err(TestSetupError::InvalidFilePath(String::new()))?;
             }
         }
         Ok(())
@@ -162,7 +158,7 @@ impl TestCase {
     /// Returns the path to the directory for test `self.test_id`,
     /// creating parent directories along the way
     ///
-    /// /tmp/lspresso-shot/`test_id`/
+    /// `/tmp/lspresso-shot/<test_id>/`
     ///
     /// # Errors
     ///
@@ -178,14 +174,13 @@ impl TestCase {
     /// Returns the path to the result file for test `self.test_id`,
     /// creating parent directories along the way
     ///
-    /// /tmp/lspresso-shot/`test_id`/results.json
+    /// `/tmp/lspresso-shot/<test_id>/results.json`
     ///
     /// # Errors
     ///
     /// Returns `std::io::Error` if the the test directory can't be created
     pub fn get_results_file_path(&self) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
-        fs::create_dir_all(&lspresso_dir)?;
         lspresso_dir.push("results.json");
         Ok(lspresso_dir)
     }
@@ -193,7 +188,7 @@ impl TestCase {
     /// Returns the path to a source file for test `test_id`,
     /// creating parent directories along the way
     ///
-    /// /tmp/lspresso-shot/`test_id`/src/`file_path`
+    /// `/tmp/lspresso-shot/<test_id>/src/<file_path>`
     ///
     /// # Errors
     ///
@@ -209,46 +204,43 @@ impl TestCase {
     /// Returns the path to a source file for test `test_id`,
     /// creating parent directories along the way
     ///
-    /// /tmp/lspresso-shot/`test_id`/init.lua
+    /// `/tmp/lspresso-shot/<test_id>/init.lua`
     ///
     /// # Errors
     ///
     /// Returns `std::io::Error` if the the test directory can't be created
     pub fn get_init_lua_file_path(&self) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
-        fs::create_dir_all(&lspresso_dir)?;
         lspresso_dir.push("init.lua");
         Ok(lspresso_dir)
     }
 
     /// Returns the path to the error file for test `test_id`,
-    /// creating parent directories along the way. Any errors
-    /// encounted by the config's lua code will be recorded here
+    /// creating parent directories along the way. Any non-fatal
+    /// errors encounted by the lua code will be recorded here.
     ///
-    /// /tmp/lspresso-shot/`test_id`/error.txt
+    /// `/tmp/lspresso-shot/<test_id>/error.txt`
     ///
     /// # Errors
     ///
     /// Returns `std::io::Error` if the the test directory can't be created
     pub fn get_error_file_path(&self) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
-        fs::create_dir_all(&lspresso_dir)?;
         lspresso_dir.push("error.txt");
         Ok(lspresso_dir)
     }
 
     /// Returns the path to the log file for test `test_id`,
     /// creating parent directories along the way. Any logs
-    /// created by the config's lua code will be recorded here
+    /// created by the lua code will be recorded here.
     ///
-    /// /tmp/lspresso-shot/`test_id`/log.txt
+    /// `/tmp/lspresso-shot/<test_id>/log.txt`
     ///
     /// # Errors
     ///
     /// Returns `std::io::Error` if the the test directory can't be created
     pub fn get_log_file_path(&self) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
-        fs::create_dir_all(&lspresso_dir)?;
         lspresso_dir.push("log.txt");
         Ok(lspresso_dir)
     }
@@ -272,7 +264,7 @@ impl TestCase {
             .source_path
             .extension()
             .ok_or_else(|| {
-                // NOTE: use `.unwrap_or("*")` here instead?
+                // NOTE: use `.unwrap_or("*")` here instead to cover files without extensions?
                 TestSetupError::MissingFileExtension(self.source_path.to_string_lossy().to_string())
             })?
             .to_str()
@@ -312,6 +304,10 @@ impl TestCase {
 }
 
 /// Check if a path points to an executable file
+///
+/// # Panics
+///
+/// Will panic on failure to check to metadata of a path
 fn is_executable(server_path: &Path) -> bool {
     let exec_check = |path: &Path| -> bool {
         if path.is_file() {
@@ -358,9 +354,8 @@ fn is_executable(server_path: &Path) -> bool {
         return true;
     }
 
-    use std::env;
-    let path_var = env::var_os("PATH").unwrap();
-    for path in env::split_paths(&path_var) {
+    let path_var = std::env::var_os("PATH").unwrap();
+    for path in std::env::split_paths(&path_var) {
         let full_path = path.join(server_path);
         if exec_check(&full_path) {
             return true;
@@ -372,8 +367,9 @@ fn is_executable(server_path: &Path) -> bool {
 
 // TODO: Need to find a good way to test `Simple` server setup. rust-analyzer doesn't
 // support this obviously, so we can't use that. Expecting contributors to have
-// asm-lsp or some other simple non-`$/progress` server installed isn't great, but maybe
-// that's the only way to do it...
+// asm-lsp or some other simple non-`$/progress` server installed isn't ideal, but maybe
+// that's the only way to do it. Implementing a test server for the project seems
+// like overkill.
 /// Indicates how the server initializes itself before it is ready to service
 /// requests
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -381,8 +377,8 @@ pub enum ServerStartType {
     /// The server is ready to serve requests immediately after attaching
     Simple,
     /// The server needs to undergo some indexing-like process reported via `$/progress`
-    /// before servicing requests. The inner `String` type contains the text of the relevant
-    /// progress token
+    /// before properly servicing requests. The inner `String` type contains the text
+    /// of the relevant progress token (i.e. "rustAnalyzer/indexing")
     Progress(String),
 }
 
@@ -390,7 +386,7 @@ pub enum ServerStartType {
 pub enum TestSetupError {
     #[error("Source file \"{0}\" must have an extension")]
     MissingFileExtension(String),
-    #[error("The server command \"{}\" is not executable", ._0.display())]
+    #[error("The server command/path \"{}\" is not executable", ._0.display())]
     InvalidServerCommand(PathBuf),
     #[error("The command \"nvim\" is not executable")]
     InvalidNeovim,
@@ -506,7 +502,7 @@ fn write_fields_comparison<T: Serialize>(
             for (expected_key, expected_val) in &map.clone() {
                 let actual_val = actual_value.get(expected_key).unwrap().to_owned();
                 match expected_val {
-                    serde_json::Value::Object(_) => {
+                    serde_json::Value::Object(_) | serde_json::Value::Array(_) => {
                         write_fields_comparison(
                             f,
                             expected_key,
@@ -520,7 +516,7 @@ fn write_fields_comparison<T: Serialize>(
                     }
                 }
             }
-            // Display entries present in the actual map but not in the expected map
+            // Display entries present in the `actual` map but not in the `expected` map
             if let Some(actual_map) = actual_value.as_object() {
                 for (actual_key, actual_val) in actual_map
                     .iter()
@@ -546,7 +542,7 @@ fn write_fields_comparison<T: Serialize>(
                     .to_owned();
                 write_fields_comparison(f, name, expected_val, &actual_val, indent + 1)?;
             }
-            // Display entries present in the actual array but not in the expected array
+            // Display entries present in the `actual` array but not in the `expected` array
             for i in array.len()..actual_value.as_array().map_or(0, |a| a.len()) {
                 let actual_val = actual_value
                     .get(i)
@@ -589,12 +585,25 @@ pub struct DiagnosticMismatchError {
 
 impl std::fmt::Display for DiagnosticMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write_fields_comparison(f, "Diagnostic", &self.expected, &self.actual, 0)?;
+        write_fields_comparison(f, "Diagnostics", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }
 
-// Completion Types
+#[derive(Debug, Error)]
+pub struct DefinitionMismatchError {
+    pub expected: GotoDefinitionResponse,
+    pub actual: GotoDefinitionResponse,
+}
+
+impl std::fmt::Display for DefinitionMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write_fields_comparison(f, "GotoDefinition", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+// TODO: Rework completions
 #[derive(Debug, Clone)]
 pub enum CompletionResult {
     /// Expect less than this many completion results, ignoring their contents
@@ -658,20 +667,6 @@ impl std::fmt::Display for CompletionMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         _ = f;
         // TODO: Rework the different Eq. kinds
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error)]
-pub struct DefinitionMismatchError {
-    pub expected: GotoDefinitionResponse,
-    pub actual: GotoDefinitionResponse,
-}
-
-impl std::fmt::Display for DefinitionMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write_fields_comparison(f, "GotoDefinition", &self.expected, &self.actual, 0)?;
-
         Ok(())
     }
 }

@@ -15,7 +15,7 @@ use types::{
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
-/// result is `Ok`, the value is returned. If `Err`, pretty prints the error via
+/// result is `Ok`, the value is returned. If `Err`, pretty-prints the error via
 /// `panic`
 #[macro_export]
 macro_rules! lspresso_shot {
@@ -39,7 +39,8 @@ macro_rules! lspresso_shot {
 ///
 /// # Errors
 ///
-/// Returns an `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
 pub fn test_hover(mut test_case: TestCase, expected_results: Hover) -> TestResult<()> {
     test_case.validate()?;
     test_case.test_id = get_test_id();
@@ -76,6 +77,7 @@ fn test_hover_inner(test_case: &TestCase, expected: Hover) -> TestResult<()> {
     if expected != actual {
         Err(Box::new(HoverMismatchError { expected, actual }))?;
     }
+
     Ok(())
 }
 
@@ -83,7 +85,8 @@ fn test_hover_inner(test_case: &TestCase, expected: Hover) -> TestResult<()> {
 ///
 /// # Errors
 ///
-/// Returns an `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
 pub fn test_diagnostics(
     mut test_case: TestCase,
     expected_results: &[Diagnostic],
@@ -120,14 +123,17 @@ fn test_diagnostics_inner(test_case: &TestCase, expected: &[Diagnostic]) -> Test
             actual,
         })?;
     }
+
     Ok(())
 }
 
+// TODO: Rework completions
 /// Tests the server's response to a 'textDocument/publishDiagnostics' request
 ///
 /// # Errors
 ///
-/// Returns an `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
 pub fn test_completions(
     mut test_case: TestCase,
     expected_results: &CompletionResult,
@@ -225,6 +231,7 @@ fn test_definition_inner(
             actual,
         }))?;
     }
+
     Ok(())
 }
 
@@ -235,7 +242,7 @@ fn get_test_id() -> String {
     range.sample(&mut rng).to_string()
 }
 
-/// Invokes Neovim to run the test associated with the file stored at `init_dot_lua_path`,
+/// Invokes neovim to run the test associated with the file stored at `init_dot_lua_path`,
 /// opening `source_path`
 fn run_test(test_case: &TestCase, test_type: TestType) -> TestResult<()> {
     let source_path = test_case.create_test(test_type)?;
