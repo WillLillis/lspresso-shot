@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anstyle::{AnsiColor, Color, Style};
-use lsp_types::{CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover, Position};
+pub use lsp_types::{CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover, Position};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
