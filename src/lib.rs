@@ -246,5 +246,5 @@ fn run_test(test_case: &TestCase, test_type: TestType) -> TestResult<()> {
         }
     }
 
-    Err(TestSetupError::TimeoutExceeded)?
+    Err(TestSetupError::TimeoutExceeded(test_case.timeout))?
 }

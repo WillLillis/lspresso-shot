@@ -22,7 +22,6 @@ local function check_progress_result()
         if string.len(accum) > 2 then
             accum = string.sub(accum, 1, string.len(accum) - 2) -- Remove the trailing comma
         end
-        print(accum)
         accum = accum .. '\n]' -- Close the array
         file:write(accum)
         file:close()

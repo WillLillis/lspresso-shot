@@ -23,7 +23,35 @@ Write a test:
 ```rust
 #[test]
 fn it_does_the_hover_thing() {
-    // TODO: Fill this out once the API is more flushed out
+    let hover_test_case = TestCase::new(
+        "Source file name",
+        "Source file contents"
+    )
+    .cursor_pos(Some(Position::new(0, 0)))
+    .other_file( // Optional
+        "Other file name",
+        "Other file contents"
+    );
+
+    lspresso_shot!(test_hover(
+        hover_test_case,
+        Hover {
+            range: Some(Range {
+                start: lsp_types::Position {
+                    line: 1,
+                    character: 2,
+                },
+                end: lsp_types::Position {
+                    line: 1,
+                    character: 3,
+                },
+            }),
+            contents: lsp_types::HoverContents::Markup(MarkupContent {
+                kind: lsp_types::MarkupKind::Markdown,
+                value: "Hover window contents here".to_string(),
+            })
+        }
+    ));
 }
 ```
 
@@ -32,11 +60,17 @@ That's it!
 ## Dependencies:
 
 Neovim must be available on your `$PATH`. See the project's [documentation][nvim-install-docs]
-for installation instructions.
+for installation instructions. (TODO: Figure out what versions are compatible)
+
+## Examples:
+
+- The library's test corpus uses [rust-analyzer][rust-analyzer]. See `src/test.rs`
+for examples of how to use the library.
+- TODO: Add asm-lsp/other LSPs here once it's being used.
 
 ## Checklist/TODOs:
 
-- [x] Refactor to use the type definitions from the [lsp-types](https://github.com/gluon-lang/lsp-types)
+- [x] Refactor to use the type definitions from the [lsp-types][https://github.com/gluon-lang/lsp-types]
 crate
 - [x] Use neovim's builtin api to serialize lsp responses into JSON rather than
 hand-encoding information to TOML
@@ -69,13 +103,13 @@ to pass.
 
 - **Variance in LSP client implementation**: The [LSP Spec][lsp-spec] is somewhat loosely defined,
 leaving plenty of room for client implementations to behave differently from one another. This
-project utilizes [neovim](nvim-repo)'s, meaning that unexpected behavior may occur when your server
+project utilizes [neovim][nvim-repo]'s, meaning that unexpected behavior may occur when your server
 is used with other editors' clients.
 
 ## Contributing
 
-- In addition to [neovim](nvim-repo), working on this project also requires having having
-[rust-analyzer](rust-analyzer) on your `$PATH`, as it is used in the project's test suite.
+- In addition to [neovim][nvim-repo], working on this project also requires having having
+[rust-analyzer][rust-analyzer] on your `$PATH`, as it is used in the project's test suite.
 
 [lsp-spec]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/
 [nvim-repo]: https://github.com/neovim/neovim

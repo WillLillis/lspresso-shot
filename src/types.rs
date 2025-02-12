@@ -14,9 +14,13 @@ use crate::init_dot_lua::get_init_dot_lua;
 /// Specifies the type of test to run
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TestType {
+    /// Test `textDocument/hover` requests
     Hover,
+    /// Test `textDocument/publishDiagnostics` requests
     Diagnostic,
+    /// Test `textDocument/completion` requests
     Completion,
+    /// Test `textDocument/definition` requests
     Definition,
 }
 
@@ -318,7 +322,6 @@ fn is_executable(server_path: &Path) -> bool {
     }
 
     use std::env;
-    // Get the PATH environment variable
     let path_var = env::var_os("PATH").unwrap();
     for path in env::split_paths(&path_var) {
         let full_path = path.join(server_path);
@@ -332,7 +335,7 @@ fn is_executable(server_path: &Path) -> bool {
 
 // TODO: Need to find a good way to test `Simple` server setup. rust-analyzer doesn't
 // support this obviously, so we can't use that. Expecting contributors to have
-// asm-lsp or some other simple non-`$/progress` installed isn't great, but maybe
+// asm-lsp or some other simple non-`$/progress` server installed isn't great, but maybe
 // that's the only way to do it...
 /// Indicates how the server initializes itself before it is ready to service
 /// requests
@@ -360,8 +363,8 @@ pub enum TestSetupError {
     InvalidFilePath(String),
     #[error("{0}")]
     InvalidCursorPosition(String),
-    #[error("Test timout exceeded")]
-    TimeoutExceeded,
+    #[error("Test timout of {:.3}s exceeded", ._0.as_secs_f64())]
+    TimeoutExceeded(Duration),
 }
 
 impl From<std::io::Error> for TestError {
