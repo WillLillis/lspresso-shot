@@ -17,8 +17,8 @@ mod tests {
     #[test]
     fn rust_analyzer_definition() {
         let definition_test_case = TestCase::new(
-            "src/main.rs",
             "rust-analyzer",
+            "src/main.rs",
             "pub fn main() {
     let mut foo = 5;
     foo = 10;
@@ -88,8 +88,8 @@ path = "src/main.rs"
     fn rust_analyzer_multi_diagnostics() {
         // Add a source and config file to the case case!
         let diagnostic_test_case = TestCase::new(
-            "src/main.rs",
             "rust-analyzer",
+            "src/main.rs",
             "pub fn main() {
     let bar = 1;
 }",
@@ -175,8 +175,8 @@ path = "src/main.rs"
     fn rust_analyzer_diagnostics() {
         // Add a source and config file to the case case!
         let diagnostic_test_case = TestCase::new(
-            "src/main.rs",
             "rust-analyzer",
+            "src/main.rs",
             r#"pub fn main() {
     println!("Hello, world!
 }"#,
@@ -239,8 +239,8 @@ path = "src/main.rs"
     #[test]
     fn rust_analyzer_hover() {
         let hover_test_case = TestCase::new(
-            "src/main.rs",
             "rust-analyzer",
+            "src/main.rs",
             r#"pub fn main() {
     println!("Hello, world!");
 }"#,
@@ -343,8 +343,8 @@ println!(\"format {local_variable} arguments\");
     //     #[test]
     //     fn rust_analyzer_completion() {
     //         let completion_test_case = TestCase::new(
-    //             "src/main.rs",
     //             "rust-analyzer",
+    //             "src/main.rs",
     //             r#"pub fn main() {
     //     prin
     // }"#,

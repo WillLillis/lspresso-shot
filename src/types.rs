@@ -61,8 +61,8 @@ pub struct TestCase {
 
 impl TestCase {
     pub fn new<P1: Into<PathBuf>, P2: Into<PathBuf>>(
-        source_path: P1,
-        executable_path: P2,
+        executable_path: P1,
+        source_path: P2,
         source_contents: &str,
     ) -> Self {
         Self {

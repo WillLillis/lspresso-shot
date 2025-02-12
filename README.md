@@ -24,6 +24,7 @@ Write a test:
 #[test]
 fn it_does_the_hover_thing() {
     let hover_test_case = TestCase::new(
+        "Path to server"
         "Source file name",
         "Source file contents"
     )
