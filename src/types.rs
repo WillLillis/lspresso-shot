@@ -129,6 +129,11 @@ impl TestCase {
     }
 
     /// Validate the data contained within `self`
+    ///
+    /// # Errors
+    ///
+    /// Returns `TestSetupError` if `nvim` isn't executable, the provided server
+    /// isn't executable, or if an invalid test file path is found,
     pub fn validate(&self) -> Result<(), TestSetupError> {
         if !is_executable(&PathBuf::from("nvim")) {
             Err(TestSetupError::InvalidNeovim)?;
@@ -158,6 +163,10 @@ impl TestCase {
     /// creating parent directories along the way
     ///
     /// /tmp/lspresso-shot/`test_id`/
+    ///
+    /// # Errors
+    ///
+    /// Returns `std::io::Error` if the the test directory can't be created
     pub fn get_lspresso_dir(&self) -> std::io::Result<PathBuf> {
         let mut tmp_dir = temp_dir();
         tmp_dir.push("lspresso-shot");
@@ -170,6 +179,10 @@ impl TestCase {
     /// creating parent directories along the way
     ///
     /// /tmp/lspresso-shot/`test_id`/results.json
+    ///
+    /// # Errors
+    ///
+    /// Returns `std::io::Error` if the the test directory can't be created
     pub fn get_results_file_path(&self) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
         fs::create_dir_all(&lspresso_dir)?;
@@ -181,6 +194,10 @@ impl TestCase {
     /// creating parent directories along the way
     ///
     /// /tmp/lspresso-shot/`test_id`/src/`file_path`
+    ///
+    /// # Errors
+    ///
+    /// Returns `std::io::Error` if the the test directory can't be created
     pub fn get_source_file_path<P: AsRef<Path>>(&self, file_path: P) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
         lspresso_dir.push("src");
@@ -193,6 +210,10 @@ impl TestCase {
     /// creating parent directories along the way
     ///
     /// /tmp/lspresso-shot/`test_id`/init.lua
+    ///
+    /// # Errors
+    ///
+    /// Returns `std::io::Error` if the the test directory can't be created
     pub fn get_init_lua_file_path(&self) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
         fs::create_dir_all(&lspresso_dir)?;
@@ -205,6 +226,10 @@ impl TestCase {
     /// encounted by the config's lua code will be recorded here
     ///
     /// /tmp/lspresso-shot/`test_id`/error.txt
+    ///
+    /// # Errors
+    ///
+    /// Returns `std::io::Error` if the the test directory can't be created
     pub fn get_error_file_path(&self) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
         fs::create_dir_all(&lspresso_dir)?;
@@ -217,6 +242,10 @@ impl TestCase {
     /// created by the config's lua code will be recorded here
     ///
     /// /tmp/lspresso-shot/`test_id`/log.txt
+    ///
+    /// # Errors
+    ///
+    /// Returns `std::io::Error` if the the test directory can't be created
     pub fn get_log_file_path(&self) -> std::io::Result<PathBuf> {
         let mut lspresso_dir = self.get_lspresso_dir()?;
         fs::create_dir_all(&lspresso_dir)?;
@@ -225,6 +254,14 @@ impl TestCase {
     }
 
     /// Creates a test directory for `test_id` based on `self`
+    ///
+    /// # Errors
+    ///
+    /// Returns `TestSetupError` if the test directory can't be created,
+    ///
+    /// # Panics
+    ///
+    /// Will panic if a test source file path doesn't have a parent directory
     pub fn create_test(&self, test_type: TestType) -> TestResult<PathBuf> {
         let results_file_path = self.get_results_file_path()?;
         let init_dot_lua_path = self.get_init_lua_file_path()?;
@@ -258,14 +295,14 @@ impl TestCase {
         }
 
         let source_path = self.get_source_file_path(&self.source_path)?;
-        // Source file paths should always have a parent directory
+        // Invariant: test source file paths should always have a parent directory
         fs::create_dir_all(source_path.parent().unwrap())?;
         fs::File::create(&source_path)?;
         fs::write(&source_path, &self.source_contents)?;
 
         for (path, contents) in &self.other_files {
             let source_file_path = self.get_source_file_path(path)?;
-            // Invariant: test source file paths should always have a parent directory
+            // Invariant: test file paths should always have a parent directory
             fs::create_dir_all(source_file_path.parent().unwrap())?;
             fs::File::create(&source_file_path)?;
             fs::write(&source_file_path, contents)?;
@@ -405,39 +442,34 @@ fn paint(color: Option<impl Into<Color>>, text: &str) -> String {
     format!("{style}{text}{style:#}")
 }
 
-fn write_fields_comparison<T: Serialize>(
+fn compare_fields(
     f: &mut std::fmt::Formatter<'_>,
-    name: &str,
-    expected: &T,
-    actual: &T,
     indent: usize,
+    key: &str,
+    expected: &serde_json::Value,
+    actual: &serde_json::Value,
 ) -> std::fmt::Result {
-    let compare_fields = |f: &mut std::fmt::Formatter<'_>,
-                          indent: usize,
-                          key: &str,
-                          expected: &serde_json::Value,
-                          actual: &serde_json::Value| {
-        let padding = "  ".repeat(indent);
-        let key_render = format!("{key}: ");
+    let padding = "  ".repeat(indent);
+    let key_render = format!("{key}: ");
 
-        if expected == actual {
-            writeln!(
-                f,
-                "{}",
-                paint(GREEN, &format!("{padding}{key_render}{expected}"))
-            )?;
+    if expected == actual {
+        writeln!(
+            f,
+            "{}",
+            paint(GREEN, &format!("{padding}{key_render}{expected}"))
+        )?;
+    } else {
+        let expected_render = if expected.is_string() {
+            format!("\n{padding}    {expected}")
         } else {
-            let expected_render = if expected.is_string() {
-                format!("\n{padding}    {expected}")
-            } else {
-                format!(" {expected}")
-            };
-            let actual_render = if actual.is_string() {
-                format!("\n{padding}    {actual}")
-            } else {
-                format!(" {actual}")
-            };
-            writeln!(
+            format!(" {expected}")
+        };
+        let actual_render = if actual.is_string() {
+            format!("\n{padding}    {actual}")
+        } else {
+            format!(" {actual}")
+        };
+        writeln!(
                 f,
                 "{}",
                 paint(
@@ -445,10 +477,18 @@ fn write_fields_comparison<T: Serialize>(
                     &format!("{padding}{key_render}\n{padding}  Expected:{expected_render}\n{padding}  Actual:{actual_render}")
                 )
             )?;
-        }
+    }
 
-        std::fmt::Result::Ok(())
-    };
+    std::fmt::Result::Ok(())
+}
+
+fn write_fields_comparison<T: Serialize>(
+    f: &mut std::fmt::Formatter<'_>,
+    name: &str,
+    expected: &T,
+    actual: &T,
+    indent: usize,
+) -> std::fmt::Result {
     let mut expected_value = serde_json::to_value(expected).unwrap();
     let actual_value = serde_json::to_value(actual).unwrap();
     let padding = "  ".repeat(indent);
@@ -460,9 +500,10 @@ fn write_fields_comparison<T: Serialize>(
 
     match expected_value {
         serde_json::Value::Object(ref mut map) => {
+            let expected_keys: HashSet<_> = map.keys().map(|k| k.to_owned()).collect();
             map.sort_keys(); // ensure a deterministic ordering
             writeln!(f, "{padding}{key_render}{{",)?;
-            for (expected_key, expected_val) in map {
+            for (expected_key, expected_val) in &map.clone() {
                 let actual_val = actual_value.get(expected_key).unwrap().to_owned();
                 match expected_val {
                     serde_json::Value::Object(_) => {
@@ -479,6 +520,21 @@ fn write_fields_comparison<T: Serialize>(
                     }
                 }
             }
+            // Display entries present in the actual map but not in the expected map
+            if let Some(actual_map) = actual_value.as_object() {
+                for (actual_key, actual_val) in actual_map
+                    .iter()
+                    .filter(|(k, _)| !expected_keys.contains(k.as_str()))
+                {
+                    compare_fields(
+                        f,
+                        indent + 1,
+                        actual_key,
+                        &serde_json::Value::Null,
+                        actual_val,
+                    )?;
+                }
+            }
             writeln!(f, "{padding}}},")?;
         }
         serde_json::Value::Array(ref array) => {
@@ -489,6 +545,20 @@ fn write_fields_comparison<T: Serialize>(
                     .unwrap_or(&serde_json::Value::Null)
                     .to_owned();
                 write_fields_comparison(f, name, expected_val, &actual_val, indent + 1)?;
+            }
+            // Display entries present in the actual array but not in the expected array
+            for i in array.len()..actual_value.as_array().map_or(0, |a| a.len()) {
+                let actual_val = actual_value
+                    .get(i)
+                    .unwrap_or(&serde_json::Value::Null)
+                    .to_owned();
+                write_fields_comparison(
+                    f,
+                    name,
+                    &serde_json::Value::Null,
+                    &actual_val,
+                    indent + 1,
+                )?;
             }
             writeln!(f, "{padding}],")?;
         }

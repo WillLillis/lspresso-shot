@@ -36,6 +36,10 @@ macro_rules! lspresso_shot {
 // Do we even need to cover this use case?
 
 /// Tests the server's response to a 'textDocument/hover' request
+///
+/// # Errors
+///
+/// Returns an `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_hover(mut test_case: TestCase, expected_results: Hover) -> TestResult<()> {
     test_case.validate()?;
     test_case.test_id = get_test_id();
@@ -76,6 +80,10 @@ fn test_hover_inner(test_case: &TestCase, expected: Hover) -> TestResult<()> {
 }
 
 /// Tests the server's response to a 'textDocument/publishDiagnostics' request
+///
+/// # Errors
+///
+/// Returns an `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_diagnostics(
     mut test_case: TestCase,
     expected_results: &[Diagnostic],
@@ -116,6 +124,10 @@ fn test_diagnostics_inner(test_case: &TestCase, expected: &[Diagnostic]) -> Test
 }
 
 /// Tests the server's response to a 'textDocument/publishDiagnostics' request
+///
+/// # Errors
+///
+/// Returns an `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_completions(
     mut test_case: TestCase,
     expected_results: &CompletionResult,
@@ -149,7 +161,7 @@ fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> 
     // temporary struct just to make parsing the results more straightforward
     let raw_results = String::from_utf8(fs::read(&results_file_path)?)
         .map_err(|e| TestError::Utf8(e.to_string()))?;
-    let actual = toml::from_str::<CompletionResponse>(&raw_results)
+    let actual = serde_json::from_str::<CompletionResponse>(&raw_results)
         .map_err(|e| TestError::Serialization(e.to_string()))?;
     _ = actual;
     _ = expected;
@@ -166,6 +178,10 @@ fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> 
 }
 
 /// Tests the server's response to a 'textDocument/definition' request
+///
+/// # Errors
+///
+/// Returns an `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_definition(
     mut test_case: TestCase,
     expected_results: &GotoDefinitionResponse,

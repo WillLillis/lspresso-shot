@@ -24,10 +24,7 @@ pub fn get_init_dot_lua(
     // This is how we actually invoke the action to be tested
     match test_type {
         TestType::Hover | TestType::Completion | TestType::Definition => {
-            raw_init = raw_init.replace(
-                "LSP_ACTION",
-                &invoke_lsp_action(&test_case.start_type).to_string(),
-            );
+            raw_init = raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type));
         }
         TestType::Diagnostic => {
             // Diagnostics are handled via an autocommand, no need to handle $/progress
@@ -36,14 +33,12 @@ pub fn get_init_dot_lua(
         }
     };
 
-    let set_cursor_position = if let Some(cursor_pos) = test_case.cursor_pos {
+    let set_cursor_position = test_case.cursor_pos.map_or_else(String::new, |cursor_pos| {
         format!(
             "position = {{ line = {}, character = {} }},",
             cursor_pos.line, cursor_pos.character
         )
-    } else {
-        String::new()
-    };
+    });
     let final_init = raw_init
         .replace("RESULTS_FILE", results_path.to_str().unwrap())
         .replace(
