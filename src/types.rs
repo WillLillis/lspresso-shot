@@ -245,7 +245,8 @@ impl TestCase {
         Ok(lspresso_dir)
     }
 
-    /// Creates a test directory for `test_id` based on `self`
+    /// Creates a test directory for `test_id` based on `self`. Returns the full
+    /// path to the source file to be opened.
     ///
     /// # Errors
     ///
@@ -254,7 +255,7 @@ impl TestCase {
     /// # Panics
     ///
     /// Will panic if a test source file path doesn't have a parent directory
-    pub fn create_test(&self, test_type: TestType) -> TestResult<PathBuf> {
+    pub fn create_test(&self, test_type: TestType) -> TestSetupResult<PathBuf> {
         let results_file_path = self.get_results_file_path()?;
         let init_dot_lua_path = self.get_init_lua_file_path()?;
         let root_path = self.get_lspresso_dir()?;
@@ -299,6 +300,7 @@ impl TestCase {
             fs::File::create(&source_file_path)?;
             fs::write(&source_file_path, contents)?;
         }
+
         Ok(source_path)
     }
 }
@@ -382,6 +384,8 @@ pub enum ServerStartType {
     Progress(String),
 }
 
+pub type TestSetupResult<T> = Result<T, TestSetupError>;
+
 #[derive(Debug, Error)]
 pub enum TestSetupError {
     #[error("Source file \"{0}\" must have an extension")]
@@ -396,11 +400,11 @@ pub enum TestSetupError {
     InvalidFilePath(String),
     #[error("{0}")]
     InvalidCursorPosition(String),
-    #[error("Test timout of {:.3}s exceeded", ._0.as_secs_f64())]
-    TimeoutExceeded(Duration),
+    #[error("{0}")]
+    IO(String),
 }
 
-impl From<std::io::Error> for TestError {
+impl From<std::io::Error> for TestSetupError {
     fn from(value: std::io::Error) -> Self {
         Self::IO(value.to_string())
     }
@@ -420,14 +424,35 @@ pub enum TestError {
     DefinitionMismatch(#[from] Box<DefinitionMismatchError>), // NOTE: `Box`ed because large
     #[error(transparent)]
     Setup(#[from] TestSetupError),
-    #[error("{0}")]
-    Neovim(String),
-    #[error("{0}")]
-    IO(String),
-    #[error("{0}")]
-    Utf8(String),
-    #[error("{0}")]
-    Serialization(String),
+    #[error("Test {0}:\n{1}")]
+    Neovim(String, String),
+    #[error("Test {0}:\n{1}")]
+    IO(String, String),
+    #[error("Test {0}:\n{1}")]
+    Utf8(String, String),
+    #[error("Test {0}:\n{1}")]
+    Serialization(String, String),
+    #[error(transparent)]
+    TimeoutExceeded(TimeoutError),
+}
+
+#[derive(Debug, Error)]
+pub struct TimeoutError {
+    pub test_id: String,
+    pub timeout: Duration,
+}
+
+impl std::fmt::Display for TimeoutError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Test {}: Test timout of {:.3}s exceeded",
+            self.test_id,
+            self.timeout.as_secs_f64()
+        )?;
+
+        Ok(())
+    }
 }
 
 const GREEN: Option<Color> = Some(anstyle::Color::Ansi(AnsiColor::Green));
@@ -486,7 +511,7 @@ fn write_fields_comparison<T: Serialize>(
     indent: usize,
 ) -> std::fmt::Result {
     let mut expected_value = serde_json::to_value(expected).unwrap();
-    let actual_value = serde_json::to_value(actual).unwrap();
+    let mut actual_value = serde_json::to_value(actual).unwrap();
     let padding = "  ".repeat(indent);
     let key_render = if indent == 0 {
         String::new()
@@ -517,7 +542,8 @@ fn write_fields_comparison<T: Serialize>(
                 }
             }
             // Display entries present in the `actual` map but not in the `expected` map
-            if let Some(actual_map) = actual_value.as_object() {
+            if let Some(ref mut actual_map) = actual_value.as_object_mut() {
+                actual_map.sort_keys(); // ensure a deterministic ordering
                 for (actual_key, actual_val) in actual_map
                     .iter()
                     .filter(|(k, _)| !expected_keys.contains(k.as_str()))
@@ -566,12 +592,14 @@ fn write_fields_comparison<T: Serialize>(
 
 #[derive(Debug, Error)]
 pub struct HoverMismatchError {
+    pub test_id: String,
     pub expected: Hover,
     pub actual: Hover,
 }
 
 impl std::fmt::Display for HoverMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Incorrect Hover response:", self.test_id)?;
         write_fields_comparison(f, "Hover", &self.expected, &self.actual, 0)?;
         Ok(())
     }
@@ -579,12 +607,14 @@ impl std::fmt::Display for HoverMismatchError {
 
 #[derive(Debug, Error)]
 pub struct DiagnosticMismatchError {
+    pub test_id: String,
     pub expected: Vec<Diagnostic>,
     pub actual: Vec<Diagnostic>,
 }
 
 impl std::fmt::Display for DiagnosticMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Incorrect Diagnostic response:", self.test_id)?;
         write_fields_comparison(f, "Diagnostics", &self.expected, &self.actual, 0)?;
         Ok(())
     }
@@ -592,12 +622,18 @@ impl std::fmt::Display for DiagnosticMismatchError {
 
 #[derive(Debug, Error)]
 pub struct DefinitionMismatchError {
+    pub test_id: String,
     pub expected: GotoDefinitionResponse,
     pub actual: GotoDefinitionResponse,
 }
 
 impl std::fmt::Display for DefinitionMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect GotoDefinition response:",
+            self.test_id
+        )?;
         write_fields_comparison(f, "GotoDefinition", &self.expected, &self.actual, 0)?;
         Ok(())
     }
@@ -659,6 +695,7 @@ pub enum CompletionResult {
 
 #[derive(Debug, Error)]
 pub struct CompletionMismatchError {
+    pub test_id: String,
     pub expected: CompletionResult,
     pub actual: CompletionResponse,
 }

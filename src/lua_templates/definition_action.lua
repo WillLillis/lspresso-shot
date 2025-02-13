@@ -15,7 +15,7 @@ local function check_progress_result()
     end
     if definition_results and #definition_results > 0 and definition_results[1].result and #definition_results[1].result > 0 then
         local accum = '[\n'
-        for def_idx, def in ipairs(definition_results) do
+        for _, def in ipairs(definition_results) do
             if def.result then
                 for _, res in ipairs(def.result) do
                     if res.targetUri then
