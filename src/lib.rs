@@ -10,8 +10,8 @@ use std::{
 };
 
 use types::{
-    CompletionResult, DefinitionMismatchError, DiagnosticMismatchError, HoverMismatchError,
-    TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
+    CompletionMismatchError, CompletionResult, DefinitionMismatchError, DiagnosticMismatchError,
+    HoverMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -163,6 +163,10 @@ pub fn test_completions(
     test_result
 }
 
+// BUG: Ok so I made some progress but this is still broken. The issue is that rust-analyzer returns
+// completion results before it's fully initialized. For the particular test case in test.rs,
+// the first set of completions aren't contextful, so it doesn't include completions for `println`.
+// The second set of completions *does*, but how do we tell the difference???
 fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> TestResult<()> {
     if test_case.cursor_pos.is_none() {
         Err(TestSetupError::InvalidCursorPosition(
@@ -182,18 +186,16 @@ fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> 
     .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e.to_string()))?;
     let actual = serde_json::from_str::<CompletionResponse>(&raw_results)
         .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e.to_string()))?;
-    _ = actual;
-    _ = expected;
 
-    unimplemented!();
-    // TODO: Rework completions comparisons
-    // if !expected.compare_results(&actual) {
-    //     Err(CompletionMismatchError {
-    //         expected: expected.clone(),
-    //         actual,
-    //     })?;
-    // }
-    // Ok(())
+    if !expected.compare_results(&actual) {
+        Err(CompletionMismatchError {
+            test_id: test_case.test_id.clone(),
+            expected: expected.clone(),
+            actual,
+        })?;
+    }
+
+    Ok(())
 }
 
 /// Tests the server's response to a 'textDocument/definition' request

@@ -68,7 +68,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::Hover => include_str!("lua_templates/hover_action.lua"),
         // Diagnostic results are gathered via the `DiagnosticChanged` autocmd
         TestType::Diagnostic => "",
-        TestType::Completion => COMPLETION_ACTION, // TODO: Fix
+        TestType::Completion => include_str!("lua_templates/completion_action.lua"),
         TestType::Definition => include_str!("lua_templates/definition_action.lua"),
     }
     .to_string()
@@ -97,42 +97,3 @@ end"#
         }
     }
 }
-
-// TODO: Rework this once we have completions figured out
-/// Invoke a 'textDocument/publishDiagnostics' request, gather the results, and
-/// write them to a file in TOML format
-const COMPLETION_ACTION: &str = r#"
-local progress_count = 0 -- track how many times we've tried for the logs
-
-local function check_progress_result()
-    local completion_results = vim.lsp.buf_request_sync(0, "textDocument/completion", {
-        textDocument = vim.lsp.util.make_text_document_params(0),
-        SET_CURSOR_POSITION
-    }, 1000)
-    local file = io.open('RESULTS_FILE', "w")
-    if completion_results and #completion_results > 1 and completion_results[1].result and completion_results[1].result.items and file then
-        local t = { }
-        for _, result in pairs(completion_results) do
-            if result.result and result.result.items then
-                for _, item in ipairs(result.result.items) do
-                    t[#t+1] = '[[completions]]\n'
-                    local label = string.gsub(item.label, "\\", "\\\\") -- serde fails to parse, interpreting slashes as escape sequences
-                    t[#t+1] = 'label = "' .. label .. '"'
-                    t[#t+1] = 'kind = "' .. tostring(item.kind) .. '"'
-                    t[#t+1] = 'documentation_kind = "' .. item.documentation.kind .. '"'
-                    local raw_value = tostring(item.documentation.value)
-                    local value = string.gsub(raw_value, "\\", "\\\\") -- serde fails to parse, interpreting slashes as escape sequences
-                    t[#t+1] = 'documentation_value = """\n' .. value .. '\n"""\n'
-                end
-            end
-        end
-        local completions = table.concat(t, '\n')
-        file:write(completions)
-        file:close()
-        vim.cmd('qa!')
-    else
-        report_log('No completion result returned (Attempt ' .. tostring(progress_count) .. ')\n')
-    end
-    progress_count = progress_count + 1
-end
-"#;
