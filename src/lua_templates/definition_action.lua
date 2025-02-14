@@ -34,7 +34,8 @@ local function check_progress_result()
         results_file:write(accum)
         results_file:close()
         ---@diagnostic enable: need-check-nil
-        vim.cmd('qa!')
+        ---@diagnostic disable-next-line: undefined-global, exp-in-action
+        PROGRESS_EXIT_ACTION
     else
         ---@diagnostic disable: undefined-global
         report_log('No definition result returned (Attempt ' ..

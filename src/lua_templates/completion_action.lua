@@ -26,8 +26,10 @@ local function check_progress_result()
         -- Does this ever return more than one??? For now, let's just grab the first
         ---@diagnostic disable: need-check-nil
         results_file:write(vim.json.encode(completion_result[1].result))
+        results_file:close()
         ---@diagnostic enable: need-check-nil
-        vim.cmd('qa!')
+        ---@diagnostic disable-next-line: undefined-global, exp-in-action
+        PROGRESS_EXIT_ACTION
     else
         ---@diagnostic disable: undefined-global
         report_log('No completion result returned (Attempt ' ..

@@ -25,7 +25,7 @@ mod tests {
     foo = 10;
 }",
         )
-        .start_type(ServerStartType::Progress(
+        .start_type(ServerStartType::ProgressFirst(
             "rustAnalyzer/Indexing".to_string(),
         ))
         .cursor_pos(Some(Position::new(2, 5)))
@@ -96,7 +96,7 @@ path = "src/main.rs"
     let bar = 1;
 }",
         )
-        .start_type(ServerStartType::Progress(
+        .start_type(ServerStartType::ProgressFirst(
             "rustAnalyzer/Indexing".to_string(),
         ))
         .timeout(Duration::from_secs(5)) // rust-analyzer is *slow* to startup cold
@@ -184,7 +184,7 @@ path = "src/main.rs"
     println!("Hello, world!
 }"#,
         )
-        .start_type(ServerStartType::Progress(
+        .start_type(ServerStartType::ProgressFirst(
             "rustAnalyzer/Indexing".to_string(),
         ))
         .timeout(Duration::from_secs(5)) // rust-analyzer is *slow* to startup cold
@@ -249,7 +249,7 @@ path = "src/main.rs"
     println!("Hello, world!");
 }"#,
         )
-        .start_type(ServerStartType::Progress(
+        .start_type(ServerStartType::ProgressFirst(
             "rustAnalyzer/Indexing".to_string(),
         ))
         .timeout(Duration::from_secs(10)) // rust-analyzer is *slow* to startup cold
@@ -344,7 +344,13 @@ println!(\"format {local_variable} arguments\");
     ));
     }
 
-    #[ignore = "completions are still broken"]
+    // TODO: The end user experience for debugging completions test with CompletionResult::Contains
+    // is pretty awful. If we're not going to check by struct equality, there needs
+    // to be some helpers for cases where you have the "right" expected completion
+    // item, but a few fields are off. Maybe write a function to sort the provided
+    // results by similarity to the first unnaccounted for expected item. Then we
+    // can use the json diff printing logic to help highlight differences
+    #[allow(clippy::too_many_lines)]
     #[test]
     fn rust_analyzer_completion() {
         let expected_comps = CompletionResult::Contains(vec![CompletionItem {
@@ -356,14 +362,19 @@ println!(\"format {local_variable} arguments\");
                 kind: lsp_types::MarkupKind::Markdown,
                 value: r#"Prints to the standard output, with a newline.
 
-On all platforms, the newline is the LINE FEED character (`\n`/`U+000A`) alone\n(no additional CARRIAGE RETURN (`\r`/`U+000D`)).
+On all platforms, the newline is the LINE FEED character (`\n`/`U+000A`) alone
+(no additional CARRIAGE RETURN (`\r`/`U+000D`)).
 
 This macro uses the same syntax as [`format!`], but writes to the standard output instead.
-See [`std::fmt`] for more information.\n\nThe `println!` macro will lock the standard output on each call. If you call
+See [`std::fmt`] for more information.
+
+The `println!` macro will lock the standard output on each call. If you call
 `println!` within a hot loop, this behavior may be the bottleneck of the loop.
 To avoid this, lock stdout with [`io::stdout().lock()`][lock]:
 ```rust
-use std::io::{stdout, Write};\n\nlet mut lock = stdout().lock();
+use std::io::{stdout, Write};
+
+let mut lock = stdout().lock();
 writeln!(lock, "hello world").unwrap();
 ```
 
@@ -373,7 +384,8 @@ Use `println!` only for the primary output of your program. Use
 See [the formatting documentation in `std::fmt`](../std/fmt/index.html)
 for details of the macro argument syntax.
 
-[`std::fmt`]:crate::fmt\n[`eprintln!`]: crate::eprintln
+[`std::fmt`]: crate::fmt
+[`eprintln!`]: crate::eprintln
 [lock]: crate::io::Stdout
 
 # Panics
@@ -393,7 +405,8 @@ println!("hello there!");
 println!("format {} arguments", "some");
 let local_variable = "some";
 println!("format {local_variable} arguments");
-```"#.to_string(),
+```"#
+                    .to_string(),
             })),
             deprecated: Some(false),
             preselect: Some(true),
@@ -402,21 +415,20 @@ println!("format {local_variable} arguments");
             insert_text: None,
             insert_text_format: Some(InsertTextFormat::SNIPPET),
             insert_text_mode: None,
-            text_edit: Some(
-                CompletionTextEdit::Edit(TextEdit {
-                    range: Range {
-                        start: Position {
-                            line: 2,
-                            character: 0,
-                        },
-                        end: Position {
-                            line: 2,
-                            character: 0,
-                        },
+            text_edit: Some(CompletionTextEdit::Edit(TextEdit {
+                range: Range {
+                    start: Position {
+                        line: 2,
+                        character: 0,
                     },
-                    new_text: "println!($0)".to_string(),
-                })),
-            additional_text_edits: None,
+                    end: Position {
+                        line: 2,
+                        character: 0,
+                    },
+                },
+                new_text: "println!($0)".to_string(),
+            })),
+            additional_text_edits: Some(vec![]),
             command: None,
             commit_characters: None,
             data: None,
@@ -429,7 +441,7 @@ println!("format {local_variable} arguments");
     prin
 }",
         )
-        .start_type(ServerStartType::Progress(
+        .start_type(ServerStartType::ProgressLast(
             "rustAnalyzer/Indexing".to_string(),
         ))
         .timeout(Duration::from_secs(10)) // rust-analyzer is *slow* to startup cold

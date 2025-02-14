@@ -286,7 +286,6 @@ impl TestCase {
                 &log_path,
                 extension,
             );
-            println!("{nvim_config}");
             fs::File::create(&init_dot_lua_path)?;
             fs::write(&init_dot_lua_path, &nvim_config)?;
         }
@@ -384,8 +383,14 @@ pub enum ServerStartType {
     Simple,
     /// The server needs to undergo some indexing-like process reported via `$/progress`
     /// before properly servicing requests. The inner `String` type contains the text
-    /// of the relevant progress token (i.e. "rustAnalyzer/indexing")
-    Progress(String),
+    /// of the relevant progress token (i.e. "rustAnalyzer/indexing"). Poll for progress
+    /// messages, and accept the first valid result
+    ProgressFirst(String),
+    /// The server needs to undergo some indexing-like process reported via `$/progress`
+    /// before properly servicing requests. The inner `String` type contains the text
+    /// of the relevant progress token (i.e. "rustAnalyzer/indexing"). Poll for progress
+    /// messages, and accept the last valid result before the timeout is exceeded
+    ProgressLast(String),
 }
 
 pub type TestSetupResult<T> = Result<T, TestSetupError>;
@@ -484,6 +489,8 @@ fn compare_fields(
             paint(GREEN, &format!("{padding}{key_render}{expected}"))
         )?;
     } else {
+        // TODO: Pull in some sort of diffing library to make this more readable,
+        // can be very difficult to spot what's off in long strings
         let expected_render = if expected.is_string() {
             format!("\n{padding}    {expected}")
         } else {
@@ -661,13 +668,12 @@ pub enum CompletionResult {
 }
 
 impl CompletionResult {
-    // TODO: Better function name lol
     /// Compares the expected results in `self` to the `actual` results, respecting
     /// the intended behavior for each enum variant of `Self`
     ///
     /// Returns true if the two are considered equal, false otherwise
     #[must_use]
-    pub fn compare_results(&self, actual: &CompletionResponse) -> bool {
+    pub fn results_satisfy(&self, actual: &CompletionResponse) -> bool {
         match self {
             Self::Contains(expected_results) => {
                 let actual_items = match actual {
@@ -721,7 +727,6 @@ pub struct CompletionMismatchError {
 // TODO: Cleanup/ consolidate this logic with Self::compare_results
 impl std::fmt::Display for CompletionMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Completion response:", self.test_id)?;
         match &self.expected {
             CompletionResult::Contains(expected_results) => {
                 let actual_items = match &self.actual {
@@ -755,7 +760,7 @@ impl std::fmt::Display for CompletionMismatchError {
                 writeln!(
                     f,
                     "\nProvided item{}:",
-                    if expected.len() > 1 { "s" } else { "" }
+                    if actual_items.len() > 1 { "s" } else { "" }
                 )?;
                 for item in actual_items {
                     writeln!(

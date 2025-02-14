@@ -11,7 +11,8 @@ use std::{
 
 use types::{
     CompletionMismatchError, CompletionResult, DefinitionMismatchError, DiagnosticMismatchError,
-    HoverMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
+    HoverMismatchError, ServerStartType, TestCase, TestError, TestResult, TestSetupError, TestType,
+    TimeoutError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -138,7 +139,6 @@ fn test_diagnostics_inner(test_case: &TestCase, expected: &[Diagnostic]) -> Test
     Ok(())
 }
 
-// TODO: Rework completions
 /// Tests the server's response to a 'textDocument/publishDiagnostics' request
 ///
 /// # Errors
@@ -163,10 +163,6 @@ pub fn test_completions(
     test_result
 }
 
-// BUG: Ok so I made some progress but this is still broken. The issue is that rust-analyzer returns
-// completion results before it's fully initialized. For the particular test case in test.rs,
-// the first set of completions aren't contextful, so it doesn't include completions for `println`.
-// The second set of completions *does*, but how do we tell the difference???
 fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> TestResult<()> {
     if test_case.cursor_pos.is_none() {
         Err(TestSetupError::InvalidCursorPosition(
@@ -178,7 +174,6 @@ fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> 
     let results_file_path = test_case
         .get_results_file_path()
         .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
-    // temporary struct just to make parsing the results more straightforward
     let raw_results = String::from_utf8(
         fs::read(&results_file_path)
             .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
@@ -187,7 +182,7 @@ fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> 
     let actual = serde_json::from_str::<CompletionResponse>(&raw_results)
         .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e.to_string()))?;
 
-    if !expected.compare_results(&actual) {
+    if !expected.results_satisfy(&actual) {
         Err(CompletionMismatchError {
             test_id: test_case.test_id.clone(),
             expected: expected.clone(),
@@ -302,8 +297,14 @@ fn run_test(test_case: &TestCase, test_type: TestType) -> TestResult<()> {
         Err(TestError::Neovim(test_case.test_id.clone(), error))?;
     }
 
-    Err(TestError::TimeoutExceeded(TimeoutError {
-        test_id: test_case.test_id.clone(),
-        timeout: test_case.timeout,
-    }))?
+    // `ProgressLast` has the test run until the timeout intentionally. If no errors
+    // were reported, assume valid results
+    if matches!(test_case.start_type, ServerStartType::ProgressLast(_)) {
+        Ok(())
+    } else {
+        Err(TestError::TimeoutExceeded(TimeoutError {
+            test_id: test_case.test_id.clone(),
+            timeout: test_case.timeout,
+        }))?
+    }
 }

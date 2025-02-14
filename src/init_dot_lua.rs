@@ -41,6 +41,10 @@ pub fn get_init_dot_lua(
         )
     });
     let final_init = raw_init
+        .replace(
+            "PROGRESS_EXIT_ACTION",
+            get_progress_exit(&test_case.start_type),
+        )
         .replace("RESULTS_FILE", results_path.to_str().unwrap())
         .replace(
             "EXECUTABLE_PATH",
@@ -63,6 +67,13 @@ pub fn get_init_dot_lua(
     final_init
 }
 
+const fn get_progress_exit(start_type: &ServerStartType) -> &str {
+    match start_type {
+        ServerStartType::Simple | ServerStartType::ProgressFirst(_) => "vim.cmd('qa!')",
+        ServerStartType::ProgressLast(_) => "",
+    }
+}
+
 fn get_attach_action(test_type: TestType) -> String {
     match test_type {
         TestType::Hover => include_str!("lua_templates/hover_action.lua"),
@@ -82,7 +93,7 @@ fn invoke_lsp_action(start_type: &ServerStartType) -> String {
         // Directly invoke the action
         ServerStartType::Simple => "check_progress_result()".to_string(),
         // Setup polling to check if the server is ready
-        ServerStartType::Progress(token_name) => {
+        ServerStartType::ProgressFirst(token_name) | ServerStartType::ProgressLast(token_name) => {
             format!(
                 r#"
 vim.lsp.handlers["$/progress"] = function(_, result, _)
