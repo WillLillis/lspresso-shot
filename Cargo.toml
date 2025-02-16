@@ -28,3 +28,4 @@ cargo = { level = "warn", priority = -1 }
 multiple_crate_versions = "allow"
 items_after_statements = "allow"
 redundant_closure_for_method_calls = "allow"
+module_name_repetitions = "allow"

@@ -11,8 +11,7 @@ use std::{
 
 use types::{
     CompletionMismatchError, CompletionResult, DefinitionMismatchError, DiagnosticMismatchError,
-    HoverMismatchError, ServerStartType, TestCase, TestError, TestResult, TestSetupError, TestType,
-    TimeoutError,
+    HoverMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -114,8 +113,7 @@ pub fn test_diagnostics(
 }
 
 fn test_diagnostics_inner(test_case: &TestCase, expected: &[Diagnostic]) -> TestResult<()> {
-    run_test(test_case, TestType::Diagnostic)
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+    run_test(test_case, TestType::Diagnostic)?;
 
     let results_file_path = test_case
         .get_results_file_path()
@@ -297,14 +295,8 @@ fn run_test(test_case: &TestCase, test_type: TestType) -> TestResult<()> {
         Err(TestError::Neovim(test_case.test_id.clone(), error))?;
     }
 
-    // `ProgressLast` has the test run until the timeout intentionally. If no errors
-    // were reported, assume valid results
-    if matches!(test_case.start_type, ServerStartType::ProgressLast(_)) {
-        Ok(())
-    } else {
-        Err(TestError::TimeoutExceeded(TimeoutError {
-            test_id: test_case.test_id.clone(),
-            timeout: test_case.timeout,
-        }))?
-    }
+    Err(TestError::TimeoutExceeded(TimeoutError {
+        test_id: test_case.test_id.clone(),
+        timeout: test_case.timeout,
+    }))?
 }

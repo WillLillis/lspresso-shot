@@ -138,6 +138,9 @@ impl TestCase {
     /// Returns `TestSetupError` if `nvim` isn't executable, the provided server
     /// isn't executable, or if an invalid test file path is found
     pub fn validate(&self) -> Result<(), TestSetupError> {
+        if !self.start_type.is_valid() {
+            Err(TestSetupError::InvalidServerStartType)?;
+        }
         if !is_executable(&PathBuf::from("nvim")) {
             Err(TestSetupError::InvalidNeovim)?;
         }
@@ -371,10 +374,11 @@ fn is_executable(server_path: &Path) -> bool {
 }
 
 // TODO: Need to find a good way to test `Simple` server setup. rust-analyzer doesn't
-// support this obviously, so we can't use that. Expecting contributors to have
-// asm-lsp or some other simple non-`$/progress` server installed isn't ideal, but maybe
-// that's the only way to do it. Implementing a test server for the project seems
-// like overkill.
+// support this obviously, so we can't use that. Once the project is stable enough
+// with a few of the request types, we can probably implement a *very* basic test
+// server to send back dummy responses to known test inputs. This way, we can get
+// complete coverage for all the  different ways results can be returned
+
 /// Indicates how the server initializes itself before it is ready to service
 /// requests
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -382,15 +386,27 @@ pub enum ServerStartType {
     /// The server is ready to serve requests immediately after attaching
     Simple,
     /// The server needs to undergo some indexing-like process reported via `$/progress`
-    /// before properly servicing requests. The inner `String` type contains the text
-    /// of the relevant progress token (i.e. "rustAnalyzer/indexing"). Poll for progress
-    /// messages, and accept the first valid result
-    ProgressFirst(String),
-    /// The server needs to undergo some indexing-like process reported via `$/progress`
-    /// before properly servicing requests. The inner `String` type contains the text
-    /// of the relevant progress token (i.e. "rustAnalyzer/indexing"). Poll for progress
-    /// messages, and accept the last valid result before the timeout is exceeded
-    ProgressLast(String),
+    /// before properly servicing requests. Listen to progress messages and issue
+    /// the related request after the ith one is received.
+    ///
+    /// The inner `u32` type indicates on which `end` `$/progress` message the
+    /// server is ready to respond to a particular request. Counting is 1-based.
+    ///
+    /// The inner `String` type contains the text of the relevant progress token
+    /// (i.e. "rustAnalyzer/indexing").
+    Progress(u32, String),
+}
+
+impl ServerStartType {
+    // NOTE: Is there a better way to enforce strictly positive integers?
+    /// Returns true if the given `ServerStartType` is valid
+    #[must_use]
+    pub const fn is_valid(&self) -> bool {
+        match self {
+            Self::Simple => true,
+            Self::Progress(x, _) => *x > 0,
+        }
+    }
 }
 
 pub type TestSetupResult<T> = Result<T, TestSetupError>;
@@ -409,6 +425,8 @@ pub enum TestSetupError {
     InvalidFilePath(String),
     #[error("{0}")]
     InvalidCursorPosition(String),
+    #[error("Server start type progress value must be greater than 0")]
+    InvalidServerStartType,
     #[error("{0}")]
     IO(String),
 }
@@ -536,7 +554,10 @@ fn write_fields_comparison<T: Serialize>(
             map.sort_keys(); // ensure a deterministic ordering
             writeln!(f, "{padding}{key_render}{{",)?;
             for (expected_key, expected_val) in &map.clone() {
-                let actual_val = actual_value.get(expected_key).unwrap().to_owned();
+                let actual_val = actual_value
+                    .get(expected_key)
+                    .unwrap_or(&serde_json::Value::Null)
+                    .to_owned();
                 match expected_val {
                     serde_json::Value::Object(_) | serde_json::Value::Array(_) => {
                         write_fields_comparison(

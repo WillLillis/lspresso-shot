@@ -41,10 +41,6 @@ pub fn get_init_dot_lua(
         )
     });
     let final_init = raw_init
-        .replace(
-            "PROGRESS_EXIT_ACTION",
-            get_progress_exit(&test_case.start_type),
-        )
         .replace("RESULTS_FILE", results_path.to_str().unwrap())
         .replace(
             "EXECUTABLE_PATH",
@@ -55,6 +51,10 @@ pub fn get_init_dot_lua(
         .replace("LOG_PATH", log_path.to_str().unwrap())
         .replace("FILE_EXTENSION", source_extension)
         .replace("SET_CURSOR_POSITION", &set_cursor_position)
+        .replace(
+            "PROGRESS_THRESHOLD",
+            &progress_threshold(&test_case.start_type),
+        )
         .replace(
             "PARENT_PATH",
             test_case
@@ -67,18 +67,17 @@ pub fn get_init_dot_lua(
     final_init
 }
 
-const fn get_progress_exit(start_type: &ServerStartType) -> &str {
+fn progress_threshold(start_type: &ServerStartType) -> String {
     match start_type {
-        ServerStartType::Simple | ServerStartType::ProgressFirst(_) => "vim.cmd('qa!')",
-        ServerStartType::ProgressLast(_) => "",
+        ServerStartType::Simple => "0".to_string(),
+        ServerStartType::Progress(threshold, _) => threshold.to_string(),
     }
 }
 
 fn get_attach_action(test_type: TestType) -> String {
     match test_type {
         TestType::Hover => include_str!("lua_templates/hover_action.lua"),
-        // Diagnostic results are gathered via the `DiagnosticChanged` autocmd
-        TestType::Diagnostic => "",
+        TestType::Diagnostic => "\n-- NOTE: No `check_progress_result` function for diagnostics, instead handled by `DiagnosticChanged` autocmd\n",
         TestType::Completion => include_str!("lua_templates/completion_action.lua"),
         TestType::Definition => include_str!("lua_templates/definition_action.lua"),
     }
@@ -86,24 +85,23 @@ fn get_attach_action(test_type: TestType) -> String {
 }
 
 /// In the simple case, the action is invoked immediately. If a server employs
-/// some sort of `$/progress` scheme, then we need to issue a request every time
-/// it claims it's "done" until we get a real result
+/// some sort of `$/progress` scheme, then we need to check each time the server
+/// claims it's ready, respecting the user-set `progress_threshold`
 fn invoke_lsp_action(start_type: &ServerStartType) -> String {
     match start_type {
-        // Directly invoke the action
-        ServerStartType::Simple => "check_progress_result()".to_string(),
-        // Setup polling to check if the server is ready
-        ServerStartType::ProgressFirst(token_name) | ServerStartType::ProgressLast(token_name) => {
+        // Directly invoke the action. Note we unconditionally end the test after the first try
+        ServerStartType::Simple => "check_progress_result()\nvim.cmd('qa!')".to_string(),
+        // Hook into `$/progress` messages
+        ServerStartType::Progress(_, token_name) => {
             format!(
-                r#"
-vim.lsp.handlers["$/progress"] = function(_, result, _)
-    if client then
-        if result.value.kind == "end" and result.token == "{token_name}" then
-            client.initialized = true
-            check_progress_result()
-        end
-    end
-end"#
+                r#"vim.lsp.handlers["$/progress"] = function(_, result, _)
+                    if client then
+                        if result.value.kind == "end" and result.token == "{token_name}" then
+                            client.initialized = true
+                            check_progress_result()
+                        end
+                    end
+                end"#
             )
         }
     }

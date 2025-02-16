@@ -1,19 +1,24 @@
-local progress_count = 0 -- track how many times we've tried for the logs
+local progress_count = 0     -- track how many times we've tried for the logs
 
 ---@diagnostic disable-next-line: unused-function, unused-local
 local function check_progress_result()
+    progress_count = progress_count + 1
+    if progress_count < PROGRESS_THRESHOLD then ---@diagnostic disable-line: undefined-global
+        report_log(tostring(progress_count) ' < ' .. tostring(PROGRESS_THRESHOLD) .. '\n') ---@diagnostic disable-line: undefined-global
+        return
+    end
     report_log('Issuing definition request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
     local definition_results = vim.lsp.buf_request_sync(0, "textDocument/definition", {
         textDocument = vim.lsp.util.make_text_document_params(0),
         ---@diagnostic disable-next-line: undefined-global
         SET_CURSOR_POSITION
     }, 1000)
-    local results_file = io.open('RESULTS_FILE', "w")
-    if not results_file then
-        report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
-        vim.cmd('qa!')
-    end
     if definition_results and #definition_results > 0 and definition_results[1].result and #definition_results[1].result > 0 then
+        local results_file = io.open('RESULTS_FILE', "w")
+        if not results_file then
+            report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
+            vim.cmd('qa!')
+        end
         local accum = '[\n'
         for _, def in ipairs(definition_results) do
             if def.result then
@@ -35,12 +40,9 @@ local function check_progress_result()
         results_file:close()
         ---@diagnostic enable: need-check-nil
         ---@diagnostic disable-next-line: undefined-global, exp-in-action
-        PROGRESS_EXIT_ACTION
     else
-        ---@diagnostic disable: undefined-global
-        report_log('No definition result returned (Attempt ' ..
-            tostring(progress_count) .. '):\n ' .. vim.inspect(definition_results) .. '\n\n')
-        ---@diagnostic enable: undefined-global
+        ---@diagnostic disable-next-line: undefined-global
+        report_log('No valid definition result returned (Attempt ' .. vim.inspect(definition_results) .. '\n')
     end
-    progress_count = progress_count + 1
+    vim.cmd('qa!')
 end

@@ -25,7 +25,8 @@ mod tests {
     foo = 10;
 }",
         )
-        .start_type(ServerStartType::ProgressFirst(
+        .start_type(ServerStartType::Progress(
+            4,
             "rustAnalyzer/Indexing".to_string(),
         ))
         .cursor_pos(Some(Position::new(2, 5)))
@@ -86,6 +87,7 @@ path = "src/main.rs"
         ));
     }
 
+    // NOTE:: Specifying the start type is ignored for diagnostics tests
     #[test]
     fn rust_analyzer_multi_diagnostics() {
         // Add a source and config file to the case case!
@@ -96,9 +98,6 @@ path = "src/main.rs"
     let bar = 1;
 }",
         )
-        .start_type(ServerStartType::ProgressFirst(
-            "rustAnalyzer/Indexing".to_string(),
-        ))
         .timeout(Duration::from_secs(5)) // rust-analyzer is *slow* to startup cold
         .cleanup(false)
         .other_file(
@@ -174,6 +173,7 @@ path = "src/main.rs"
         ));
     }
 
+    // NOTE:: Specifying the start type is ignored for diagnostics tests
     #[test]
     fn rust_analyzer_diagnostics() {
         // Add a source and config file to the case case!
@@ -184,9 +184,6 @@ path = "src/main.rs"
     println!("Hello, world!
 }"#,
         )
-        .start_type(ServerStartType::ProgressFirst(
-            "rustAnalyzer/Indexing".to_string(),
-        ))
         .timeout(Duration::from_secs(5)) // rust-analyzer is *slow* to startup cold
         .cleanup(false)
         .other_file(
@@ -249,10 +246,11 @@ path = "src/main.rs"
     println!("Hello, world!");
 }"#,
         )
-        .start_type(ServerStartType::ProgressFirst(
+        .start_type(ServerStartType::Progress(
+            1,
             "rustAnalyzer/Indexing".to_string(),
         ))
-        .timeout(Duration::from_secs(10)) // rust-analyzer is *slow* to startup cold
+        .timeout(Duration::from_secs(15)) // rust-analyzer is *slow* to startup cold
         .cleanup(false)
         .cursor_pos(Some(Position::new(1, 5)))
         .other_file(
@@ -441,7 +439,8 @@ println!("format {local_variable} arguments");
     prin
 }",
         )
-        .start_type(ServerStartType::ProgressLast(
+        .start_type(ServerStartType::Progress(
+            4,
             "rustAnalyzer/Indexing".to_string(),
         ))
         .timeout(Duration::from_secs(10)) // rust-analyzer is *slow* to startup cold
