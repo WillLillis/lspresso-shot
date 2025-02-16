@@ -65,7 +65,7 @@ for installation instructions. (TODO: Figure out what versions are compatible)
 
 ## Examples:
 
-- The library's test corpus uses [rust-analyzer][rust-analyzer]. See `src/test.rs`
+- The library's test corpus uses [rust-analyzer][rust-analyzer]. See [`src/test.rs`][repo-tests]
 for examples of how to use the library.
 - TODO: Add asm-lsp/other LSPs here once it's being used.
 
@@ -75,7 +75,7 @@ for examples of how to use the library.
 crate
 - [x] Use neovim's builtin api to serialize lsp responses into JSON rather than
 hand-encoding information to TOML
-- [ ] Try to find a better way to determine when a `$/progress`-style server has
+- [x] Try to find a better way to determine when a `$/progress`-style server has
 fully started up, rather than the current polling approach
 - [x] Place Lua logic into dedicated files rather than as strings within the Rust
 files
@@ -85,17 +85,18 @@ files
 As an eventual end goal, we'd obviously like to provide test coverage for *all* LSP methods.
 To start though, let's focus on the following TODOs:
 
-- [ ] It likely doesn't make sense to bundle a neovim execuatable with the project. The
-solution here is probably just to require uses to have neovim installed on their systems
-in order to use the project, but maybe there's a way around this.
-- [ ] `textDocument/hover`
-- [ ] `textDocument/publishDiagnostics`
+- [ ] Create a *very* simple test server so we can ensure coverage of all type variants
+- [x] `textDocument/hover`
+- [x] `textDocument/publishDiagnostics`
 - [ ] `textDocument/references`
-- [ ] `textDocument/definition`
+- [ ] `textDocument/definition` (partially addressed)
+- [ ] `textDocument/completion` (partially addressed)
 - [ ] `textDocument/formatting`
 - [ ] `textDocument/rename`
 
 ## Gotchas
+
+- TODO: Add explanation of the API for `$/progress`-initialized servers.
 
 - **String comparison of results**: Many LSP client implementations do some post processing
 of responses returned by a given language server, primarily removing newlines. Your expected
@@ -116,3 +117,4 @@ is used with other editors' clients.
 [nvim-repo]: https://github.com/neovim/neovim
 [nvim-install-docs]: https://github.com/neovim/neovim#install-from-source
 [rust-analyzer]: https://github.com/rust-lang/rust-analyzer
+[repo-tests]: https://github.com/WillLillis/lspresso-shot/blob/master/src/test.rs
