@@ -15,6 +15,8 @@ mod tests {
         types::{CompletionResult, ServerStartType, TestCase},
     };
 
+    /// NOTE: Timouts are set to ridiculous values for these to avoid issues with
+    /// slow CI runners. For local testing, 5-15 seconds should be sufficient
     #[test]
     fn rust_analyzer_definition() {
         let definition_test_case = TestCase::new(
@@ -26,11 +28,11 @@ mod tests {
 }",
         )
         .start_type(ServerStartType::Progress(
-            4,
+            5,
             "rustAnalyzer/Indexing".to_string(),
         ))
         .cursor_pos(Some(Position::new(2, 5)))
-        .timeout(Duration::from_secs(10)) // rust-analyzer is *slow* to startup cold
+        .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
         .cleanup(false)
         .other_file(
             "Cargo.toml",
@@ -98,7 +100,7 @@ path = "src/main.rs"
     let bar = 1;
 }",
         )
-        .timeout(Duration::from_secs(5)) // rust-analyzer is *slow* to startup cold
+        .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
         .cleanup(false)
         .other_file(
             "Cargo.toml",
@@ -184,7 +186,7 @@ path = "src/main.rs"
     println!("Hello, world!
 }"#,
         )
-        .timeout(Duration::from_secs(5)) // rust-analyzer is *slow* to startup cold
+        .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
         .cleanup(false)
         .other_file(
             "Cargo.toml",
@@ -250,7 +252,7 @@ path = "src/main.rs"
             1,
             "rustAnalyzer/Indexing".to_string(),
         ))
-        .timeout(Duration::from_secs(15)) // rust-analyzer is *slow* to startup cold
+        .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
         .cleanup(false)
         .cursor_pos(Some(Position::new(1, 5)))
         .other_file(
@@ -443,7 +445,7 @@ println!("format {local_variable} arguments");
             4,
             "rustAnalyzer/Indexing".to_string(),
         ))
-        .timeout(Duration::from_secs(10)) // rust-analyzer is *slow* to startup cold
+        .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
         .cleanup(false)
         .cursor_pos(Some(Position::new(1, 9)))
         .other_file(

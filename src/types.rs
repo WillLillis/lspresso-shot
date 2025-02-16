@@ -449,15 +449,17 @@ pub enum TestError {
     CompletionMismatch(#[from] CompletionMismatchError),
     #[error(transparent)]
     DefinitionMismatch(#[from] Box<DefinitionMismatchError>), // NOTE: `Box`ed because large
+    #[error("No results were written")]
+    NoResults,
     #[error(transparent)]
     Setup(#[from] TestSetupError),
-    #[error("Test {0}:\n{1}")]
+    #[error("Test {0}: Neovim Error\n{1}")]
     Neovim(String, String),
-    #[error("Test {0}:\n{1}")]
+    #[error("Test {0}: IO Error\n{1}")]
     IO(String, String),
-    #[error("Test {0}:\n{1}")]
+    #[error("Test {0}: UTF8 Error\n{1}")]
     Utf8(String, String),
-    #[error("Test {0}:\n{1}")]
+    #[error("Test {0}: Serialization Error\n{1}")]
     Serialization(String, String),
     #[error(transparent)]
     TimeoutExceeded(TimeoutError),
