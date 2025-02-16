@@ -1,0 +1,61 @@
+name: Build Lint and Test
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Neovim
+      run: |
+        # TODO: Pin to 11.0 once it's released
+        curl -LSs https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-x86_64.tar.gz | tar xzf - -C "$HOME"
+        echo "$HOME/nvim-linux-x86_64/bin" >> $GITHUB_PATH
+
+    # Need a fresh install of rust and all its components for rust-analyzer to function properly
+    - name: Rust toolchain clean install
+      run: |
+        command -v rustup >/dev/null && rustup self uninstall -y
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    # NOTE: There's nothing particularly special about 1.84.1, we just pin to a
+    # specific version to avoid unexpected breakages with each update. We *should*
+    # keep the project in sync with rustc/rust-analyzer as they release new versions
+    - name: Pin Rust to 1.84.1
+      run: rustup default '1.84.1'
+
+    - name: Add rust components
+      run: |
+        rustup component add rust-src rustfmt clippy rust-analyzer
+
+    - name: Build
+      run: cargo build
+
+    - name: Lint
+      run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: fmt
+      run: cargo fmt --check
+
+    # Tests have to be wrapped in `script` because GH runners are headless.
+    # For some reason, we need the appearance of a tty for things to work.
+    - name: Run tests
+      run: |
+        script -q -c "cargo test -- --nocapture"
+
+    # Uncomment this to ssh into the runner and debug if needed
+    # - name: Setup tmate session
+    #   if: always()
+    #   uses: mxschmitt/action-tmate@v3

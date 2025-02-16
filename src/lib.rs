@@ -67,7 +67,7 @@ fn test_hover_inner(test_case: &TestCase, expected: Hover) -> TestResult<()> {
 
     let results_file_path = test_case
         .get_results_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+        .map_err(|_| TestError::NoResults)?;
     let raw_results = String::from_utf8(
         fs::read(&results_file_path)
             .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
@@ -117,7 +117,7 @@ fn test_diagnostics_inner(test_case: &TestCase, expected: &[Diagnostic]) -> Test
 
     let results_file_path = test_case
         .get_results_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+        .map_err(|_| TestError::NoResults)?;
     let raw_results = String::from_utf8(
         fs::read(&results_file_path)
             .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
@@ -171,7 +171,7 @@ fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> 
 
     let results_file_path = test_case
         .get_results_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+        .map_err(|_| TestError::NoResults)?;
     let raw_results = String::from_utf8(
         fs::read(&results_file_path)
             .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
@@ -227,7 +227,7 @@ fn test_definition_inner(
 
     let results_file_path = test_case
         .get_results_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+        .map_err(|_| TestError::NoResults)?;
     let raw_results = String::from_utf8(
         fs::read(&results_file_path)
             .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
@@ -270,8 +270,8 @@ fn run_test(test_case: &TestCase, test_type: TestType) -> TestResult<()> {
         .arg(source_path)
         .arg("--headless")
         .arg("-n") // disable swap files
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
+        .stdout(Stdio::null()) // Commenting these out can be helpful for local
+        .stderr(Stdio::null()) // debugging, can print some rust-analyzer logs
         .spawn()
         .map_err(|e| TestError::Neovim(test_case.test_id.clone(), e.to_string()))?;
 
