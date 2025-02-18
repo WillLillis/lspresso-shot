@@ -33,9 +33,9 @@ local function check_progress_result()
         results_file:write(vim.json.encode(completion_result[1].result))
         results_file:close()
         ---@diagnostic enable: need-check-nil
+        vim.cmd('qa!')
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid completion result returned (Attempt ' .. vim.inspect(completion_result) .. '\n')
+        report_log('No valid completion result returned (Attempt ' .. vim.inspect(completion_result) .. ')\n')
     end
-    vim.cmd('qa!')
 end

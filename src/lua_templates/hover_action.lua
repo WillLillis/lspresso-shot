@@ -13,7 +13,8 @@ local function check_progress_result()
         ---@diagnostic disable-next-line: undefined-global
         SET_CURSOR_POSITION
     }, 1000)
-    if hover_result and #hover_result >= 1 and hover_result[1].result then
+    if hover_result and #hover_result >= 1 and hover_result[1].result and 
+        hover_result[1].result.contents and hover_result[1].result.contents.value then
         local results_file = io.open('RESULTS_FILE', 'w')
         if not results_file then
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
