@@ -24,14 +24,12 @@ Write a test:
 #[test]
 fn it_does_the_hover_thing() {
     let hover_test_case = TestCase::new(
-        "Path to server"
-        "Source file name",
-        "Source file contents"
+        "Path to server",
+        TestFile::new("Source file name", "Contents")
     )
     .cursor_pos(Some(Position::new(0, 0)))
     .other_file( // Optional
-        "Other file name",
-        "Other file contents"
+        TestFile::new("Other file name", "Other contents")
     );
 
     lspresso_shot!(test_hover(
