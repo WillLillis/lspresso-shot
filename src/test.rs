@@ -12,29 +12,11 @@ mod tests {
 
     use crate::{
         lspresso_shot, test_completions, test_definition, test_diagnostics, test_hover,
-        types::{CompletionResult, ServerStartType, TestCase},
+        types::{CompletionResult, ServerStartType, TestCase, TestFile},
     };
 
-    /// NOTE: Timouts are set to ridiculous values for these to avoid issues with
-    /// slow CI runners. For local testing, 5-15 seconds should be sufficient
-    #[test]
-    fn rust_analyzer_definition() {
-        let definition_test_case = TestCase::new(
-            "rust-analyzer",
-            "src/main.rs",
-            "pub fn main() {
-    let mut foo = 5;
-    foo = 10;
-}",
-        )
-        .start_type(ServerStartType::Progress(
-            5,
-            "rustAnalyzer/Indexing".to_string(),
-        ))
-        .cursor_pos(Some(Position::new(2, 5)))
-        .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
-        .cleanup(false)
-        .other_file(
+    fn cargo_dot_toml() -> TestFile {
+        TestFile::new(
             "Cargo.toml",
             r#"
 [package]
@@ -46,9 +28,30 @@ edition = "2021"
 
 [[bin]]
 name = "test"
-path = "src/main.rs"
-"#,
+path = "src/main.rs""#,
+        )
+    }
+
+    /// NOTE: Timouts are set to ridiculous values for these to avoid issues with
+    /// slow CI runners. For local testing, 5-15 seconds should be sufficient
+    #[test]
+    fn rust_analyzer_definition() {
+        let source_file = TestFile::new(
+            "src/main.rs",
+            "pub fn main() {
+    let mut foo = 5;
+    foo = 10;
+}",
         );
+        let definition_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                5,
+                "rustAnalyzer/Indexing".to_string(),
+            ))
+            .cursor_pos(Some(Position::new(2, 5)))
+            .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
+            .cleanup(false)
+            .other_file(cargo_dot_toml());
 
         // TODO: Add test for multiple definitions returned
         lspresso_shot!(test_definition(
@@ -92,31 +95,16 @@ path = "src/main.rs"
     // NOTE:: Specifying the start type is ignored for diagnostics tests
     #[test]
     fn rust_analyzer_multi_diagnostics() {
-        // Add a source and config file to the case case!
-        let diagnostic_test_case = TestCase::new(
-            "rust-analyzer",
+        let source_file = TestFile::new(
             "src/main.rs",
             "pub fn main() {
     let bar = 1;
 }",
-        )
-        .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
-        .cleanup(false)
-        .other_file(
-            "Cargo.toml",
-            r#"
-[package]
-name = "test"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-
-[[bin]]
-name = "test"
-path = "src/main.rs"
-"#,
         );
+        let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
+            .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
+            .cleanup(false)
+            .other_file(cargo_dot_toml());
 
         let mut data_map = Map::new();
         data_map.insert(
@@ -178,31 +166,16 @@ path = "src/main.rs"
     // NOTE:: Specifying the start type is ignored for diagnostics tests
     #[test]
     fn rust_analyzer_diagnostics() {
-        // Add a source and config file to the case case!
-        let diagnostic_test_case = TestCase::new(
-            "rust-analyzer",
+        let source_file = TestFile::new(
             "src/main.rs",
             r#"pub fn main() {
     println!("Hello, world!
 }"#,
-        )
-        .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
-        .cleanup(false)
-        .other_file(
-            "Cargo.toml",
-            r#"
-[package]
-name = "test"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-
-[[bin]]
-name = "test"
-path = "src/main.rs"
-"#,
         );
+        let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
+            .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
+            .cleanup(false)
+            .other_file(cargo_dot_toml());
 
         let mut data_map = Map::new();
         _ = data_map.insert(
@@ -241,35 +214,21 @@ path = "src/main.rs"
 
     #[test]
     fn rust_analyzer_hover() {
-        let hover_test_case = TestCase::new(
-            "rust-analyzer",
+        let source_file = TestFile::new(
             "src/main.rs",
             r#"pub fn main() {
     println!("Hello, world!");
 }"#,
-        )
-        .start_type(ServerStartType::Progress(
-            1,
-            "rustAnalyzer/Indexing".to_string(),
-        ))
-        .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
-        .cleanup(false)
-        .cursor_pos(Some(Position::new(1, 5)))
-        .other_file(
-            "Cargo.toml",
-            r#"
-[package]
-name = "test"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-
-[[bin]]
-name = "test"
-path = "src/main.rs"
-"#,
         );
+        let hover_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                1,
+                "rustAnalyzer/Indexing".to_string(),
+            ))
+            .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
+            .cleanup(false)
+            .cursor_pos(Some(Position::new(1, 5)))
+            .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_hover(
         hover_test_case,
@@ -434,35 +393,21 @@ println!("format {local_variable} arguments");
             data: None,
             tags: None,
         }]);
-        let completion_test_case = TestCase::new(
-            "rust-analyzer",
+        let source_file = TestFile::new(
             "src/main.rs",
             "pub fn main() {
     prin
 }",
-        )
-        .start_type(ServerStartType::Progress(
-            4,
-            "rustAnalyzer/Indexing".to_string(),
-        ))
-        .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
-        .cleanup(false)
-        .cursor_pos(Some(Position::new(1, 9)))
-        .other_file(
-            "Cargo.toml",
-            r#"
-    [package]
-    name = "test"
-    version = "0.1.0"
-    edition = "2021"
-
-    [dependencies]
-
-    [[bin]]
-    name = "test"
-    path = "src/main.rs"
-    "#,
         );
+        let completion_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                4,
+                "rustAnalyzer/Indexing".to_string(),
+            ))
+            .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
+            .cleanup(false)
+            .cursor_pos(Some(Position::new(1, 9)))
+            .other_file(cargo_dot_toml());
         lspresso_shot!(test_completions(completion_test_case, &expected_comps));
     }
 }

@@ -27,14 +27,30 @@ pub enum TestType {
     Definition,
 }
 
+/// Represents a file to be used in the test case.
+#[derive(Debug, Clone)]
+pub struct TestFile {
+    /// Path to this file relative to the test case source root.
+    pub path: PathBuf,
+    /// The contents of the source file.
+    pub contents: String,
+}
+
+impl TestFile {
+    pub fn new<P: Into<PathBuf>, T: Into<String>>(path: P, contents: T) -> Self {
+        Self {
+            path: path.into(),
+            contents: contents.into(),
+        }
+    }
+}
+
 /// Describes a test case to be used in an lspresso-shot test.
 ///
 /// - `test_id`: internal identifier for a single run of a test case, *not* to be
 ///    set by the user.
 /// - `executable_path`: path to the language server's executable.
-/// - `source_path`: gives the test project-relative path for the file to be opened
-///    in Neovim.
-/// - `source_contents`: the contents of the source file to be opened by Neovim.
+/// - `source_file`: the source file to be opened by Neovim.
 /// - `cursor_pos`: the position of the cursor within `source_contents` when the
 ///    lsp request being tested is executed.
 /// - `other_files`: other files to be placed in the mock directory (e.g. other source
@@ -46,10 +62,9 @@ pub enum TestType {
 pub struct TestCase {
     pub test_id: String,
     pub executable_path: PathBuf,
-    pub source_path: PathBuf,
-    pub source_contents: String,
+    pub source_file: TestFile,
     pub cursor_pos: Option<Position>,
-    pub other_files: Vec<(PathBuf, String)>,
+    pub other_files: Vec<TestFile>,
     pub start_type: ServerStartType,
     pub timeout: Duration,
     pub cleanup: bool,
@@ -63,16 +78,11 @@ pub struct TestCase {
 // Maybe just add it for files, return Err otherwise
 
 impl TestCase {
-    pub fn new<P1: Into<PathBuf>, P2: Into<PathBuf>>(
-        executable_path: P1,
-        source_path: P2,
-        source_contents: &str,
-    ) -> Self {
+    pub fn new<P1: Into<PathBuf>>(executable_path: P1, source_file: TestFile) -> Self {
         Self {
             test_id: String::new(),
             executable_path: executable_path.into(),
-            source_path: source_path.into(),
-            source_contents: source_contents.to_string(),
+            source_file,
             cursor_pos: None,
             other_files: Vec::new(),
             start_type: ServerStartType::Simple,
@@ -97,16 +107,15 @@ impl TestCase {
 
     /// Change the source file used in the test case
     #[must_use]
-    pub fn source_file<P: Into<PathBuf>>(mut self, path: P, contents: &str) -> Self {
-        self.source_path = path.into();
-        self.source_contents = contents.to_string();
+    pub fn source_file(mut self, source_file: TestFile) -> Self {
+        self.source_file = source_file;
         self
     }
 
     /// Add an additional file to the test case
     #[must_use]
-    pub fn other_file<P: Into<PathBuf>>(mut self, path: P, contents: &str) -> Self {
-        self.other_files.push((path.into(), contents.to_string()));
+    pub fn other_file(mut self, other_file: TestFile) -> Self {
+        self.other_files.push(other_file);
         self
     }
 
@@ -149,11 +158,11 @@ impl TestCase {
                 self.executable_path.clone(),
             ))?;
         }
-        if self.source_path.to_string_lossy().is_empty() {
+        if self.source_file.path.to_string_lossy().is_empty() {
             Err(TestSetupError::InvalidFilePath(String::new()))?;
         }
 
-        for (path, _) in &self.other_files {
+        for TestFile { ref path, .. } in &self.other_files {
             if path.to_string_lossy().is_empty() {
                 Err(TestSetupError::InvalidFilePath(String::new()))?;
             }
@@ -268,15 +277,20 @@ impl TestCase {
         let error_path = self.get_error_file_path()?;
         let log_path = self.get_log_file_path()?;
         let extension = self
-            .source_path
+            .source_file
+            .path
             .extension()
             .ok_or_else(|| {
                 // NOTE: use `.unwrap_or("*")` here instead to cover files without extensions?
-                TestSetupError::MissingFileExtension(self.source_path.to_string_lossy().to_string())
+                TestSetupError::MissingFileExtension(
+                    self.source_file.path.to_string_lossy().to_string(),
+                )
             })?
             .to_str()
             .ok_or_else(|| {
-                TestSetupError::InvalidFileExtension(self.source_path.to_string_lossy().to_string())
+                TestSetupError::InvalidFileExtension(
+                    self.source_file.path.to_string_lossy().to_string(),
+                )
             })?;
 
         {
@@ -293,13 +307,13 @@ impl TestCase {
             fs::write(&init_dot_lua_path, &nvim_config)?;
         }
 
-        let source_path = self.get_source_file_path(&self.source_path)?;
+        let source_path = self.get_source_file_path(&self.source_file.path)?;
         // Invariant: test source file paths should always have a parent directory
         fs::create_dir_all(source_path.parent().unwrap())?;
         fs::File::create(&source_path)?;
-        fs::write(&source_path, &self.source_contents)?;
+        fs::write(&source_path, &self.source_file.contents)?;
 
-        for (path, contents) in &self.other_files {
+        for TestFile { path, contents } in &self.other_files {
             let source_file_path = self.get_source_file_path(path)?;
             // Invariant: test file paths should always have a parent directory
             fs::create_dir_all(source_file_path.parent().unwrap())?;
