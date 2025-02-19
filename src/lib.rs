@@ -41,45 +41,16 @@ macro_rules! lspresso_shot {
 ///
 /// Returns `TestError` if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
-pub fn test_hover(mut test_case: TestCase, expected_results: Hover) -> TestResult<()> {
-    test_case.validate()?;
-    test_case.test_id = get_test_id();
-    let test_result = test_hover_inner(&test_case, expected_results);
-    let test_dir = test_case
-        .get_lspresso_dir()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
-    if test_case.cleanup && test_dir.exists() {
-        fs::remove_dir_all(test_dir)
-            .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
-    }
-
-    test_result
-}
-
-fn test_hover_inner(test_case: &TestCase, expected: Hover) -> TestResult<()> {
+pub fn test_hover(mut test_case: TestCase, expected: Hover) -> TestResult<()> {
     if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(
-            "Cursor position must be specified for hover tests".to_string(),
-        ))?;
+        Err(TestSetupError::InvalidCursorPosition(TestType::Hover))?;
     }
-
-    run_test(test_case, TestType::Hover)?;
-
-    let results_file_path = test_case
-        .get_results_file_path()
-        .map_err(|_| TestError::NoResults)?;
-    let raw_results = String::from_utf8(
-        fs::read(&results_file_path)
-            .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
-    )
-    .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e.to_string()))?;
-    let actual: Hover = serde_json::from_str(&raw_results).map_err(|e| {
-        TestError::Serialization(test_case.test_id.clone(), format!("Results file -- {e}"))
-    })?;
+    test_case.test_type = Some(TestType::Hover);
+    let actual = test_inner(&mut test_case)?;
 
     if expected != actual {
         Err(Box::new(HoverMismatchError {
-            test_id: test_case.test_id.clone(),
+            test_id: test_case.test_id,
             expected,
             actual,
         }))?;
@@ -94,38 +65,9 @@ fn test_hover_inner(test_case: &TestCase, expected: Hover) -> TestResult<()> {
 ///
 /// Returns `TestError` if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
-pub fn test_diagnostics(
-    mut test_case: TestCase,
-    expected_results: &[Diagnostic],
-) -> TestResult<()> {
-    test_case.validate()?;
-    test_case.test_id = get_test_id();
-    let test_result = test_diagnostics_inner(&test_case, expected_results);
-    let test_dir = test_case
-        .get_lspresso_dir()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
-    if test_case.cleanup && test_dir.exists() {
-        fs::remove_dir_all(test_dir)
-            .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
-    }
-
-    test_result
-}
-
-fn test_diagnostics_inner(test_case: &TestCase, expected: &[Diagnostic]) -> TestResult<()> {
-    run_test(test_case, TestType::Diagnostic)?;
-
-    let results_file_path = test_case
-        .get_results_file_path()
-        .map_err(|_| TestError::NoResults)?;
-    let raw_results = String::from_utf8(
-        fs::read(&results_file_path)
-            .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
-    )
-    .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e.to_string()))?;
-    let actual = serde_json::from_str::<Vec<Diagnostic>>(&raw_results)
-        .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e.to_string()))?;
-
+pub fn test_diagnostics(mut test_case: TestCase, expected: &[Diagnostic]) -> TestResult<()> {
+    test_case.test_type = Some(TestType::Diagnostic);
+    let actual: Vec<Diagnostic> = test_inner(&mut test_case)?;
     if expected != actual {
         Err(DiagnosticMismatchError {
             test_id: test_case.test_id.clone(),
@@ -143,42 +85,12 @@ fn test_diagnostics_inner(test_case: &TestCase, expected: &[Diagnostic]) -> Test
 ///
 /// Returns `TestError` if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
-pub fn test_completions(
-    mut test_case: TestCase,
-    expected_results: &CompletionResult,
-) -> TestResult<()> {
-    test_case.validate()?;
-    test_case.test_id = get_test_id();
-    let test_result = test_completions_inner(&test_case, expected_results);
-    let test_dir = test_case
-        .get_lspresso_dir()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
-    if test_case.cleanup && test_dir.exists() {
-        fs::remove_dir_all(test_dir)
-            .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
-    }
-
-    test_result
-}
-
-fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> TestResult<()> {
+pub fn test_completions(mut test_case: TestCase, expected: &CompletionResult) -> TestResult<()> {
     if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(
-            "Cursor position must be specified for completion tests".to_string(),
-        ))?;
+        Err(TestSetupError::InvalidCursorPosition(TestType::Completion))?;
     }
-    run_test(test_case, TestType::Completion)?;
-
-    let results_file_path = test_case
-        .get_results_file_path()
-        .map_err(|_| TestError::NoResults)?;
-    let raw_results = String::from_utf8(
-        fs::read(&results_file_path)
-            .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
-    )
-    .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e.to_string()))?;
-    let actual = serde_json::from_str::<CompletionResponse>(&raw_results)
-        .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e.to_string()))?;
+    test_case.test_type = Some(TestType::Completion);
+    let actual: CompletionResponse = test_inner(&mut test_case)?;
 
     if !expected.results_satisfy(&actual) {
         Err(CompletionMismatchError {
@@ -198,43 +110,13 @@ fn test_completions_inner(test_case: &TestCase, expected: &CompletionResult) -> 
 /// Returns an `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_definition(
     mut test_case: TestCase,
-    expected_results: &GotoDefinitionResponse,
-) -> TestResult<()> {
-    test_case.validate()?;
-    test_case.test_id = get_test_id();
-    let test_result = test_definition_inner(&test_case, expected_results);
-    let test_dir = test_case
-        .get_lspresso_dir()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
-    if test_case.cleanup && test_dir.exists() {
-        fs::remove_dir_all(test_dir)
-            .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
-    }
-
-    test_result
-}
-
-fn test_definition_inner(
-    test_case: &TestCase,
     expected: &GotoDefinitionResponse,
 ) -> TestResult<()> {
     if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(
-            "Cursor position must be specified for definition tests".to_string(),
-        ))?;
+        Err(TestSetupError::InvalidCursorPosition(TestType::Definition))?;
     }
-    run_test(test_case, TestType::Definition)?;
-
-    let results_file_path = test_case
-        .get_results_file_path()
-        .map_err(|_| TestError::NoResults)?;
-    let raw_results = String::from_utf8(
-        fs::read(&results_file_path)
-            .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
-    )
-    .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e.to_string()))?;
-    let actual = serde_json::from_str::<GotoDefinitionResponse>(&raw_results)
-        .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e.to_string()))?;
+    test_case.test_type = Some(TestType::Definition);
+    let actual: GotoDefinitionResponse = test_inner(&mut test_case)?;
 
     if *expected != actual {
         Err(Box::new(DefinitionMismatchError {
@@ -252,6 +134,32 @@ fn get_test_id() -> String {
     let range = rand::distr::Uniform::new(0, usize::MAX).unwrap();
     let mut rng = rand::rng();
     range.sample(&mut rng).to_string()
+}
+
+fn test_inner<R>(test_case: &mut TestCase) -> TestResult<R>
+where
+    R: serde::de::DeserializeOwned,
+{
+    test_case.validate()?;
+    test_case.test_id = get_test_id();
+    // Invariant: `test_case.test_type` should always be set to `Some(_)` in the caller
+    run_test(test_case, test_case.test_type.expect("Test type is `None`"))?;
+
+    let results_file_path = test_case
+        .get_results_file_path()
+        .map_err(|_| TestError::NoResults)?;
+    let raw_results = String::from_utf8(
+        fs::read(&results_file_path)
+            .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
+    )
+    .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e.to_string()))?;
+    let actual: R = serde_json::from_str(&raw_results).map_err(|e| {
+        TestError::Serialization(test_case.test_id.clone(), format!("Results file -- {e}"))
+    })?;
+
+    test_case.do_cleanup();
+
+    Ok(actual)
 }
 
 /// Invokes neovim to run the test associated with the file stored at `init_dot_lua_path`,
