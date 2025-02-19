@@ -164,7 +164,7 @@ pub fn test_rename(
 }
 
 /// Generates a new random test ID
-fn get_test_id() -> String {
+fn generate_test_id() -> String {
     let range = rand::distr::Uniform::new(0, usize::MAX).unwrap();
     let mut rng = rand::rng();
     range.sample(&mut rng).to_string()
@@ -178,7 +178,7 @@ where
     R: serde::de::DeserializeOwned,
 {
     test_case.validate()?;
-    test_case.test_id = get_test_id();
+    test_case.test_id = generate_test_id();
     // Invariant: `test_case.test_type` should always be set to `Some(_)` in the caller
     let source_path = test_case.create_test(
         test_case.test_type.expect("Test type is `None`"),
