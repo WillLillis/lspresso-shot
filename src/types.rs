@@ -27,6 +27,22 @@ pub enum TestType {
     Definition,
 }
 
+impl std::fmt::Display for TestType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "textDocument/{}",
+            match self {
+                Self::Hover => "hover",
+                Self::Diagnostic => "publishDiagnostics",
+                Self::Completion => "completion",
+                Self::Definition => "definition",
+            }
+        )?;
+        Ok(())
+    }
+}
+
 /// Represents a file to be used in the test case.
 #[derive(Debug, Clone)]
 pub struct TestFile {
@@ -49,6 +65,8 @@ impl TestFile {
 ///
 /// - `test_id`: internal identifier for a single run of a test case, *not* to be
 ///    set by the user.
+/// - `test_type`: internal marker for the test type to be run, *not to be set by
+///    the user.
 /// - `executable_path`: path to the language server's executable.
 /// - `source_file`: the source file to be opened by Neovim.
 /// - `cursor_pos`: the position of the cursor within `source_contents` when the
@@ -61,6 +79,7 @@ impl TestFile {
 #[derive(Debug, Clone)]
 pub struct TestCase {
     pub test_id: String,
+    pub test_type: Option<TestType>,
     pub executable_path: PathBuf,
     pub source_file: TestFile,
     pub cursor_pos: Option<Position>,
@@ -81,6 +100,7 @@ impl TestCase {
     pub fn new<P1: Into<PathBuf>>(executable_path: P1, source_file: TestFile) -> Self {
         Self {
             test_id: String::new(),
+            test_type: None,
             executable_path: executable_path.into(),
             source_file,
             cursor_pos: None,
@@ -140,6 +160,24 @@ impl TestCase {
         self
     }
 
+    /// Removes the associated test directory if `self.cleanup`. *Intentionally*
+    /// ignores any errors, as these should not be surfaced to the user. Error prints
+    /// are left to aid in internal development.
+    pub fn do_cleanup(&self) {
+        let test_dir = match self.get_lspresso_dir() {
+            Ok(dir) => dir,
+            Err(e) => {
+                eprintln!("Test cleanup error (dir fetch): {e}");
+                return;
+            }
+        };
+        if self.cleanup && test_dir.exists() {
+            if let Err(e) = fs::remove_dir_all(test_dir) {
+                eprintln!("Test cleanup error (dir removal): {e}");
+            }
+        }
+    }
+
     /// Validate the data contained within `self`
     ///
     /// # Errors
@@ -167,6 +205,7 @@ impl TestCase {
                 Err(TestSetupError::InvalidFilePath(String::new()))?;
             }
         }
+
         Ok(())
     }
 
@@ -437,8 +476,8 @@ pub enum TestSetupError {
     InvalidFileExtension(String),
     #[error("Source file path \"{0}\" is invalid")]
     InvalidFilePath(String),
-    #[error("{0}")]
-    InvalidCursorPosition(String),
+    #[error("Cursor position must be specified for {0} tests")]
+    InvalidCursorPosition(TestType),
     #[error("Server start type progress value must be greater than 0")]
     InvalidServerStartType,
     #[error("{0}")]
