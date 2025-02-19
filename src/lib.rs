@@ -2,16 +2,18 @@ mod init_dot_lua;
 mod test;
 pub mod types;
 
-use lsp_types::{CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover};
+use lsp_types::{CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover, WorkspaceEdit};
 use rand::distr::Distribution;
 use std::{
     fs,
+    path::Path,
     process::{Command, Stdio},
 };
 
 use types::{
     CompletionMismatchError, CompletionResult, DefinitionMismatchError, DiagnosticMismatchError,
-    HoverMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
+    HoverMismatchError, RenameMismatchError, TestCase, TestError, TestResult, TestSetupError,
+    TestType, TimeoutError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -46,7 +48,7 @@ pub fn test_hover(mut test_case: TestCase, expected: Hover) -> TestResult<()> {
         Err(TestSetupError::InvalidCursorPosition(TestType::Hover))?;
     }
     test_case.test_type = Some(TestType::Hover);
-    let actual = test_inner(&mut test_case)?;
+    let actual = test_inner(&mut test_case, None)?;
 
     if expected != actual {
         Err(Box::new(HoverMismatchError {
@@ -59,6 +61,8 @@ pub fn test_hover(mut test_case: TestCase, expected: Hover) -> TestResult<()> {
     Ok(())
 }
 
+// TODO: Accept PublishDiagnosticsParams rather than a raw `Vec<Diagnostic>`, might
+// help clean up the lua logic a bit
 /// Tests the server's response to a 'textDocument/publishDiagnostics' request
 ///
 /// # Errors
@@ -67,7 +71,7 @@ pub fn test_hover(mut test_case: TestCase, expected: Hover) -> TestResult<()> {
 /// or some other failure occurs
 pub fn test_diagnostics(mut test_case: TestCase, expected: &[Diagnostic]) -> TestResult<()> {
     test_case.test_type = Some(TestType::Diagnostic);
-    let actual: Vec<Diagnostic> = test_inner(&mut test_case)?;
+    let actual: Vec<Diagnostic> = test_inner(&mut test_case, None)?;
     if expected != actual {
         Err(DiagnosticMismatchError {
             test_id: test_case.test_id.clone(),
@@ -90,7 +94,7 @@ pub fn test_completions(mut test_case: TestCase, expected: &CompletionResult) ->
         Err(TestSetupError::InvalidCursorPosition(TestType::Completion))?;
     }
     test_case.test_type = Some(TestType::Completion);
-    let actual: CompletionResponse = test_inner(&mut test_case)?;
+    let actual: CompletionResponse = test_inner(&mut test_case, None)?;
 
     if !expected.results_satisfy(&actual) {
         Err(CompletionMismatchError {
@@ -107,7 +111,7 @@ pub fn test_completions(mut test_case: TestCase, expected: &CompletionResult) ->
 ///
 /// # Errors
 ///
-/// Returns an `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_definition(
     mut test_case: TestCase,
     expected: &GotoDefinitionResponse,
@@ -116,10 +120,40 @@ pub fn test_definition(
         Err(TestSetupError::InvalidCursorPosition(TestType::Definition))?;
     }
     test_case.test_type = Some(TestType::Definition);
-    let actual: GotoDefinitionResponse = test_inner(&mut test_case)?;
+    let actual: GotoDefinitionResponse = test_inner(&mut test_case, None)?;
 
     if *expected != actual {
         Err(Box::new(DefinitionMismatchError {
+            test_id: test_case.test_id.clone(),
+            expected: expected.clone(),
+            actual,
+        }))?;
+    }
+
+    Ok(())
+}
+
+/// Tests the server's response to a 'textDocument/rename' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+pub fn test_rename(
+    mut test_case: TestCase,
+    new_name: &str,
+    expected: &WorkspaceEdit,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(TestType::Rename))?;
+    }
+    test_case.test_type = Some(TestType::Rename);
+    let actual: WorkspaceEdit = test_inner(
+        &mut test_case,
+        Some(&vec![("NEW_NAME", format!("newName = '{new_name}'"))]),
+    )?;
+
+    if *expected != actual {
+        Err(Box::new(RenameMismatchError {
             test_id: test_case.test_id.clone(),
             expected: expected.clone(),
             actual,
@@ -136,14 +170,21 @@ fn get_test_id() -> String {
     range.sample(&mut rng).to_string()
 }
 
-fn test_inner<R>(test_case: &mut TestCase) -> TestResult<R>
+fn test_inner<R>(
+    test_case: &mut TestCase,
+    replacements: Option<&Vec<(&str, String)>>,
+) -> TestResult<R>
 where
     R: serde::de::DeserializeOwned,
 {
     test_case.validate()?;
     test_case.test_id = get_test_id();
     // Invariant: `test_case.test_type` should always be set to `Some(_)` in the caller
-    run_test(test_case, test_case.test_type.expect("Test type is `None`"))?;
+    let source_path = test_case.create_test(
+        test_case.test_type.expect("Test type is `None`"),
+        replacements,
+    )?;
+    run_test(test_case, &source_path)?;
 
     let results_file_path = test_case
         .get_results_file_path()
@@ -164,8 +205,7 @@ where
 
 /// Invokes neovim to run the test associated with the file stored at `init_dot_lua_path`,
 /// opening `source_path`
-fn run_test(test_case: &TestCase, test_type: TestType) -> TestResult<()> {
-    let source_path = test_case.create_test(test_type)?;
+fn run_test(test_case: &TestCase, source_path: &Path) -> TestResult<()> {
     let init_dot_lua_path = test_case
         .get_init_lua_file_path()
         .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;

@@ -11,7 +11,7 @@ local function check_progress_result()
     local hover_result = vim.lsp.buf_request_sync(0, 'textDocument/hover', {
         textDocument = vim.lsp.util.make_text_document_params(0),
         ---@diagnostic disable-next-line: undefined-global
-        SET_CURSOR_POSITION
+        SET_CURSOR_POSITION,
     }, 1000)
     if hover_result and #hover_result >= 1 and hover_result[1].result and
         hover_result[1].result.contents and hover_result[1].result.contents.value then
