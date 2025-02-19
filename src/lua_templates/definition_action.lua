@@ -11,7 +11,7 @@ local function check_progress_result()
     local definition_results = vim.lsp.buf_request_sync(0, "textDocument/definition", {
         textDocument = vim.lsp.util.make_text_document_params(0),
         ---@diagnostic disable-next-line: undefined-global
-        SET_CURSOR_POSITION
+        SET_CURSOR_POSITION,
     }, 1000)
     if definition_results and #definition_results > 0 and definition_results[1].result and #definition_results[1].result > 0 then
         local results_file = io.open('RESULTS_FILE', "w")

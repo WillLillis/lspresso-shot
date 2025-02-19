@@ -11,7 +11,7 @@ local function check_progress_result()
     local completion_result = vim.lsp.buf_request_sync(0, 'textDocument/completion', {
         textDocument = vim.lsp.util.make_text_document_params(0),
         ---@diagnostic disable-next-line: undefined-global
-        SET_CURSOR_POSITION
+        SET_CURSOR_POSITION,
     }, 1000)
     if completion_result and #completion_result >= 1 then
         local results_file = io.open('RESULTS_FILE', "w")

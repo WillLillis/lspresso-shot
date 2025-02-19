@@ -1,18 +1,32 @@
-use std::path::Path;
-
-use crate::types::{ServerStartType, TestCase, TestType};
+use crate::types::{ServerStartType, TestCase, TestSetupError, TestSetupResult, TestType};
 
 /// Construct the contents of an `init.lua` file to test an lsp request corresponding
-/// to `init_type` using the given parameters
+/// to `test_type`
 pub fn get_init_dot_lua(
     test_case: &TestCase,
     test_type: TestType,
-    root_path: &Path,
-    results_path: &Path,
-    error_path: &Path,
-    log_path: &Path,
-    source_extension: &str,
-) -> String {
+    custom_replacements: Option<&Vec<(&str, String)>>,
+) -> TestSetupResult<String> {
+    let results_file_path = test_case.get_results_file_path()?;
+    let root_path = test_case.get_lspresso_dir()?;
+    let error_path = test_case.get_error_file_path()?;
+    let log_path = test_case.get_log_file_path()?;
+    let source_extension = test_case
+        .source_file
+        .path
+        .extension()
+        .ok_or_else(|| {
+            // NOTE: use `.unwrap_or("*")` here instead to cover files without extensions?
+            TestSetupError::MissingFileExtension(
+                test_case.source_file.path.to_string_lossy().to_string(),
+            )
+        })?
+        .to_str()
+        .ok_or_else(|| {
+            TestSetupError::InvalidFileExtension(
+                test_case.source_file.path.to_string_lossy().to_string(),
+            )
+        })?;
     // Start out with some utilities, adding the relevant filetype and the attach
     // logic, and the relevant `check_progress_result` function to invoke our request
     // at the appropriate time
@@ -24,7 +38,7 @@ pub fn get_init_dot_lua(
     );
     // This is how we actually invoke the action to be tested
     match test_type {
-        TestType::Hover | TestType::Completion | TestType::Definition => {
+        TestType::Hover | TestType::Completion | TestType::Definition | TestType::Rename => {
             raw_init = raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type));
         }
         TestType::Diagnostic => {
@@ -34,14 +48,20 @@ pub fn get_init_dot_lua(
         }
     };
 
+    if let Some(replacements) = custom_replacements {
+        for (from, to) in replacements {
+            raw_init = raw_init.replace(from, to);
+        }
+    }
+
     let set_cursor_position = test_case.cursor_pos.map_or_else(String::new, |cursor_pos| {
         format!(
-            "position = {{ line = {}, character = {} }},",
+            "position = {{ line = {}, character = {} }}",
             cursor_pos.line, cursor_pos.character
         )
     });
     let final_init = raw_init
-        .replace("RESULTS_FILE", results_path.to_str().unwrap())
+        .replace("RESULTS_FILE", results_file_path.to_str().unwrap())
         .replace(
             "EXECUTABLE_PATH",
             test_case.executable_path.to_str().unwrap(),
@@ -64,7 +84,7 @@ pub fn get_init_dot_lua(
                 .unwrap(),
         );
 
-    final_init
+    Ok(final_init)
 }
 
 fn progress_threshold(start_type: &ServerStartType) -> String {
@@ -80,6 +100,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::Diagnostic => "\n-- NOTE: No `check_progress_result` function for diagnostics, instead handled by `DiagnosticChanged` autocmd\n",
         TestType::Completion => include_str!("lua_templates/completion_action.lua"),
         TestType::Definition => include_str!("lua_templates/definition_action.lua"),
+        TestType::Rename => include_str!("lua_templates/rename_action.lua"),
     }
     .to_string()
 }

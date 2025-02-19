@@ -4,14 +4,16 @@ mod tests {
 
     use lsp_types::{
         CodeDescription, CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
-        DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag, Documentation,
-        GotoDefinitionResponse, Hover, InsertTextFormat, Location, LocationLink, MarkupContent,
-        NumberOrString, Position, Range, TextEdit, Uri,
+        DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag, DocumentChanges,
+        Documentation, GotoDefinitionResponse, Hover, InsertTextFormat, Location, LocationLink,
+        MarkupContent, NumberOrString, OneOf, OptionalVersionedTextDocumentIdentifier, Position,
+        Range, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
     };
     use serde_json::Map;
 
     use crate::{
         lspresso_shot, test_completions, test_definition, test_diagnostics, test_hover,
+        test_rename,
         types::{CompletionResult, ServerStartType, TestCase, TestFile},
     };
 
@@ -35,6 +37,47 @@ path = "src/main.rs""#,
     /// NOTE: Timouts are set to ridiculous values for these to avoid issues with
     /// slow CI runners. For local testing, 5-15 seconds should be sufficient
     #[test]
+    fn rust_analyzer_rename() {
+        let source_file = TestFile::new(
+            "src/main.rs",
+            "pub fn main() {
+    let foo = 5;
+}",
+        );
+        let rename_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                5,
+                "rustAnalyzer/Indexing".to_string(),
+            ))
+            .cursor_pos(Some(Position::new(1, 9)))
+            .timeout(Duration::from_secs(20))
+            .cleanup(false)
+            .other_file(cargo_dot_toml());
+
+        lspresso_shot!(test_rename(
+            rename_test_case,
+            "bar",
+            &WorkspaceEdit {
+                changes: None,
+                document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {
+                    text_document: OptionalVersionedTextDocumentIdentifier {
+                        uri: Uri::from_str("src/main.rs").unwrap(),
+                        version: Some(0)
+                    },
+                    edits: vec![OneOf::Left(TextEdit {
+                        range: Range {
+                            start: Position::new(1, 8),
+                            end: Position::new(1, 11)
+                        },
+                        new_text: "bar".to_string()
+                    })]
+                }])),
+                change_annotations: None
+            }
+        ));
+    }
+
+    #[test]
     fn rust_analyzer_definition() {
         let source_file = TestFile::new(
             "src/main.rs",
@@ -49,7 +92,7 @@ path = "src/main.rs""#,
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .cursor_pos(Some(Position::new(2, 5)))
-            .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
+            .timeout(Duration::from_secs(20))
             .cleanup(false)
             .other_file(cargo_dot_toml());
 
@@ -102,7 +145,7 @@ path = "src/main.rs""#,
 }",
         );
         let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
-            .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
+            .timeout(Duration::from_secs(20))
             .cleanup(false)
             .other_file(cargo_dot_toml());
 
@@ -173,7 +216,7 @@ path = "src/main.rs""#,
 }"#,
         );
         let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
-            .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
+            .timeout(Duration::from_secs(20))
             .cleanup(false)
             .other_file(cargo_dot_toml());
 
@@ -225,7 +268,7 @@ path = "src/main.rs""#,
                 1,
                 "rustAnalyzer/Indexing".to_string(),
             ))
-            .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
+            .timeout(Duration::from_secs(20))
             .cleanup(false)
             .cursor_pos(Some(Position::new(1, 5)))
             .other_file(cargo_dot_toml());
@@ -404,7 +447,7 @@ println!("format {local_variable} arguments");
                 4,
                 "rustAnalyzer/Indexing".to_string(),
             ))
-            .timeout(Duration::from_secs(20)) // rust-analyzer is *slow* to startup cold
+            .timeout(Duration::from_secs(20))
             .cleanup(false)
             .cursor_pos(Some(Position::new(1, 9)))
             .other_file(cargo_dot_toml());
