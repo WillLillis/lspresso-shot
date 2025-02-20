@@ -37,6 +37,6 @@ local function check_progress_result()
         ---@diagnostic enable: need-check-nil
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid rename result returned (Attempt ' .. vim.inspect(rename_result) .. ')\n')
+        report_log('No valid rename result returned: ' .. vim.inspect(rename_result) .. '\n')
     end
 end

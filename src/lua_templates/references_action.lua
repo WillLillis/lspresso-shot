@@ -35,6 +35,6 @@ local function check_progress_result()
         ---@diagnostic enable: need-check-nil
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid reference result returned (Attempt ' .. vim.inspect(reference_result) .. ')\n')
+        report_log('No valid reference result returned: ' .. vim.inspect(reference_result) .. '\n')
     end
 end

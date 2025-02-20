@@ -41,8 +41,7 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
             ---@diagnostic enable: need-check-nil
         else
             ---@diagnostic disable: undefined-global
-            report_log('No diagnostic result returned (Attempt ' ..
-                tostring(progress_count) .. '):\n ' .. vim.inspect(diagnostics_result) .. '\n\n')
+            report_log('No diagnostic result returned: ' .. vim.inspect(diagnostics_result) .. '\n')
             ---@diagnostic enable: undefined-global
         end
     end,
