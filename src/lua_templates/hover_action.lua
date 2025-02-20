@@ -29,6 +29,6 @@ local function check_progress_result()
         ---@diagnostic enable: need-check-nil
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid hover result returned (Attempt ' .. vim.inspect(hover_result) .. ')\n')
+        report_log('No valid hover result returned: ' .. vim.inspect(hover_result) .. '\n')
     end
 end

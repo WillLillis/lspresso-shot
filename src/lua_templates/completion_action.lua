@@ -36,6 +36,6 @@ local function check_progress_result()
         vim.cmd('qa!')
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid completion result returned (Attempt ' .. vim.inspect(completion_result) .. ')\n')
+        report_log('No valid completion result returned: ' .. vim.inspect(completion_result) .. '\n')
     end
 end

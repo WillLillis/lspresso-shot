@@ -42,7 +42,7 @@ local function check_progress_result()
         ---@diagnostic disable-next-line: undefined-global, exp-in-action
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid definition result returned (Attempt ' .. vim.inspect(definition_results) .. '\n')
+        report_log('No valid definition result returned: ' .. vim.inspect(definition_results) .. '\n')
     end
     vim.cmd('qa!')
 end
