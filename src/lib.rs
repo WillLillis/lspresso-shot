@@ -10,6 +10,7 @@ use std::{
     fs,
     path::Path,
     process::{Command, Stdio},
+    sync::{Arc, Condvar, Mutex, OnceLock},
 };
 
 use types::{
@@ -31,6 +32,49 @@ macro_rules! lspresso_shot {
     };
 }
 
+/// The parallelism utilized in Cargo's test runner and the concrete timeout values
+/// used in our test cases do not play nicely together, leading to intermittent failures.
+/// We use `RUNNER_COUNT` to restrict the number of concurrent test cases, treating
+/// each case's "neovim portion" inside `run_test` as a critical section. Another
+/// approach that works is to manually limit the number of threads used by the test
+/// runner via `--test-threads x`, but it isn't realistic to expect consumers to do this.
+static RUNNER_LIMIT: u32 = 3;
+static RUNNER_COUNT: OnceLock<Arc<(Mutex<u32>, Condvar)>> = OnceLock::new();
+
+fn get_runner_count() -> Arc<(Mutex<u32>, Condvar)> {
+    #[allow(clippy::mutex_integer)]
+    RUNNER_COUNT
+        .get_or_init(|| Arc::new((Mutex::new(0), Condvar::new())))
+        .clone()
+}
+
+/// Helper struct to automatically decrement `n_jobs` when dropped.
+struct RunnerGuard<'a> {
+    lock: &'a Mutex<u32>,
+    cvar: &'a Condvar,
+}
+
+impl<'a> RunnerGuard<'a> {
+    fn new(lock: &'a Mutex<u32>, cvar: &'a Condvar) -> Self {
+        let mut n_jobs = lock.lock().expect("Mutex poisoned");
+
+        while *n_jobs >= RUNNER_LIMIT {
+            n_jobs = cvar.wait(n_jobs).expect("Condition variable poisoned");
+        }
+
+        *n_jobs += 1;
+        drop(n_jobs);
+
+        Self { lock, cvar }
+    }
+}
+
+impl Drop for RunnerGuard<'_> {
+    fn drop(&mut self) {
+        *self.lock.lock().expect("Mutex poisoned") -= 1;
+        self.cvar.notify_one();
+    }
+}
 // TODO: We'll need some separate handling for negative cases, e.g. where it's
 // expected for *no* results to be returned. This is tricky because for servers
 // with a `$/progress` style startup, we need to basically poll the server for valid
