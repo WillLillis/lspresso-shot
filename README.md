@@ -69,7 +69,7 @@ for examples of how to use the library.
 
 ## Checklist/TODOs:
 
-- [x] Refactor to use the type definitions from the [lsp-types][https://github.com/gluon-lang/lsp-types]
+- [x] Refactor to use the type definitions from the [lsp-types](https://github.com/gluon-lang/lsp-types)
 crate
 - [x] Use neovim's builtin api to serialize lsp responses into JSON rather than
 hand-encoding information to TOML
@@ -78,15 +78,22 @@ fully started up, rather than the current polling approach
 - [x] Place Lua logic into dedicated files rather than as strings within the Rust
 files
 - [ ] Clean up Lua logic (I'm unfamiliar with the neovim API)
-- [ ] Add CI and whatnot
+- [ ] Add CI and whatnot (Rust done, still need Lua linting)
 
 As an eventual end goal, we'd obviously like to provide test coverage for *all* LSP methods.
 To start though, let's focus on the following TODOs:
 
 - [ ] Create a *very* simple test server so we can ensure coverage of all type variants
+    - The basic thought here is to have the server's response defined so that it can
+      be accessed on the Rust side by both the testing library and test server.
+    - There will be a simple event loop, matching against each covered request type.
+    - For methods with multiple return types (i.e. `textDocument/completion`, we'll
+      have multiple predefined responses for each. The expected response type can be communicated
+      from the test to the test server through one or more of the request params (i.e.
+      line number).
 - [x] `textDocument/hover`
-- [x] `textDocument/publishDiagnostics`
-- [ ] `textDocument/references`
+- [x] `textDocument/publishDiagnostics` (needs slight rework)
+- [x] `textDocument/references`
 - [ ] `textDocument/definition` (partially addressed)
 - [ ] `textDocument/completion` (partially addressed)
 - [ ] `textDocument/formatting`
@@ -94,7 +101,10 @@ To start though, let's focus on the following TODOs:
 
 ## Gotchas
 
-- TODO: Add explanation of the API for `$/progress`-initialized servers.
+- If your server undergoes some sort of indexing process at startup before it's ready
+to service a given request, you need to account for this by specifying `ServerStartType::Progress(i32, String)`
+to the test case. The `i32` specifies *which* `end` message to issue the request
+after (in case there are multiple). The `String` provides the relevant [progress token][progress-token].
 
 - **String comparison of results**: Many LSP client implementations do some post processing
 of responses returned by a given language server, primarily removing newlines. Your expected
@@ -109,9 +119,10 @@ is used with other editors' clients.
 ## Contributing
 
 - In addition to [neovim][nvim-repo], working on this project also requires having having
-[rust-analyzer][rust-analyzer] on your `$PATH`, as it is used in the project's test suite.
+[rust-analyzer][rust-analyzer] 1.84.1 on your `$PATH`, as it is used in the project's test suite.
 
 [lsp-spec]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/
+[progress-token]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#progress
 [nvim-repo]: https://github.com/neovim/neovim
 [nvim-install-docs]: https://github.com/neovim/neovim#install-from-source
 [rust-analyzer]: https://github.com/rust-lang/rust-analyzer
