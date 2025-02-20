@@ -38,7 +38,11 @@ pub fn get_init_dot_lua(
     );
     // This is how we actually invoke the action to be tested
     match test_type {
-        TestType::Hover | TestType::Completion | TestType::Definition | TestType::Rename => {
+        TestType::Hover
+        | TestType::Completion
+        | TestType::Definition
+        | TestType::References
+        | TestType::Rename => {
             raw_init = raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type));
         }
         TestType::Diagnostic => {
@@ -100,6 +104,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::Diagnostic => "\n-- NOTE: No `check_progress_result` function for diagnostics, instead handled by `DiagnosticChanged` autocmd\n",
         TestType::Completion => include_str!("lua_templates/completion_action.lua"),
         TestType::Definition => include_str!("lua_templates/definition_action.lua"),
+        TestType::References => include_str!("lua_templates/references_action.lua"),
         TestType::Rename => include_str!("lua_templates/rename_action.lua"),
     }
     .to_string()

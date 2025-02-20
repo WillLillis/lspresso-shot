@@ -5,10 +5,9 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anstyle::{AnsiColor, Color, Style};
-use lsp_types::WorkspaceEdit;
 pub use lsp_types::{
     CompletionItem, CompletionList, CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover,
-    Position,
+    Location, Position, WorkspaceEdit,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -26,6 +25,8 @@ pub enum TestType {
     Completion,
     /// Test `textDocument/definition` requests
     Definition,
+    /// Test `textDocument/references` requests
+    References,
     /// Test `textDocument/rename` requests
     Rename,
 }
@@ -40,6 +41,7 @@ impl std::fmt::Display for TestType {
                 Self::Definition => "definition",
                 Self::Diagnostic => "publishDiagnostics",
                 Self::Hover => "hover",
+                Self::References => "references",
                 Self::Rename => "rename",
             }
         )?;
@@ -483,6 +485,8 @@ pub enum TestError {
     #[error(transparent)]
     HoverMismatch(#[from] Box<HoverMismatchError>),
     #[error(transparent)]
+    ReferencesMismatch(#[from] ReferencesMismatchError),
+    #[error(transparent)]
     RenameMismatch(#[from] Box<RenameMismatchError>),
     #[error("No results were written")]
     NoResults,
@@ -881,6 +885,21 @@ impl std::fmt::Display for CompletionMismatchError {
             },
         };
 
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct ReferencesMismatchError {
+    pub test_id: String,
+    pub expected: Vec<Location>,
+    pub actual: Vec<Location>,
+}
+
+impl std::fmt::Display for ReferencesMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Incorrect References response:", self.test_id)?;
+        write_fields_comparison(f, "Location", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }
