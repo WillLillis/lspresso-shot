@@ -2,7 +2,9 @@ mod init_dot_lua;
 mod test;
 pub mod types;
 
-use lsp_types::{CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover, WorkspaceEdit};
+use lsp_types::{
+    CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover, Location, WorkspaceEdit,
+};
 use rand::distr::Distribution;
 use std::{
     fs,
@@ -12,8 +14,8 @@ use std::{
 
 use types::{
     CompletionMismatchError, CompletionResult, DefinitionMismatchError, DiagnosticMismatchError,
-    HoverMismatchError, RenameMismatchError, TestCase, TestError, TestResult, TestSetupError,
-    TestType, TimeoutError,
+    HoverMismatchError, ReferencesMismatchError, RenameMismatchError, TestCase, TestError,
+    TestResult, TestSetupError, TestType, TimeoutError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -133,6 +135,39 @@ pub fn test_definition(
     Ok(())
 }
 
+/// Tests the server's response to a 'textDocument/references' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+pub fn test_references(
+    mut test_case: TestCase,
+    include_declaration: bool,
+    expected: &Vec<Location>,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(TestType::References))?;
+    }
+    test_case.test_type = Some(TestType::References);
+    let actual: Vec<Location> = test_inner(
+        &mut test_case,
+        Some(&vec![(
+            "SET_CONTEXT",
+            format!("context = {{ includeDeclaration = {include_declaration} }}"),
+        )]),
+    )?;
+
+    if *expected != actual {
+        Err(ReferencesMismatchError {
+            test_id: test_case.test_id.clone(),
+            expected: expected.clone(),
+            actual,
+        })?;
+    }
+
+    Ok(())
+}
+
 /// Tests the server's response to a 'textDocument/rename' request
 ///
 /// # Errors
@@ -209,6 +244,10 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestResult<()> {
     let init_dot_lua_path = test_case
         .get_init_lua_file_path()
         .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+
+    // Restrict the number of tests invoking neovim at a given time to prevent timeout issues
+    let (lock, cvar) = &*get_runner_count();
+    let _guard = RunnerGuard::new(lock, cvar); // Ensures proper decrement on exit
 
     let start = std::time::Instant::now();
     let mut child = Command::new("nvim")

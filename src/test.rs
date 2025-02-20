@@ -13,9 +13,12 @@ mod tests {
 
     use crate::{
         lspresso_shot, test_completions, test_definition, test_diagnostics, test_hover,
-        test_rename,
+        test_references, test_rename,
         types::{CompletionResult, ServerStartType, TestCase, TestFile},
     };
+
+    // NOTE: Timouts are set to ridiculous values for these to avoid issues with
+    // slow CI runners. For local testing, 5-15 seconds should be sufficient
 
     fn cargo_dot_toml() -> TestFile {
         TestFile::new(
@@ -34,8 +37,37 @@ path = "src/main.rs""#,
         )
     }
 
-    /// NOTE: Timouts are set to ridiculous values for these to avoid issues with
-    /// slow CI runners. For local testing, 5-15 seconds should be sufficient
+    #[test]
+    fn rust_analyzer_references() {
+        let source_file = TestFile::new(
+            "src/main.rs",
+            "pub fn main() {
+    let foo = 5;
+}",
+        );
+        let reference_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                5,
+                "rustAnalyzer/Indexing".to_string(),
+            ))
+            .cursor_pos(Some(Position::new(1, 9)))
+            .timeout(Duration::from_secs(20))
+            .cleanup(false)
+            .other_file(cargo_dot_toml());
+
+        lspresso_shot!(test_references(
+            reference_test_case,
+            true,
+            &vec![Location {
+                uri: Uri::from_str("src/main.rs").unwrap(),
+                range: Range {
+                    start: Position::new(1, 8),
+                    end: Position::new(1, 11)
+                },
+            }]
+        ));
+    }
+
     #[test]
     fn rust_analyzer_rename() {
         let source_file = TestFile::new(
