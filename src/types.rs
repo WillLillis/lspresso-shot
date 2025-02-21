@@ -8,7 +8,7 @@ use std::time::Duration;
 use anstyle::{AnsiColor, Color, Style};
 pub use lsp_types::{
     CompletionItem, CompletionList, CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover,
-    Location, Position, WorkspaceEdit,
+    Location, Position, TextEdit, WorkspaceEdit,
 };
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -18,14 +18,16 @@ use crate::init_dot_lua::get_init_dot_lua;
 /// Specifies the type of test to run
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TestType {
-    /// Test `textDocument/hover` requests
-    Hover,
-    /// Test `textDocument/publishDiagnostics` requests
-    Diagnostic,
     /// Test `textDocument/completion` requests
     Completion,
     /// Test `textDocument/definition` requests
     Definition,
+    /// Test `textDocument/publishDiagnostics` requests
+    Diagnostic,
+    /// Test `textDocument/formatting` requests
+    Formatting,
+    /// Test `textDocument/hover` requests
+    Hover,
     /// Test `textDocument/references` requests
     References,
     /// Test `textDocument/rename` requests
@@ -41,6 +43,7 @@ impl std::fmt::Display for TestType {
                 Self::Completion => "completion",
                 Self::Definition => "definition",
                 Self::Diagnostic => "publishDiagnostics",
+                Self::Formatting => "formatting",
                 Self::Hover => "hover",
                 Self::References => "references",
                 Self::Rename => "rename",
@@ -466,6 +469,8 @@ pub enum TestError {
     DefinitionMismatch(#[from] Box<DefinitionMismatchError>),
     #[error(transparent)]
     DiagnosticMismatch(#[from] DiagnosticMismatchError),
+    #[error(transparent)]
+    FormattingMismatch(#[from] FormattingMismatchError),
     #[error(transparent)]
     HoverMismatch(#[from] Box<HoverMismatchError>),
     #[error(transparent)]
@@ -899,6 +904,21 @@ impl std::fmt::Display for RenameMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Test {}: Incorrect Rename response:", self.test_id)?;
         write_fields_comparison(f, "WorkspaceEdit", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct FormattingMismatchError {
+    pub test_id: String,
+    pub expected: Vec<TextEdit>,
+    pub actual: Vec<TextEdit>,
+}
+
+impl std::fmt::Display for FormattingMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Incorrect Formatting response:", self.test_id)?;
+        write_fields_comparison(f, "TextEdit", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }

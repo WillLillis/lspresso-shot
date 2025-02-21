@@ -3,10 +3,12 @@ mod test;
 pub mod types;
 
 use lsp_types::{
-    CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover, Location, WorkspaceEdit,
+    CompletionResponse, Diagnostic, FormattingOptions, GotoDefinitionResponse, Hover, Location,
+    TextEdit, WorkspaceEdit,
 };
 use rand::distr::Distribution;
 use std::{
+    collections::HashMap,
     fs,
     path::Path,
     process::{Command, Stdio},
@@ -15,8 +17,8 @@ use std::{
 
 use types::{
     CompletionMismatchError, CompletionResult, DefinitionMismatchError, DiagnosticMismatchError,
-    HoverMismatchError, ReferencesMismatchError, RenameMismatchError, TestCase, TestError,
-    TestResult, TestSetupError, TestType, TimeoutError,
+    FormattingMismatchError, HoverMismatchError, ReferencesMismatchError, RenameMismatchError,
+    TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -237,6 +239,51 @@ pub fn test_rename(
             expected: expected.clone(),
             actual,
         }))?;
+    }
+
+    Ok(())
+}
+
+/// Tests the server's response to a 'textDocument/formatting' request. If `options`
+/// is `None`, defaults are provided (4 space tabs, prefer spaces over tabs)
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `options` fails
+pub fn test_formatting(
+    mut test_case: TestCase,
+    options: Option<FormattingOptions>,
+    expected: &Vec<TextEdit>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::Formatting);
+    let opts = options.unwrap_or_else(|| FormattingOptions {
+        tab_size: 4,
+        insert_spaces: true,
+        properties: HashMap::new(),
+        trim_trailing_whitespace: None,
+        insert_final_newline: None,
+        trim_final_newlines: None,
+    });
+
+    let actual: Vec<TextEdit> = test_inner(
+        &mut test_case,
+        Some(&vec![(
+            "JSON_OPTIONS",
+            serde_json::to_string_pretty(&opts)
+                .expect("JSON deserialzation of formatting options failed"),
+        )]),
+    )?;
+
+    if *expected != actual {
+        Err(FormattingMismatchError {
+            test_id: test_case.test_id.clone(),
+            expected: expected.clone(),
+            actual,
+        })?;
     }
 
     Ok(())
