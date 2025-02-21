@@ -40,7 +40,7 @@ macro_rules! lspresso_shot {
 /// each case's "neovim portion" inside `run_test` as a critical section. Another
 /// approach that works is to manually limit the number of threads used by the test
 /// runner via `--test-threads x`, but it isn't realistic to expect consumers to do this.
-static RUNNER_LIMIT: u32 = 3;
+static RUNNER_LIMIT: u32 = 1;
 static RUNNER_COUNT: OnceLock<Arc<(Mutex<u32>, Condvar)>> = OnceLock::new();
 
 fn get_runner_count() -> Arc<(Mutex<u32>, Condvar)> {
