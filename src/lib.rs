@@ -17,8 +17,8 @@ use std::{
 
 use types::{
     CompletionMismatchError, CompletionResult, DefinitionMismatchError, DiagnosticMismatchError,
-    FormattingMismatchError, HoverMismatchError, ReferencesMismatchError, RenameMismatchError,
-    TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
+    FormattingMismatchError, FormattingResult, HoverMismatchError, ReferencesMismatchError,
+    RenameMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -40,6 +40,7 @@ macro_rules! lspresso_shot {
 /// each case's "neovim portion" inside `run_test` as a critical section. Another
 /// approach that works is to manually limit the number of threads used by the test
 /// runner via `--test-threads x`, but it isn't realistic to expect consumers to do this.
+///
 /// It looks like this value needs to be 1, so we could replace the `u32` with a `bool`,
 /// but I'll leave it as is for now in case I come up with some other workaround
 static RUNNER_LIMIT: u32 = 1;
@@ -242,15 +243,15 @@ pub fn test_diagnostics(mut test_case: TestCase, expected: &[Diagnostic]) -> Tes
 /// Tests the server's response to a 'textDocument/formatting' request. If `options`
 /// is `None`, the following default is used:
 ///
-/// ```rust,ignore
-/// FormattingOptions {
+/// ```rust
+/// lsp_types::FormattingOptions {
 ///     tab_size: 4,
 ///     insert_spaces: true,
-///     properties: HashMap::new(),
+///     properties: std::collections::HashMap::new(),
 ///     trim_trailing_whitespace: None,
 ///     insert_final_newline: None,
 ///     trim_final_newlines: None,
-/// }
+/// };
 ///
 /// ```
 /// # Errors
@@ -263,7 +264,7 @@ pub fn test_diagnostics(mut test_case: TestCase, expected: &[Diagnostic]) -> Tes
 pub fn test_formatting(
     mut test_case: TestCase,
     options: Option<FormattingOptions>,
-    expected: &Vec<TextEdit>,
+    expected: &FormattingResult,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Formatting);
     let opts = options.unwrap_or_else(|| FormattingOptions {
@@ -274,15 +275,25 @@ pub fn test_formatting(
         insert_final_newline: None,
         trim_final_newlines: None,
     });
+    let json_opts = serde_json::to_string_pretty(&opts)
+        .expect("JSON deserialzation of formatting options failed");
 
-    let actual: Vec<TextEdit> = test_inner(
-        &test_case,
-        Some(&vec![(
-            "JSON_OPTIONS",
-            serde_json::to_string_pretty(&opts)
-                .expect("JSON deserialzation of formatting options failed"),
-        )]),
-    )?;
+    let actual: FormattingResult = match expected {
+        FormattingResult::Response(_) => FormattingResult::Response(test_inner::<Vec<TextEdit>>(
+            &test_case,
+            Some(&vec![
+                ("INVOKE_FORMAT", "false".to_string()),
+                ("JSON_OPTIONS", json_opts),
+            ]),
+        )?),
+        FormattingResult::EndState(_) => FormattingResult::EndState(test_inner::<String>(
+            &test_case,
+            Some(&vec![
+                ("INVOKE_FORMAT", "true".to_string()),
+                ("JSON_OPTIONS", json_opts),
+            ]),
+        )?),
+    };
 
     if *expected != actual {
         Err(FormattingMismatchError {
