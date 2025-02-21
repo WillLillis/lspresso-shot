@@ -96,7 +96,7 @@ To start though, let's focus on the following TODOs:
 - [x] `textDocument/references`
 - [ ] `textDocument/definition` (partially addressed)
 - [ ] `textDocument/completion` (partially addressed)
-- [ ] `textDocument/formatting`
+- [x] `textDocument/formatting`
 - [x] `textDocument/rename`
 
 ## Gotchas

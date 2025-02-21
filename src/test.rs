@@ -12,8 +12,8 @@ mod tests {
     use serde_json::Map;
 
     use crate::{
-        lspresso_shot, test_completions, test_definition, test_diagnostics, test_hover,
-        test_references, test_rename,
+        lspresso_shot, test_completions, test_definition, test_diagnostics, test_formatting,
+        test_hover, test_references, test_rename,
         types::{CompletionResult, ServerStartType, TestCase, TestFile},
     };
 
@@ -65,6 +65,45 @@ path = "src/main.rs""#,
                     end: Position::new(1, 11)
                 },
             }]
+        ));
+    }
+
+    #[test]
+    fn rust_analyzer_formatting() {
+        let source_file = TestFile::new(
+            "src/main.rs",
+            "pub fn main() {
+let foo = 5;
+}",
+        );
+        let formatting_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                NonZeroU32::new(5).unwrap(),
+                "rustAnalyzer/Indexing".to_string(),
+            ))
+            .timeout(Duration::from_secs(20))
+            .cleanup(false)
+            .other_file(cargo_dot_toml());
+
+        lspresso_shot!(test_formatting(
+            formatting_test_case,
+            None,
+            &vec![
+                TextEdit {
+                    new_text: "    ".to_string(),
+                    range: Range {
+                        start: Position::new(1, 0),
+                        end: Position::new(1, 0),
+                    },
+                },
+                TextEdit {
+                    new_text: "\n".to_string(),
+                    range: Range {
+                        start: Position::new(2, 1),
+                        end: Position::new(2, 1),
+                    }
+                }
+            ],
         ));
     }
 
