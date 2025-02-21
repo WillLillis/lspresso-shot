@@ -10,6 +10,7 @@ pub use lsp_types::{
     CompletionItem, CompletionList, CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover,
     Location, Position, TextEdit, WorkspaceEdit,
 };
+use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -109,7 +110,7 @@ pub struct TestCase {
 impl TestCase {
     pub fn new<P1: Into<PathBuf>>(executable_path: P1, source_file: TestFile) -> Self {
         Self {
-            test_id: String::new(),
+            test_id: Self::generate_test_id(),
             test_type: None,
             executable_path: executable_path.into(),
             source_file,
@@ -168,6 +169,13 @@ impl TestCase {
     pub fn timeout<T: Into<Duration>>(mut self, timeout: T) -> Self {
         self.timeout = timeout.into();
         self
+    }
+
+    /// Generates a new random test ID
+    fn generate_test_id() -> String {
+        let range = rand::distr::Uniform::new(0, usize::MAX).unwrap();
+        let mut rng = rand::rng();
+        range.sample(&mut rng).to_string()
     }
 
     /// Removes the associated test directory if `self.cleanup`. *Intentionally*
@@ -652,55 +660,6 @@ fn write_fields_comparison<T: Serialize>(
     Ok(())
 }
 
-#[derive(Debug, Error)]
-pub struct HoverMismatchError {
-    pub test_id: String,
-    pub expected: Hover,
-    pub actual: Hover,
-}
-
-impl std::fmt::Display for HoverMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Hover response:", self.test_id)?;
-        write_fields_comparison(f, "Hover", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error)]
-pub struct DiagnosticMismatchError {
-    pub test_id: String,
-    pub expected: Vec<Diagnostic>,
-    pub actual: Vec<Diagnostic>,
-}
-
-impl std::fmt::Display for DiagnosticMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Diagnostic response:", self.test_id)?;
-        write_fields_comparison(f, "Diagnostics", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error)]
-pub struct DefinitionMismatchError {
-    pub test_id: String,
-    pub expected: GotoDefinitionResponse,
-    pub actual: GotoDefinitionResponse,
-}
-
-impl std::fmt::Display for DefinitionMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect GotoDefinition response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "GotoDefinition", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
 // `textDocument/completion` is a bit different from other requests. Servers commonly
 // send a *bunch* of completion items, and rely on the editor's lsp client to filter
 // them out/ display the most relevant ones first. This is fine, but it means that
@@ -879,6 +838,70 @@ impl std::fmt::Display for CompletionMismatchError {
 }
 
 #[derive(Debug, Error)]
+pub struct DefinitionMismatchError {
+    pub test_id: String,
+    pub expected: GotoDefinitionResponse,
+    pub actual: GotoDefinitionResponse,
+}
+
+impl std::fmt::Display for DefinitionMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect GotoDefinition response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "GotoDefinition", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct DiagnosticMismatchError {
+    pub test_id: String,
+    pub expected: Vec<Diagnostic>,
+    pub actual: Vec<Diagnostic>,
+}
+
+impl std::fmt::Display for DiagnosticMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Incorrect Diagnostic response:", self.test_id)?;
+        write_fields_comparison(f, "Diagnostics", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct FormattingMismatchError {
+    pub test_id: String,
+    pub expected: Vec<TextEdit>,
+    pub actual: Vec<TextEdit>,
+}
+
+impl std::fmt::Display for FormattingMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Incorrect Formatting response:", self.test_id)?;
+        write_fields_comparison(f, "TextEdit", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct HoverMismatchError {
+    pub test_id: String,
+    pub expected: Hover,
+    pub actual: Hover,
+}
+
+impl std::fmt::Display for HoverMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Incorrect Hover response:", self.test_id)?;
+        write_fields_comparison(f, "Hover", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
 pub struct ReferencesMismatchError {
     pub test_id: String,
     pub expected: Vec<Location>,
@@ -904,21 +927,6 @@ impl std::fmt::Display for RenameMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Test {}: Incorrect Rename response:", self.test_id)?;
         write_fields_comparison(f, "WorkspaceEdit", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error)]
-pub struct FormattingMismatchError {
-    pub test_id: String,
-    pub expected: Vec<TextEdit>,
-    pub actual: Vec<TextEdit>,
-}
-
-impl std::fmt::Display for FormattingMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Formatting response:", self.test_id)?;
-        write_fields_comparison(f, "TextEdit", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }
