@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use std::{str::FromStr, time::Duration};
+    use std::{num::NonZeroU32, str::FromStr, time::Duration};
 
     use lsp_types::{
         CodeDescription, CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
@@ -47,7 +47,7 @@ path = "src/main.rs""#,
         );
         let reference_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                5,
+                NonZeroU32::new(5).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .cursor_pos(Some(Position::new(1, 9)))
@@ -78,7 +78,7 @@ path = "src/main.rs""#,
         );
         let rename_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                5,
+                NonZeroU32::new(5).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .cursor_pos(Some(Position::new(1, 9)))
@@ -120,7 +120,7 @@ path = "src/main.rs""#,
         );
         let definition_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                5,
+                NonZeroU32::new(5).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .cursor_pos(Some(Position::new(2, 5)))
@@ -297,7 +297,7 @@ path = "src/main.rs""#,
         );
         let hover_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                1,
+                NonZeroU32::new(1).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
@@ -476,7 +476,7 @@ println!("format {local_variable} arguments");
         );
         let completion_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                4,
+                NonZeroU32::new(5).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
