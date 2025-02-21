@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 use std::env::temp_dir;
 use std::fs;
+use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -191,9 +192,6 @@ impl TestCase {
     /// Returns `TestSetupError` if `nvim` isn't executable, the provided server
     /// isn't executable, or if an invalid test file path is found
     pub fn validate(&self) -> Result<(), TestSetupError> {
-        if !self.start_type.is_valid() {
-            Err(TestSetupError::InvalidServerStartType)?;
-        }
         if !is_executable(&PathBuf::from("nvim")) {
             Err(TestSetupError::InvalidNeovim)?;
         }
@@ -423,24 +421,12 @@ pub enum ServerStartType {
     /// before properly servicing requests. Listen to progress messages and issue
     /// the related request after the ith one is received.
     ///
-    /// The inner `u32` type indicates on which `end` `$/progress` message the
+    /// The inner `NonZeroU32` type indicates on which `end` `$/progress` message the
     /// server is ready to respond to a particular request. Counting is 1-based.
     ///
     /// The inner `String` type contains the text of the relevant progress token
     /// (i.e. "rustAnalyzer/indexing").
-    Progress(u32, String),
-}
-
-impl ServerStartType {
-    // NOTE: Is there a better way to enforce strictly positive integers?
-    /// Returns true if the given `ServerStartType` is valid
-    #[must_use]
-    pub const fn is_valid(&self) -> bool {
-        match self {
-            Self::Simple => true,
-            Self::Progress(x, _) => *x > 0,
-        }
-    }
+    Progress(NonZeroU32, String),
 }
 
 pub type TestSetupResult<T> = Result<T, TestSetupError>;
@@ -459,8 +445,6 @@ pub enum TestSetupError {
     InvalidFilePath(String),
     #[error("Cursor position must be specified for {0} tests")]
     InvalidCursorPosition(TestType),
-    #[error("Server start type progress value must be greater than 0")]
-    InvalidServerStartType,
     #[error("{0}")]
     IO(String),
 }
