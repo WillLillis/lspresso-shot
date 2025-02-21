@@ -42,7 +42,8 @@ pub fn get_init_dot_lua(
         | TestType::Completion
         | TestType::Definition
         | TestType::References
-        | TestType::Rename => {
+        | TestType::Rename
+        | TestType::Formatting => {
             raw_init = raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type));
         }
         TestType::Diagnostic => {
@@ -100,10 +101,11 @@ fn progress_threshold(start_type: &ServerStartType) -> String {
 
 fn get_attach_action(test_type: TestType) -> String {
     match test_type {
-        TestType::Hover => include_str!("lua_templates/hover_action.lua"),
-        TestType::Diagnostic => "\n-- NOTE: No `check_progress_result` function for diagnostics, instead handled by `DiagnosticChanged` autocmd\n",
         TestType::Completion => include_str!("lua_templates/completion_action.lua"),
         TestType::Definition => include_str!("lua_templates/definition_action.lua"),
+        TestType::Diagnostic => "\n-- NOTE: No `check_progress_result` function for diagnostics, instead handled by `DiagnosticChanged` autocmd\n",
+        TestType::Formatting => include_str!("lua_templates/formatting_action.lua"),
+        TestType::Hover => include_str!("lua_templates/hover_action.lua"),
         TestType::References => include_str!("lua_templates/references_action.lua"),
         TestType::Rename => include_str!("lua_templates/rename_action.lua"),
     }

@@ -96,14 +96,14 @@ To start though, let's focus on the following TODOs:
 - [x] `textDocument/references`
 - [ ] `textDocument/definition` (partially addressed)
 - [ ] `textDocument/completion` (partially addressed)
-- [ ] `textDocument/formatting`
-- [ ] `textDocument/rename`
+- [x] `textDocument/formatting`
+- [x] `textDocument/rename`
 
 ## Gotchas
 
 - If your server undergoes some sort of indexing process at startup before it's ready
 to service a given request, you need to account for this by specifying `ServerStartType::Progress(i32, String)`
-to the test case. The `i32` specifies *which* `end` message to issue the request
+to the test case. The `NonZeroU32` specifies *which* `end` message to issue the request
 after (in case there are multiple). The `String` provides the relevant [progress token][progress-token].
 
 - **String comparison of results**: Many LSP client implementations do some post processing

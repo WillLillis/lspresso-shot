@@ -1,14 +1,16 @@
 use std::collections::HashSet;
 use std::env::temp_dir;
 use std::fs;
+use std::num::NonZeroU32;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use anstyle::{AnsiColor, Color, Style};
 pub use lsp_types::{
     CompletionItem, CompletionList, CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover,
-    Location, Position, WorkspaceEdit,
+    Location, Position, TextEdit, WorkspaceEdit,
 };
+use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -17,14 +19,16 @@ use crate::init_dot_lua::get_init_dot_lua;
 /// Specifies the type of test to run
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TestType {
-    /// Test `textDocument/hover` requests
-    Hover,
-    /// Test `textDocument/publishDiagnostics` requests
-    Diagnostic,
     /// Test `textDocument/completion` requests
     Completion,
     /// Test `textDocument/definition` requests
     Definition,
+    /// Test `textDocument/publishDiagnostics` requests
+    Diagnostic,
+    /// Test `textDocument/formatting` requests
+    Formatting,
+    /// Test `textDocument/hover` requests
+    Hover,
     /// Test `textDocument/references` requests
     References,
     /// Test `textDocument/rename` requests
@@ -40,6 +44,7 @@ impl std::fmt::Display for TestType {
                 Self::Completion => "completion",
                 Self::Definition => "definition",
                 Self::Diagnostic => "publishDiagnostics",
+                Self::Formatting => "formatting",
                 Self::Hover => "hover",
                 Self::References => "references",
                 Self::Rename => "rename",
@@ -105,7 +110,7 @@ pub struct TestCase {
 impl TestCase {
     pub fn new<P1: Into<PathBuf>>(executable_path: P1, source_file: TestFile) -> Self {
         Self {
-            test_id: String::new(),
+            test_id: Self::generate_test_id(),
             test_type: None,
             executable_path: executable_path.into(),
             source_file,
@@ -166,6 +171,13 @@ impl TestCase {
         self
     }
 
+    /// Generates a new random test ID
+    fn generate_test_id() -> String {
+        let range = rand::distr::Uniform::new(0, usize::MAX).unwrap();
+        let mut rng = rand::rng();
+        range.sample(&mut rng).to_string()
+    }
+
     /// Removes the associated test directory if `self.cleanup`. *Intentionally*
     /// ignores any errors, as these should not be surfaced to the user. Error prints
     /// are left to aid in internal development.
@@ -191,9 +203,6 @@ impl TestCase {
     /// Returns `TestSetupError` if `nvim` isn't executable, the provided server
     /// isn't executable, or if an invalid test file path is found
     pub fn validate(&self) -> Result<(), TestSetupError> {
-        if !self.start_type.is_valid() {
-            Err(TestSetupError::InvalidServerStartType)?;
-        }
         if !is_executable(&PathBuf::from("nvim")) {
             Err(TestSetupError::InvalidNeovim)?;
         }
@@ -423,24 +432,12 @@ pub enum ServerStartType {
     /// before properly servicing requests. Listen to progress messages and issue
     /// the related request after the ith one is received.
     ///
-    /// The inner `u32` type indicates on which `end` `$/progress` message the
+    /// The inner `NonZeroU32` type indicates on which `end` `$/progress` message the
     /// server is ready to respond to a particular request. Counting is 1-based.
     ///
     /// The inner `String` type contains the text of the relevant progress token
     /// (i.e. "rustAnalyzer/indexing").
-    Progress(u32, String),
-}
-
-impl ServerStartType {
-    // NOTE: Is there a better way to enforce strictly positive integers?
-    /// Returns true if the given `ServerStartType` is valid
-    #[must_use]
-    pub const fn is_valid(&self) -> bool {
-        match self {
-            Self::Simple => true,
-            Self::Progress(x, _) => *x > 0,
-        }
-    }
+    Progress(NonZeroU32, String),
 }
 
 pub type TestSetupResult<T> = Result<T, TestSetupError>;
@@ -459,8 +456,6 @@ pub enum TestSetupError {
     InvalidFilePath(String),
     #[error("Cursor position must be specified for {0} tests")]
     InvalidCursorPosition(TestType),
-    #[error("Server start type progress value must be greater than 0")]
-    InvalidServerStartType,
     #[error("{0}")]
     IO(String),
 }
@@ -482,6 +477,8 @@ pub enum TestError {
     DefinitionMismatch(#[from] Box<DefinitionMismatchError>),
     #[error(transparent)]
     DiagnosticMismatch(#[from] DiagnosticMismatchError),
+    #[error(transparent)]
+    FormattingMismatch(#[from] FormattingMismatchError),
     #[error(transparent)]
     HoverMismatch(#[from] Box<HoverMismatchError>),
     #[error(transparent)]
@@ -663,55 +660,6 @@ fn write_fields_comparison<T: Serialize>(
     Ok(())
 }
 
-#[derive(Debug, Error)]
-pub struct HoverMismatchError {
-    pub test_id: String,
-    pub expected: Hover,
-    pub actual: Hover,
-}
-
-impl std::fmt::Display for HoverMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Hover response:", self.test_id)?;
-        write_fields_comparison(f, "Hover", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error)]
-pub struct DiagnosticMismatchError {
-    pub test_id: String,
-    pub expected: Vec<Diagnostic>,
-    pub actual: Vec<Diagnostic>,
-}
-
-impl std::fmt::Display for DiagnosticMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Diagnostic response:", self.test_id)?;
-        write_fields_comparison(f, "Diagnostics", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error)]
-pub struct DefinitionMismatchError {
-    pub test_id: String,
-    pub expected: GotoDefinitionResponse,
-    pub actual: GotoDefinitionResponse,
-}
-
-impl std::fmt::Display for DefinitionMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect GotoDefinition response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "GotoDefinition", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
 // `textDocument/completion` is a bit different from other requests. Servers commonly
 // send a *bunch* of completion items, and rely on the editor's lsp client to filter
 // them out/ display the most relevant ones first. This is fine, but it means that
@@ -885,6 +833,70 @@ impl std::fmt::Display for CompletionMismatchError {
             },
         };
 
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct DefinitionMismatchError {
+    pub test_id: String,
+    pub expected: GotoDefinitionResponse,
+    pub actual: GotoDefinitionResponse,
+}
+
+impl std::fmt::Display for DefinitionMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect GotoDefinition response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "GotoDefinition", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct DiagnosticMismatchError {
+    pub test_id: String,
+    pub expected: Vec<Diagnostic>,
+    pub actual: Vec<Diagnostic>,
+}
+
+impl std::fmt::Display for DiagnosticMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Incorrect Diagnostic response:", self.test_id)?;
+        write_fields_comparison(f, "Diagnostics", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct FormattingMismatchError {
+    pub test_id: String,
+    pub expected: Vec<TextEdit>,
+    pub actual: Vec<TextEdit>,
+}
+
+impl std::fmt::Display for FormattingMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Incorrect Formatting response:", self.test_id)?;
+        write_fields_comparison(f, "TextEdit", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct HoverMismatchError {
+    pub test_id: String,
+    pub expected: Hover,
+    pub actual: Hover,
+}
+
+impl std::fmt::Display for HoverMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Incorrect Hover response:", self.test_id)?;
+        write_fields_comparison(f, "Hover", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }

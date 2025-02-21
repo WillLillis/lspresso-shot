@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use std::{str::FromStr, time::Duration};
+    use std::{num::NonZeroU32, str::FromStr, time::Duration};
 
     use lsp_types::{
         CodeDescription, CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
@@ -12,8 +12,8 @@ mod tests {
     use serde_json::Map;
 
     use crate::{
-        lspresso_shot, test_completions, test_definition, test_diagnostics, test_hover,
-        test_references, test_rename,
+        lspresso_shot, test_completion, test_definition, test_diagnostics, test_formatting,
+        test_hover, test_references, test_rename,
         types::{CompletionResult, ServerStartType, TestCase, TestFile},
     };
 
@@ -47,7 +47,7 @@ path = "src/main.rs""#,
         );
         let reference_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                5,
+                NonZeroU32::new(5).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .cursor_pos(Some(Position::new(1, 9)))
@@ -69,6 +69,45 @@ path = "src/main.rs""#,
     }
 
     #[test]
+    fn rust_analyzer_formatting() {
+        let source_file = TestFile::new(
+            "src/main.rs",
+            "pub fn main() {
+let foo = 5;
+}",
+        );
+        let formatting_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                NonZeroU32::new(5).unwrap(),
+                "rustAnalyzer/Indexing".to_string(),
+            ))
+            .timeout(Duration::from_secs(20))
+            .cleanup(false)
+            .other_file(cargo_dot_toml());
+
+        lspresso_shot!(test_formatting(
+            formatting_test_case,
+            None,
+            &vec![
+                TextEdit {
+                    new_text: "    ".to_string(),
+                    range: Range {
+                        start: Position::new(1, 0),
+                        end: Position::new(1, 0),
+                    },
+                },
+                TextEdit {
+                    new_text: "\n".to_string(),
+                    range: Range {
+                        start: Position::new(2, 1),
+                        end: Position::new(2, 1),
+                    }
+                }
+            ],
+        ));
+    }
+
+    #[test]
     fn rust_analyzer_rename() {
         let source_file = TestFile::new(
             "src/main.rs",
@@ -78,7 +117,7 @@ path = "src/main.rs""#,
         );
         let rename_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                5,
+                NonZeroU32::new(5).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .cursor_pos(Some(Position::new(1, 9)))
@@ -120,7 +159,7 @@ path = "src/main.rs""#,
         );
         let definition_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                5,
+                NonZeroU32::new(5).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .cursor_pos(Some(Position::new(2, 5)))
@@ -297,7 +336,7 @@ path = "src/main.rs""#,
         );
         let hover_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                1,
+                NonZeroU32::new(1).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
@@ -476,13 +515,13 @@ println!("format {local_variable} arguments");
         );
         let completion_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                4,
+                NonZeroU32::new(5).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
             .cleanup(false)
             .cursor_pos(Some(Position::new(1, 9)))
             .other_file(cargo_dot_toml());
-        lspresso_shot!(test_completions(completion_test_case, &expected_comps));
+        lspresso_shot!(test_completion(completion_test_case, &expected_comps));
     }
 }
