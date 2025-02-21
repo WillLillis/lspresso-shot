@@ -6,7 +6,7 @@ use lsp_types::{
     CompletionResponse, Diagnostic, FormattingOptions, GotoDefinitionResponse, Hover, Location,
     TextEdit, WorkspaceEdit,
 };
-use rand::distr::Distribution;
+
 use std::{
     collections::HashMap,
     fs,
@@ -40,6 +40,8 @@ macro_rules! lspresso_shot {
 /// each case's "neovim portion" inside `run_test` as a critical section. Another
 /// approach that works is to manually limit the number of threads used by the test
 /// runner via `--test-threads x`, but it isn't realistic to expect consumers to do this.
+/// It looks like this value needs to be 1, so we could replace the `u32` with a `bool`,
+/// but I'll leave it as is for now in case I come up with some other workaround
 static RUNNER_LIMIT: u32 = 1;
 static RUNNER_COUNT: OnceLock<Arc<(Mutex<u32>, Condvar)>> = OnceLock::new();
 
@@ -77,234 +79,12 @@ impl Drop for RunnerGuard<'_> {
         self.cvar.notify_one();
     }
 }
-// TODO: We'll need some separate handling for negative cases, e.g. where it's
-// expected for *no* results to be returned. This is tricky because for servers
-// with a `$/progress` style startup, we need to basically poll the server for valid
-// results until we find something. There's no way (that I can tell) to distinguish
-// between an empty "not ready" and a true empty response -- the lua table just looks
-// like this: `{ {} }`
-// Do we even need to cover this use case?
 
-/// Tests the server's response to a 'textDocument/hover' request
-///
-/// # Errors
-///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
-/// or some other failure occurs
-pub fn test_hover(mut test_case: TestCase, expected: Hover) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(TestType::Hover))?;
-    }
-    test_case.test_type = Some(TestType::Hover);
-    let actual = test_inner(&mut test_case, None)?;
-
-    if expected != actual {
-        Err(Box::new(HoverMismatchError {
-            test_id: test_case.test_id,
-            expected,
-            actual,
-        }))?;
-    }
-
-    Ok(())
-}
-
-// TODO: Accept PublishDiagnosticsParams rather than a raw `Vec<Diagnostic>`, might
-// help clean up the lua logic a bit
-/// Tests the server's response to a 'textDocument/publishDiagnostics' request
-///
-/// # Errors
-///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
-/// or some other failure occurs
-pub fn test_diagnostics(mut test_case: TestCase, expected: &[Diagnostic]) -> TestResult<()> {
-    test_case.test_type = Some(TestType::Diagnostic);
-    let actual: Vec<Diagnostic> = test_inner(&mut test_case, None)?;
-    if expected != actual {
-        Err(DiagnosticMismatchError {
-            test_id: test_case.test_id.clone(),
-            expected: expected.to_vec(),
-            actual,
-        })?;
-    }
-
-    Ok(())
-}
-
-/// Tests the server's response to a 'textDocument/publishDiagnostics' request
-///
-/// # Errors
-///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
-/// or some other failure occurs
-pub fn test_completions(mut test_case: TestCase, expected: &CompletionResult) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(TestType::Completion))?;
-    }
-    test_case.test_type = Some(TestType::Completion);
-    let actual: CompletionResponse = test_inner(&mut test_case, None)?;
-
-    if !expected.results_satisfy(&actual) {
-        Err(CompletionMismatchError {
-            test_id: test_case.test_id.clone(),
-            expected: expected.clone(),
-            actual,
-        })?;
-    }
-
-    Ok(())
-}
-
-/// Tests the server's response to a 'textDocument/definition' request
-///
-/// # Errors
-///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
-pub fn test_definition(
-    mut test_case: TestCase,
-    expected: &GotoDefinitionResponse,
-) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(TestType::Definition))?;
-    }
-    test_case.test_type = Some(TestType::Definition);
-    let actual: GotoDefinitionResponse = test_inner(&mut test_case, None)?;
-
-    if *expected != actual {
-        Err(Box::new(DefinitionMismatchError {
-            test_id: test_case.test_id.clone(),
-            expected: expected.clone(),
-            actual,
-        }))?;
-    }
-
-    Ok(())
-}
-
-/// Tests the server's response to a 'textDocument/references' request
-///
-/// # Errors
-///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
-pub fn test_references(
-    mut test_case: TestCase,
-    include_declaration: bool,
-    expected: &Vec<Location>,
-) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(TestType::References))?;
-    }
-    test_case.test_type = Some(TestType::References);
-    let actual: Vec<Location> = test_inner(
-        &mut test_case,
-        Some(&vec![(
-            "SET_CONTEXT",
-            format!("context = {{ includeDeclaration = {include_declaration} }}"),
-        )]),
-    )?;
-
-    if *expected != actual {
-        Err(ReferencesMismatchError {
-            test_id: test_case.test_id.clone(),
-            expected: expected.clone(),
-            actual,
-        })?;
-    }
-
-    Ok(())
-}
-
-/// Tests the server's response to a 'textDocument/rename' request
-///
-/// # Errors
-///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
-pub fn test_rename(
-    mut test_case: TestCase,
-    new_name: &str,
-    expected: &WorkspaceEdit,
-) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(TestType::Rename))?;
-    }
-    test_case.test_type = Some(TestType::Rename);
-    let actual: WorkspaceEdit = test_inner(
-        &mut test_case,
-        Some(&vec![("NEW_NAME", format!("newName = '{new_name}'"))]),
-    )?;
-
-    if *expected != actual {
-        Err(Box::new(RenameMismatchError {
-            test_id: test_case.test_id.clone(),
-            expected: expected.clone(),
-            actual,
-        }))?;
-    }
-
-    Ok(())
-}
-
-/// Tests the server's response to a 'textDocument/formatting' request. If `options`
-/// is `None`, defaults are provided (4 space tabs, prefer spaces over tabs)
-///
-/// # Errors
-///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
-///
-/// # Panics
-///
-/// Panics if JSON deserialization of `options` fails
-pub fn test_formatting(
-    mut test_case: TestCase,
-    options: Option<FormattingOptions>,
-    expected: &Vec<TextEdit>,
-) -> TestResult<()> {
-    test_case.test_type = Some(TestType::Formatting);
-    let opts = options.unwrap_or_else(|| FormattingOptions {
-        tab_size: 4,
-        insert_spaces: true,
-        properties: HashMap::new(),
-        trim_trailing_whitespace: None,
-        insert_final_newline: None,
-        trim_final_newlines: None,
-    });
-
-    let actual: Vec<TextEdit> = test_inner(
-        &mut test_case,
-        Some(&vec![(
-            "JSON_OPTIONS",
-            serde_json::to_string_pretty(&opts)
-                .expect("JSON deserialzation of formatting options failed"),
-        )]),
-    )?;
-
-    if *expected != actual {
-        Err(FormattingMismatchError {
-            test_id: test_case.test_id.clone(),
-            expected: expected.clone(),
-            actual,
-        })?;
-    }
-
-    Ok(())
-}
-
-/// Generates a new random test ID
-fn generate_test_id() -> String {
-    let range = rand::distr::Uniform::new(0, usize::MAX).unwrap();
-    let mut rng = rand::rng();
-    range.sample(&mut rng).to_string()
-}
-
-fn test_inner<R>(
-    test_case: &mut TestCase,
-    replacements: Option<&Vec<(&str, String)>>,
-) -> TestResult<R>
+fn test_inner<R>(test_case: &TestCase, replacements: Option<&Vec<(&str, String)>>) -> TestResult<R>
 where
     R: serde::de::DeserializeOwned,
 {
     test_case.validate()?;
-    test_case.test_id = generate_test_id();
     // Invariant: `test_case.test_type` should always be set to `Some(_)` in the caller
     let source_path = test_case.create_test(
         test_case.test_type.expect("Test type is `None`"),
@@ -377,4 +157,227 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestResult<()> {
         test_id: test_case.test_id.clone(),
         timeout: test_case.timeout,
     }))?
+}
+
+// TODO: We'll need some separate handling for negative cases, e.g. where it's
+// expected for *no* results to be returned. This is tricky because for servers
+// with a `$/progress` style startup, we need to basically poll the server for valid
+// results until we find something. There's no way (that I can tell) to distinguish
+// between an empty "not ready" and a true empty response -- the lua table just looks
+// like this: `{ {} }`
+// Do we even need to cover this use case?
+
+/// Tests the server's response to a 'textDocument/complection' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_completion(mut test_case: TestCase, expected: &CompletionResult) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(TestType::Completion))?;
+    }
+    test_case.test_type = Some(TestType::Completion);
+    let actual: CompletionResponse = test_inner(&test_case, None)?;
+
+    if !expected.results_satisfy(&actual) {
+        Err(CompletionMismatchError {
+            test_id: test_case.test_id,
+            expected: expected.clone(),
+            actual,
+        })?;
+    }
+
+    Ok(())
+}
+
+/// Tests the server's response to a 'textDocument/definition' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+pub fn test_definition(
+    mut test_case: TestCase,
+    expected: &GotoDefinitionResponse,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(TestType::Definition))?;
+    }
+    test_case.test_type = Some(TestType::Definition);
+    let actual: GotoDefinitionResponse = test_inner(&test_case, None)?;
+
+    if *expected != actual {
+        Err(Box::new(DefinitionMismatchError {
+            test_id: test_case.test_id,
+            expected: expected.clone(),
+            actual,
+        }))?;
+    }
+
+    Ok(())
+}
+
+// TODO: Accept PublishDiagnosticsParams rather than a raw `Vec<Diagnostic>`, might
+// help clean up the lua logic a bit
+/// Tests the server's response to a 'textDocument/publishDiagnostics' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_diagnostics(mut test_case: TestCase, expected: &[Diagnostic]) -> TestResult<()> {
+    test_case.test_type = Some(TestType::Diagnostic);
+    let actual: Vec<Diagnostic> = test_inner(&test_case, None)?;
+    if expected != actual {
+        Err(DiagnosticMismatchError {
+            test_id: test_case.test_id,
+            expected: expected.to_vec(),
+            actual,
+        })?;
+    }
+
+    Ok(())
+}
+
+/// Tests the server's response to a 'textDocument/formatting' request. If `options`
+/// is `None`, the following default is used:
+///
+/// ```rust,ignore
+/// FormattingOptions {
+///     tab_size: 4,
+///     insert_spaces: true,
+///     properties: HashMap::new(),
+///     trim_trailing_whitespace: None,
+///     insert_final_newline: None,
+///     trim_final_newlines: None,
+/// }
+///
+/// ```
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `options` fails
+pub fn test_formatting(
+    mut test_case: TestCase,
+    options: Option<FormattingOptions>,
+    expected: &Vec<TextEdit>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::Formatting);
+    let opts = options.unwrap_or_else(|| FormattingOptions {
+        tab_size: 4,
+        insert_spaces: true,
+        properties: HashMap::new(),
+        trim_trailing_whitespace: None,
+        insert_final_newline: None,
+        trim_final_newlines: None,
+    });
+
+    let actual: Vec<TextEdit> = test_inner(
+        &test_case,
+        Some(&vec![(
+            "JSON_OPTIONS",
+            serde_json::to_string_pretty(&opts)
+                .expect("JSON deserialzation of formatting options failed"),
+        )]),
+    )?;
+
+    if *expected != actual {
+        Err(FormattingMismatchError {
+            test_id: test_case.test_id,
+            expected: expected.clone(),
+            actual,
+        })?;
+    }
+
+    Ok(())
+}
+
+/// Tests the server's response to a 'textDocument/hover' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_hover(mut test_case: TestCase, expected: Hover) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(TestType::Hover))?;
+    }
+    test_case.test_type = Some(TestType::Hover);
+    let actual = test_inner(&test_case, None)?;
+
+    if expected != actual {
+        Err(Box::new(HoverMismatchError {
+            test_id: test_case.test_id,
+            expected,
+            actual,
+        }))?;
+    }
+
+    Ok(())
+}
+
+/// Tests the server's response to a 'textDocument/references' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+pub fn test_references(
+    mut test_case: TestCase,
+    include_declaration: bool,
+    expected: &Vec<Location>,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(TestType::References))?;
+    }
+    test_case.test_type = Some(TestType::References);
+    let actual: Vec<Location> = test_inner(
+        &test_case,
+        Some(&vec![(
+            "SET_CONTEXT",
+            format!("context = {{ includeDeclaration = {include_declaration} }}"),
+        )]),
+    )?;
+
+    if *expected != actual {
+        Err(ReferencesMismatchError {
+            test_id: test_case.test_id,
+            expected: expected.clone(),
+            actual,
+        })?;
+    }
+
+    Ok(())
+}
+
+/// Tests the server's response to a 'textDocument/rename' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+pub fn test_rename(
+    mut test_case: TestCase,
+    new_name: &str,
+    expected: &WorkspaceEdit,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(TestType::Rename))?;
+    }
+    test_case.test_type = Some(TestType::Rename);
+    let actual: WorkspaceEdit = test_inner(
+        &test_case,
+        Some(&vec![("NEW_NAME", format!("newName = '{new_name}'"))]),
+    )?;
+
+    if *expected != actual {
+        Err(Box::new(RenameMismatchError {
+            test_id: test_case.test_id,
+            expected: expected.clone(),
+            actual,
+        }))?;
+    }
+
+    Ok(())
 }

@@ -12,7 +12,7 @@ mod tests {
     use serde_json::Map;
 
     use crate::{
-        lspresso_shot, test_completions, test_definition, test_diagnostics, test_formatting,
+        lspresso_shot, test_completion, test_definition, test_diagnostics, test_formatting,
         test_hover, test_references, test_rename,
         types::{CompletionResult, ServerStartType, TestCase, TestFile},
     };
@@ -522,6 +522,6 @@ println!("format {local_variable} arguments");
             .cleanup(false)
             .cursor_pos(Some(Position::new(1, 9)))
             .other_file(cargo_dot_toml());
-        lspresso_shot!(test_completions(completion_test_case, &expected_comps));
+        lspresso_shot!(test_completion(completion_test_case, &expected_comps));
     }
 }
