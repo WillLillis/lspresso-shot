@@ -871,17 +871,39 @@ impl std::fmt::Display for DiagnosticMismatchError {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub enum FormattingResult {
+    /// Check if the file's formatted state matches the contents
+    EndState(String),
+    /// Check if the server's response matches
+    Response(Vec<TextEdit>),
+}
+
 #[derive(Debug, Error)]
 pub struct FormattingMismatchError {
     pub test_id: String,
-    pub expected: Vec<TextEdit>,
-    pub actual: Vec<TextEdit>,
+    pub expected: FormattingResult,
+    pub actual: FormattingResult,
 }
 
 impl std::fmt::Display for FormattingMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Test {}: Incorrect Formatting response:", self.test_id)?;
-        write_fields_comparison(f, "TextEdit", &self.expected, &self.actual, 0)?;
+        match (&self.expected, &self.actual) {
+            (
+                FormattingResult::Response(expected_edits),
+                FormattingResult::Response(actual_edits),
+            ) => {
+                write_fields_comparison(f, "TextEdit", expected_edits, actual_edits, 0)?;
+            }
+            (
+                FormattingResult::EndState(expected_end_state),
+                FormattingResult::EndState(actual_end_state),
+            ) => {
+                write_fields_comparison(f, "EndState", expected_end_state, actual_end_state, 0)?;
+            }
+            _ => unreachable!(),
+        }
         Ok(())
     }
 }

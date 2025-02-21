@@ -14,7 +14,7 @@ mod tests {
     use crate::{
         lspresso_shot, test_completion, test_definition, test_diagnostics, test_formatting,
         test_hover, test_references, test_rename,
-        types::{CompletionResult, ServerStartType, TestCase, TestFile},
+        types::{CompletionResult, FormattingResult, ServerStartType, TestCase, TestFile},
     };
 
     // NOTE: Timouts are set to ridiculous values for these to avoid issues with
@@ -69,7 +69,7 @@ path = "src/main.rs""#,
     }
 
     #[test]
-    fn rust_analyzer_formatting() {
+    fn rust_analyzer_formatting_state() {
         let source_file = TestFile::new(
             "src/main.rs",
             "pub fn main() {
@@ -78,7 +78,7 @@ let foo = 5;
         );
         let formatting_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                NonZeroU32::new(5).unwrap(),
+                NonZeroU32::new(1).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
@@ -88,7 +88,37 @@ let foo = 5;
         lspresso_shot!(test_formatting(
             formatting_test_case,
             None,
-            &vec![
+            &FormattingResult::EndState(
+                "pub fn main() {
+    let foo = 5;
+}
+"
+                .to_string()
+            )
+        ));
+    }
+
+    #[test]
+    fn rust_analyzer_formatting_response() {
+        let source_file = TestFile::new(
+            "src/main.rs",
+            "pub fn main() {
+let foo = 5;
+}",
+        );
+        let formatting_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                NonZeroU32::new(1).unwrap(),
+                "rustAnalyzer/Indexing".to_string(),
+            ))
+            .timeout(Duration::from_secs(20))
+            .cleanup(false)
+            .other_file(cargo_dot_toml());
+
+        lspresso_shot!(test_formatting(
+            formatting_test_case,
+            None,
+            &FormattingResult::Response(vec![
                 TextEdit {
                     new_text: "    ".to_string(),
                     range: Range {
@@ -103,7 +133,7 @@ let foo = 5;
                         end: Position::new(2, 1),
                     }
                 }
-            ],
+            ]),
         ));
     }
 
