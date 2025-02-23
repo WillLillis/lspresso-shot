@@ -218,8 +218,10 @@ pub fn test_definition(
     Ok(())
 }
 
-// TODO: Accept PublishDiagnosticsParams rather than a raw `Vec<Diagnostic>`, might
-// help clean up the lua logic a bit
+// NOTE: As far as I can tell, we can't directly accept a `PublishDiagnosticsParams` object,
+// since diagnostics are requested via a `textDocument/publishDiagnostics` notification instead
+// of a request. The `vim.lsp.buf_notify` method only returns a boolean to indicate success,
+// so we can't access the actual data.
 /// Tests the server's response to a 'textDocument/publishDiagnostics' request
 ///
 /// # Errors

@@ -92,7 +92,7 @@ To start though, let's focus on the following TODOs:
       from the test to the test server through one or more of the request params (i.e.
       line number).
 - [x] `textDocument/hover`
-- [x] `textDocument/publishDiagnostics` (needs slight rework)
+- [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`
 - [ ] `textDocument/definition` (partially addressed)
 - [ ] `textDocument/completion` (partially addressed)
