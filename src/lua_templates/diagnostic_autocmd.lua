@@ -38,9 +38,8 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
             vim.cmd('qa!')
             ---@diagnostic enable: need-check-nil
         else
-            ---@diagnostic disable: undefined-global
+            ---@diagnostic disable-next-line: undefined-global
             report_log('No diagnostic result returned: ' .. vim.inspect(diagnostics_result) .. '\n')
-            ---@diagnostic enable: undefined-global
         end
     end,
 })
