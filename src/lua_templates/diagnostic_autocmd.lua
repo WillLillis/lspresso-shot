@@ -11,9 +11,10 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
                 report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
                 vim.cmd('qa!')
             end
-            local num_diagnostics = #diagnostics_result
-            local accum = '[\n'
-            for i, diagnostic in pairs(diagnostics_result) do
+
+            local diagnostics = {}
+
+            for _, diagnostic in pairs(diagnostics_result) do
                 report_log('Parsing diagnostic ' .. vim.inspect(diagnostic) .. '\n') ---@diagnostic disable-line: undefined-global
                 local result = diagnostic.user_data.lsp
                 result.message = string.gsub(result.message, "\\\\", "\\") -- HACK: find a better way?
@@ -27,15 +28,12 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
                         end
                     end
                 end
-                accum = accum .. vim.json.encode(result)
-                if i < num_diagnostics then
-                    accum = accum .. ',\n'
-                end
+
+                table.insert(diagnostics, result)
             end
-            accum = accum .. '\n]'
 
             ---@diagnostic disable: need-check-nil
-            results_file:write(accum)
+            results_file:write(vim.json.encode(diagnostics))
             results_file:close()
             vim.cmd('qa!')
             ---@diagnostic enable: need-check-nil
