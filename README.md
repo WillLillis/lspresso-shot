@@ -78,7 +78,7 @@ fully started up, rather than the current polling approach
 - [x] Place Lua logic into dedicated files rather than as strings within the Rust
 files
 - [ ] Clean up Lua logic (I'm unfamiliar with the neovim API)
-- [ ] Add CI and whatnot (Rust done, still need Lua linting)
+- [x] Add CI and whatnot (Improvements to current lua workflow?)
 
 As an eventual end goal, we'd obviously like to provide test coverage for *all* LSP methods.
 To start though, let's focus on the following TODOs:

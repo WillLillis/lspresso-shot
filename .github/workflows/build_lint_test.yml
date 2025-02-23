@@ -55,6 +55,16 @@ jobs:
       run: |
         script -q -c "cargo test -- --nocapture"
 
+    - name: Install luals
+      run: |
+        mkdir "$HOME/luals"
+        curl -LSs https://github.com/LuaLS/lua-language-server/releases/download/3.13.6/lua-language-server-3.13.6-linux-x64.tar.gz | tar xzf - -C "$HOME/luals"
+        echo "$HOME/luals/bin" >> $GITHUB_PATH
+
+    - name: Lua lint
+      run: |
+        lua-language-server --check src/lua_templates/
+
     # Uncomment this to ssh into the runner and debug if needed
     # - name: Setup tmate session
     #   if: always()
