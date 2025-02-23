@@ -20,11 +20,13 @@ local function check_progress_result()
     if rename_result and #rename_result >= 1 and rename_result[1].result and rename_result[1].result.documentChanges then
         local results_file = io.open('RESULTS_FILE', 'w')
         if not results_file then
+            ---@diagnostic disable-next-line: undefined-global
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
             vim.cmd('qa!')
         end
         local doc_changes = rename_result[1].result.documentChanges
         for i, edit in ipairs(doc_changes) do
+            ---@diagnostic disable-next-line: undefined-global
             local relative_path = extract_relative_path(edit.textDocument.uri) ---@diagnostic disable-line: undefined-global
             doc_changes[i].textDocument.uri = relative_path
         end
@@ -37,6 +39,6 @@ local function check_progress_result()
         ---@diagnostic enable: need-check-nil
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid rename result returned: ' .. vim.inspect(rename_result) .. '\n')
+        report_log('No valid rename result returned: ' .. vim.inspect(rename_result) .. '\n') ---@diagnostic disable-line: undefined-global
     end
 end

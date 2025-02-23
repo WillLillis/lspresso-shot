@@ -20,25 +20,33 @@ local function check_progress_result()
             vim.cmd('qa!')
         end
 
-        local definitions = {}
-
-        for _, def in ipairs(definition_results) do
-            if def.result then
-                for _, res in ipairs(def.result) do
-                    if res.targetUri then
-                        report_log('Setting `result.targetUri` field to relative path\n') ---@diagnostic disable-line: undefined-global
-                        res.targetUri = extract_relative_path(res.targetUri) ---@diagnostic disable-line: undefined-global
+        -- TODO: Needs a test
+        -- GotoDefinitionResponse::Scalar
+        if definition_results[1].result.uri then
+            definition_results[1].result.uri = extract_relative_path(definition_results[1].result.uri) ---@diagnostic disable-line: undefined-global
+        else
+            for _, def in ipairs(definition_results) do
+                if def.result then
+                    for _, res in ipairs(def.result) do
+                        if res.targetUri then
+                            --- GotoDefinitionResponse:::Link
+                            report_log('Setting `result.targetUri` field to relative path\n') ---@diagnostic disable-line: undefined-global
+                            res.targetUri = extract_relative_path(res.targetUri) ---@diagnostic disable-line: undefined-global
+                        elseif res.uri then
+                            -- TODO: Needs a test
+                            -- GotoDefinitionResponse::Array
+                            report_log('Setting `result.uri` field to relative path\n') ---@diagnostic disable-line: undefined-global
+                            res.uri = extract_relative_path(res.uri) ---@diagnostic disable-line: undefined-global
+                        end
                     end
-
-                    table.insert(definitions, res)
                 end
             end
         end
+
         ---@diagnostic disable: need-check-nil
-        results_file:write(vim.json.encode(definitions))
+        results_file:write(vim.json.encode(definition_results[1].result))
         results_file:close()
         ---@diagnostic enable: need-check-nil
-        ---@diagnostic disable-next-line: undefined-global, exp-in-action
     else
         ---@diagnostic disable-next-line: undefined-global
         report_log('No valid definition result returned: ' .. vim.inspect(definition_results) .. '\n')

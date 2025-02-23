@@ -94,8 +94,8 @@ To start though, let's focus on the following TODOs:
 - [x] `textDocument/hover`
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`
-- [ ] `textDocument/definition` (partially addressed)
-- [ ] `textDocument/completion` (partially addressed)
+- [ ] `textDocument/definition` (needs test coverage for other variants)
+- [ ] `textDocument/completion` (needs better ergonomics for failing cases)
 - [x] `textDocument/formatting`
 - [x] `textDocument/rename`
 

@@ -18,11 +18,13 @@ local function check_progress_result()
     if reference_result and #reference_result >= 1 and reference_result[1].result and #reference_result[1].result >= 1 then
         local results_file = io.open('RESULTS_FILE', 'w')
         if not results_file then
+            ---@diagnostic disable-next-line: undefined-global
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
             vim.cmd('qa!')
         end
         local refs = reference_result[1].result
         for i, ref in ipairs(refs) do
+            ---@diagnostic disable-next-line: undefined-global
             local relative_path = extract_relative_path(ref.uri) ---@diagnostic disable-line: undefined-global
             refs[i].uri = relative_path
         end
@@ -35,6 +37,6 @@ local function check_progress_result()
         ---@diagnostic enable: need-check-nil
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid reference result returned: ' .. vim.inspect(reference_result) .. '\n')
+        report_log('No valid reference result returned: ' .. vim.inspect(reference_result) .. '\n') ---@diagnostic disable-line: undefined-global
     end
 end
