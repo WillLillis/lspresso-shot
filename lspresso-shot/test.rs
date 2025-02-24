@@ -51,18 +51,17 @@ path = "src/main.rs""#,
 
     #[test]
     fn dummy_references() {
-        let response_num = 1;
-        let source_file = TestFile::new(test_server::responses::get_source_path(), "");
-        let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::new(response_num, 0)))
-            .timeout(Duration::from_secs(1))
-            .cleanup(false);
+        let mut response_num = 1;
+        while let Some(refs) = test_server::responses::get_references_response(response_num) {
+            let source_file = TestFile::new(test_server::responses::get_source_path(), "");
+            let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
+                .cursor_pos(Some(Position::new(response_num, 0)))
+                .timeout(Duration::from_secs(1))
+                .cleanup(false);
 
-        lspresso_shot!(test_references(
-            reference_test_case,
-            true,
-            &test_server::responses::get_references_response(response_num)
-        ));
+            lspresso_shot!(test_references(reference_test_case, true, &refs,));
+            response_num += 1;
+        }
     }
 
     #[test]

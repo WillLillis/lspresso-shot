@@ -8,24 +8,22 @@ pub fn get_source_path() -> String {
     "main.dummy".to_string()
 }
 
+/// For use with `test_references`.
 /// Returns a different `Vec<Location>` based on `response_num`.
-///
-/// # Panics
-///
-/// This function will not panic
 #[must_use]
-pub fn get_references_response(response_num: u32) -> Vec<Location> {
+#[allow(clippy::missing_panics_doc)]
+pub fn get_references_response(response_num: u32) -> Option<Vec<Location>> {
     let uri = Uri::from_str(&get_source_path()).unwrap();
     match response_num {
-        0 => vec![],
-        1 => vec![Location {
+        0 => Some(vec![]),
+        1 => Some(vec![Location {
             uri,
             range: Range {
                 start: Position::new(1, 2),
                 end: Position::new(3, 4),
             },
-        }],
-        2 => vec![
+        }]),
+        2 => Some(vec![
             Location {
                 uri: uri.clone(),
                 range: Range {
@@ -40,8 +38,8 @@ pub fn get_references_response(response_num: u32) -> Vec<Location> {
                     end: Position::new(7, 8),
                 },
             },
-        ],
-        _ => vec![
+        ]),
+        3 => Some(vec![
             Location {
                 uri: uri.clone(),
                 range: Range {
@@ -63,6 +61,9 @@ pub fn get_references_response(response_num: u32) -> Vec<Location> {
                     end: Position::new(11, 12),
                 },
             },
-        ],
+        ]),
+        _ => None,
+    }
+}
     }
 }
