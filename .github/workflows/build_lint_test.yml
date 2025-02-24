@@ -41,19 +41,21 @@ jobs:
         rustup component add rust-src rustfmt clippy rust-analyzer
 
     - name: Build
-      run: cargo build
+      run: cargo build --workspace
 
     - name: Lint
-      run: cargo clippy --all-targets --all-features -- -D warnings
+      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
     - name: fmt
       run: cargo fmt --check
 
     # Tests have to be wrapped in `script` because GH runners are headless.
     # For some reason, we need the appearance of a tty for things to work.
+    # HACK: We also need some means of propagating the test runner's exit
+    # code. Using this hack for now, but there may be a better way
     - name: Run tests
       run: |
-        script -q -c "cargo test -- --nocapture"
+        script -q -c "cargo test -- --nocapture; echo \$? > exitcode" && exit $(cat exitcode)
 
     - name: Install luals
       run: |
