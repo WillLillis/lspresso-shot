@@ -31,7 +31,7 @@ local function check_progress_result()
 
         --- NOTE: Does this ever return more than one result? Just use the first for now
         ---@diagnostic disable: need-check-nil
-        results_file:write(vim.json.encode(reference_result[1].result))
+        results_file:write(vim.json.encode(refs))
         results_file:close()
         vim.cmd('qa!')
         ---@diagnostic enable: need-check-nil

@@ -1,0 +1,32 @@
+[package]
+name = "lspresso-shot"
+publish = true
+edition.workspace = true
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+keywords.workspace = true
+categories.workspace = true
+license.workspace = true
+
+[lib]
+name = "lspresso_shot"
+path = "lib.rs"
+
+[dependencies]
+anstyle.workspace = true
+lsp-types.workspace = true
+rand.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+test-server = { path = "../test-server" }
+
+[lints]
+workspace = true

@@ -63,7 +63,7 @@ jobs:
 
     - name: Lua lint
       run: |
-        lua-language-server --check src/lua_templates/
+        lua-language-server --check lspresso-shot/lua_templates/
 
     # Uncomment this to ssh into the runner and debug if needed
     # - name: Setup tmate session

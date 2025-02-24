@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use std::{num::NonZeroU32, str::FromStr, time::Duration};
+    use std::{num::NonZeroU32, path::PathBuf, str::FromStr, time::Duration};
 
     use lsp_types::{
         CodeDescription, CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
@@ -20,6 +20,18 @@ mod tests {
     // NOTE: Timouts are set to ridiculous values for these to avoid issues with
     // slow CI runners. For local testing, 5-15 seconds should be sufficient
 
+    fn get_dummy_server_path() -> PathBuf {
+        let mut proj_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .to_path_buf();
+        proj_dir.push("target");
+        proj_dir.push("debug");
+        proj_dir.push("test-server");
+
+        proj_dir
+    }
+
     fn cargo_dot_toml() -> TestFile {
         TestFile::new(
             "Cargo.toml",
@@ -35,6 +47,22 @@ edition = "2021"
 name = "test"
 path = "src/main.rs""#,
         )
+    }
+
+    #[test]
+    fn dummy_references() {
+        let response_num = 1;
+        let source_file = TestFile::new(test_server::responses::get_source_path(), "");
+        let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
+            .cursor_pos(Some(Position::new(response_num, 0)))
+            .timeout(Duration::from_secs(1))
+            .cleanup(false);
+
+        lspresso_shot!(test_references(
+            reference_test_case,
+            true,
+            &test_server::responses::get_references_response(response_num)
+        ));
     }
 
     #[test]

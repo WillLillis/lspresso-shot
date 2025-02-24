@@ -1,0 +1,23 @@
+[package]
+name = "test-server"
+publish = false
+version = "0.1.0"
+description = "Reference LSP implementation"
+categories.workspace = true
+keywords.workspace = true
+readme.workspace = true
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+lsp-types.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+flexi_logger = "0.29.8"
+log = "0.4.26"
+anyhow = "1.0.96"
+lsp-server = "0.7.8"
+
+[lints]
+workspace = true

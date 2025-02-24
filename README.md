@@ -83,7 +83,7 @@ files
 As an eventual end goal, we'd obviously like to provide test coverage for *all* LSP methods.
 To start though, let's focus on the following TODOs:
 
-- [ ] Create a *very* simple test server so we can ensure coverage of all type variants
+- [x] Create a *very* simple test server so we can ensure coverage of all type variants
     - The basic thought here is to have the server's response defined so that it can
       be accessed on the Rust side by both the testing library and test server.
     - There will be a simple event loop, matching against each covered request type.
@@ -91,6 +91,7 @@ To start though, let's focus on the following TODOs:
       have multiple predefined responses for each. The expected response type can be communicated
       from the test to the test server through one or more of the request params (i.e.
       line number).
+- [ ] Sync up test server test coverage with current rust-analyzer coverage
 - [x] `textDocument/hover`
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`
