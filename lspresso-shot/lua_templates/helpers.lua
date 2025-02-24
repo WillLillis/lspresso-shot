@@ -23,11 +23,19 @@ end
 ---@return string
 ---@diagnostic disable-next-line: unused-local, unused-function
 local function extract_relative_path(uri)
-    if not string.sub(uri, 1, 7) == 'file://' then
-        report_error('URI is not a file:// URI')
+    local path = nil
+    -- TODO: Check for other URI schemes?
+    if string.sub(uri, 1, 7) == 'file://' then
+        path = vim.uri_to_fname(uri)
+    else
+        path = uri
     end
-    local path = vim.uri_to_fname(uri)
-    return string.sub(path,
-        string.len('PARENT_PATH') + 1,
-        string.len(path))
+    -- Only strip the start if the server returns an absolute path
+    if string.sub(path, 1, string.len('PARENT_PATH')) == 'PARENT_PATH' then
+        return string.sub(path,
+            string.len('PARENT_PATH') + 1,
+            string.len(path))
+    else
+        return path
+    end
 end
