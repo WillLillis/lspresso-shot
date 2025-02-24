@@ -1,13 +1,14 @@
 #[cfg(test)]
 mod tests {
-    use std::{num::NonZeroU32, path::PathBuf, str::FromStr, time::Duration};
+    use std::{collections::HashMap, num::NonZeroU32, path::PathBuf, str::FromStr, time::Duration};
 
     use lsp_types::{
         CodeDescription, CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
         DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag, DocumentChanges,
-        Documentation, GotoDefinitionResponse, Hover, InsertTextFormat, Location, LocationLink,
-        MarkupContent, NumberOrString, OneOf, OptionalVersionedTextDocumentIdentifier, Position,
-        Range, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
+        Documentation, FormattingOptions, GotoDefinitionResponse, Hover, InsertTextFormat,
+        Location, LocationLink, MarkupContent, NumberOrString, OneOf,
+        OptionalVersionedTextDocumentIdentifier, Position, Range, TextDocumentEdit, TextEdit, Uri,
+        WorkspaceEdit,
     };
     use serde_json::Map;
 
@@ -93,6 +94,48 @@ path = "src/main.rs""#,
                 },
             }]
         ));
+    }
+
+    #[test]
+    fn dummy_formatting_state() {
+        let contents = "Some source contents";
+        let source_file = TestFile::new(test_server::responses::get_source_path(), contents);
+        let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
+            .timeout(Duration::from_secs(1))
+            .cleanup(false);
+
+        lspresso_shot!(test_formatting(
+            reference_test_case,
+            None,
+            &FormattingResult::EndState(contents.to_string())
+        ));
+    }
+
+    #[test]
+    fn dummy_formatting_response() {
+        let contents = "Some source contents";
+        let mut response_num = 1;
+        while let Some(edits) = test_server::responses::get_formatting_response(response_num) {
+            let source_file = TestFile::new(test_server::responses::get_source_path(), contents);
+            let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
+                .timeout(Duration::from_secs(1))
+                .cleanup(false);
+
+            let opts = Some(FormattingOptions {
+                tab_size: response_num,
+                insert_spaces: true,
+                properties: HashMap::new(),
+                trim_trailing_whitespace: None,
+                insert_final_newline: None,
+                trim_final_newlines: None,
+            });
+            lspresso_shot!(test_formatting(
+                reference_test_case,
+                opts,
+                &FormattingResult::Response(edits)
+            ));
+            response_num += 1;
+        }
     }
 
     #[test]

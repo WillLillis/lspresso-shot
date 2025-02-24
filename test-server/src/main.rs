@@ -2,10 +2,10 @@ use anyhow::Result;
 use log::{error, info};
 use lsp_server::{Connection, Message, Request, RequestId, Response};
 use lsp_types::{
-    request::{References, Request as _},
+    request::{Formatting, References, Request as _},
     InitializeParams, OneOf, ServerCapabilities,
 };
-use test_server::responses::get_references_response;
+use test_server::responses::{get_formatting_response, get_references_response};
 
 /// Entry point of the lsp server. Connects to the client and enters the main loop
 ///
@@ -23,9 +23,11 @@ pub fn main() -> Result<()> {
 
     // Setup capabilities
     let references_provider = Some(OneOf::Left(true));
+    let document_formatting_provider = Some(OneOf::Left(true));
 
     let capabilities = ServerCapabilities {
         references_provider,
+        document_formatting_provider,
         ..ServerCapabilities::default()
     };
     let server_capabilities = serde_json::to_value(capabilities).unwrap();
@@ -61,11 +63,11 @@ fn main_loop(connection: &Connection) -> Result<()> {
                 handle_request(req, connection)?;
             }
             Message::Notification(_notif) => {
-                unimplemented!();
+                // unimplemented!();
                 // handle_notification(notif, connection)?;
             }
             Message::Response(_resp) => {
-                unimplemented!();
+                // unimplemented!();
             }
         }
     }
@@ -83,9 +85,11 @@ where
     }
 }
 
-/// Handles `Request`s from the lsp client. By convention, the `response_num` value
-/// specifying which pre-determined response to send back is taken from the first line
-/// number in `params`, if available
+/// Handles `Request`s from the lsp client.
+///
+/// By convention, the `response_num` value specifying which pre-determined response
+/// to send back is taken from the first line number in `params`, if available.
+/// Data passed via other means will be specified in a comment
 ///
 /// # Errors
 ///
@@ -106,6 +110,7 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
                 References::METHOD
             );
             let response_num = params.text_document_position.position.line;
+            info!("response_num: {response_num}");
             let Some(resp) = get_references_response(response_num) else {
                 error!("Invalid response number: {response_num}");
                 return Ok(());
@@ -119,6 +124,31 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
             };
             return Ok(connection.sender.send(Message::Response(result))?);
         }
+        Formatting::METHOD => {
+            let (id, params) =
+                cast_req::<Formatting>(req).expect("Failed to cast Formatting request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                Formatting::METHOD
+            );
+            // `response_num` passed via `params.options.tab_size`
+            let response_num = params.options.tab_size;
+            info!("response_num: {response_num}");
+            let resp = get_formatting_response(response_num).map_or_else(
+                || {
+                    // In this case, we wish to test `FormattingResponse::EndState`
+                    // Send a  reply with no edits (so the start and end state of
+                    // the file matches) to the client so it knows we got the request
+                    // and proceeds with the comparison
+                    info!("Sending response for `FormattingResponse::EndState`");
+                    Vec::new()
+                },
+                |resp| {
+                    info!("Sending response for `FormattingResponse::Response`");
+                    resp
+                },
+            );
+            let result = serde_json::to_value(&resp).unwrap();
 
             let result = Response {
                 id,
