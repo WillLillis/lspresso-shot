@@ -106,7 +106,19 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
                 References::METHOD
             );
             let response_num = params.text_document_position.position.line;
-            let result = serde_json::to_value(get_references_response(response_num)).unwrap();
+            let Some(resp) = get_references_response(response_num) else {
+                error!("Invalid response number: {response_num}");
+                return Ok(());
+            };
+            let result = serde_json::to_value(&resp).unwrap();
+
+            let result = Response {
+                id,
+                result: Some(result),
+                error: None,
+            };
+            return Ok(connection.sender.send(Message::Response(result))?);
+        }
 
             let result = Response {
                 id,
