@@ -54,7 +54,7 @@ path = "src/main.rs""#,
     fn dummy_references() {
         let mut response_num = 1;
         while let Some(refs) = test_server::responses::get_references_response(response_num) {
-            let source_file = TestFile::new(test_server::responses::get_source_path(), "");
+            let source_file = TestFile::new(test_server::get_source_path(), "");
             let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
                 .cursor_pos(Some(Position::new(response_num, 0)))
                 .timeout(Duration::from_secs(1))
@@ -99,7 +99,7 @@ path = "src/main.rs""#,
     #[test]
     fn dummy_formatting_state() {
         let contents = "Some source contents";
-        let source_file = TestFile::new(test_server::responses::get_source_path(), contents);
+        let source_file = TestFile::new(test_server::get_source_path(), contents);
         let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
             .timeout(Duration::from_secs(1))
             .cleanup(false);
@@ -116,7 +116,7 @@ path = "src/main.rs""#,
         let contents = "Some source contents";
         let mut response_num = 1;
         while let Some(edits) = test_server::responses::get_formatting_response(response_num) {
-            let source_file = TestFile::new(test_server::responses::get_source_path(), contents);
+            let source_file = TestFile::new(test_server::get_source_path(), contents);
             let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
                 .timeout(Duration::from_secs(1))
                 .cleanup(false);
@@ -205,6 +205,25 @@ let foo = 5;
                 }
             ]),
         ));
+    }
+
+    #[test]
+    fn dummy_rename() {
+        let mut response_num = 1;
+        while let Some(edits) = test_server::responses::get_rename_response(response_num) {
+            let source_file = TestFile::new(test_server::get_source_path(), "");
+            let rename_test_case = TestCase::new(get_dummy_server_path(), source_file)
+                .cursor_pos(Some(Position::new(0, 0)))
+                .timeout(Duration::from_secs(1))
+                .cleanup(false);
+
+            lspresso_shot!(test_rename(
+                rename_test_case,
+                &response_num.to_string(),
+                &edits
+            ));
+            response_num += 1;
+        }
     }
 
     #[test]

@@ -36,3 +36,5 @@ multiple_crate_versions = "allow"
 items_after_statements = "allow"
 redundant_closure_for_method_calls = "allow"
 module_name_repetitions = "allow"
+# Using the URI type as a key is unavoidable because of lsp-types, tell clippy everything's gonna be ok
+mutable_key_type = "allow"

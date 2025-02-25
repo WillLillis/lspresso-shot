@@ -1,11 +1,70 @@
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 
-use lsp_types::{Location, Position, Range, TextEdit, Uri};
+use lsp_types::{
+    ChangeAnnotation, DocumentChanges, Location, Position, Range, TextDocumentEdit, TextEdit, Uri,
+    WorkspaceEdit,
+};
 
-/// Returns `main.dummy`
+use crate::get_source_path;
+
+/// For use with `test_rename`.
+/// Returns a different `Vec<Location>` based on `response_num`.
 #[must_use]
-pub fn get_source_path() -> String {
-    "main.dummy".to_string()
+#[allow(clippy::missing_panics_doc)]
+pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
+    match response_num {
+        0 => Some(WorkspaceEdit {
+            changes: None,
+            document_changes: None,
+            change_annotations: None,
+        }),
+        1 => {
+            let mut changes = HashMap::new();
+            changes.insert(
+                Uri::from_str(&get_source_path()).unwrap(),
+                vec![TextEdit {
+                    range: Range {
+                        start: Position::new(1, 2),
+                        end: Position::new(3, 4),
+                    },
+                    new_text: "new_text".to_string(),
+                }],
+            );
+            Some(WorkspaceEdit {
+                changes: Some(changes),
+                document_changes: None,
+                change_annotations: None,
+            })
+        }
+        2 => Some(WorkspaceEdit {
+            changes: None,
+            document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {
+                text_document: lsp_types::OptionalVersionedTextDocumentIdentifier {
+                    uri: Uri::from_str(&get_source_path()).unwrap(),
+                    version: None,
+                },
+                edits: Vec::new(),
+            }])),
+            change_annotations: None,
+        }),
+        3 => {
+            let mut changes = HashMap::new();
+            changes.insert(
+                get_source_path(),
+                ChangeAnnotation {
+                    label: "label".to_string(),
+                    needs_confirmation: None,
+                    description: None,
+                },
+            );
+            Some(WorkspaceEdit {
+                changes: None,
+                document_changes: None,
+                change_annotations: Some(changes),
+            })
+        }
+        _ => None,
+    }
 }
 
 /// For use with `test_references`.
