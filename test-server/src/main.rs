@@ -2,10 +2,12 @@ use anyhow::Result;
 use log::{error, info};
 use lsp_server::{Connection, Message, Request, RequestId, Response};
 use lsp_types::{
-    request::{Formatting, References, Request as _},
+    request::{Formatting, References, Rename, Request as _},
     InitializeParams, OneOf, ServerCapabilities,
 };
-use test_server::responses::{get_formatting_response, get_references_response};
+use test_server::responses::{
+    get_formatting_response, get_references_response, get_rename_response,
+};
 
 /// Entry point of the lsp server. Connects to the client and enters the main loop
 ///
@@ -24,10 +26,12 @@ pub fn main() -> Result<()> {
     // Setup capabilities
     let references_provider = Some(OneOf::Left(true));
     let document_formatting_provider = Some(OneOf::Left(true));
+    let rename_provider = Some(OneOf::Left(true));
 
     let capabilities = ServerCapabilities {
-        references_provider,
         document_formatting_provider,
+        references_provider,
+        rename_provider,
         ..ServerCapabilities::default()
     };
     let server_capabilities = serde_json::to_value(capabilities).unwrap();
@@ -148,6 +152,31 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
                     resp
                 },
             );
+            let result = serde_json::to_value(&resp).unwrap();
+
+            let result = Response {
+                id,
+                result: Some(result),
+                error: None,
+            };
+            return Ok(connection.sender.send(Message::Response(result))?);
+        }
+        Rename::METHOD => {
+            let (id, params) = cast_req::<Rename>(req).expect("Failed to cast Rename request");
+            info!("Received `{}` request ({id}): {params:?}", Rename::METHOD);
+            // `response_num` passed via `params.new_name`
+            let Ok(response_num) = params.new_name.parse() else {
+                error!(
+                    "Failed to parse `new_name` as `response_num`: {}",
+                    params.new_name
+                );
+                return Ok(());
+            };
+            info!("response_num: {response_num}");
+            let Some(resp) = get_rename_response(response_num) else {
+                error!("Invalid response number: {response_num}");
+                return Ok(());
+            };
             let result = serde_json::to_value(&resp).unwrap();
 
             let result = Response {
