@@ -271,7 +271,6 @@ let foo = 5;
     fn dummy_definition() {
         let mut response_num = 0;
         while let Some(resp) = test_server::responses::get_definition_response(response_num) {
-            println!("{resp:#?}");
             let source_file = TestFile::new(test_server::get_source_path(), "");
             let definition_test_case = TestCase::new(get_dummy_server_path(), source_file)
                 .cursor_pos(Some(Position::new(response_num, 0)))
@@ -339,6 +338,19 @@ let foo = 5;
                 },
             }])
         ));
+    }
+
+    #[test]
+    fn dummy_diagnostics() {
+        let uri = Uri::from_str(&test_server::get_source_path()).unwrap();
+        let resp = test_server::responses::get_diagnostics_response(&uri);
+        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let diagnostics_test_case = TestCase::new(get_dummy_server_path(), source_file)
+            .cursor_pos(Some(Position::new(0, 0)))
+            .timeout(Duration::from_secs(1))
+            .cleanup(false);
+
+        lspresso_shot!(test_diagnostics(diagnostics_test_case, &resp.diagnostics));
     }
 
     // NOTE:: Specifying the start type is ignored for diagnostics tests

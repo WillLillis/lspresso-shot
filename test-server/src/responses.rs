@@ -1,14 +1,51 @@
 use std::{collections::HashMap, str::FromStr};
 
 use lsp_types::{
-    ChangeAnnotation, DocumentChanges, GotoDefinitionResponse, Location, LocationLink, Position,
-    Range, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
+    ChangeAnnotation, CodeDescription, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
+    GotoDefinitionResponse, Location, LocationLink, Position, PublishDiagnosticsParams, Range,
+    TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
 };
 
 use crate::get_source_path;
 
+// TODO: Figure out way to publish different diagnostics
+/// For use with `test_diagnostics`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_diagnostics_response(uri: &Uri) -> PublishDiagnosticsParams {
+    PublishDiagnosticsParams {
+        uri: uri.clone(),
+        diagnostics: vec![Diagnostic {
+            range: Range {
+                start: Position::new(1, 2),
+                end: Position::new(3, 4),
+            },
+            severity: Some(lsp_types::DiagnosticSeverity::ERROR),
+            code: None,
+            code_description: Some(CodeDescription {
+                href: Uri::from_str(&get_source_path()).unwrap(),
+            }),
+            source: None,
+            message: "message".to_string(),
+            tags: None,
+            related_information: Some(vec![DiagnosticRelatedInformation {
+                location: Location {
+                    uri: uri.clone(),
+                    range: Range {
+                        start: Position::new(5, 6),
+                        end: Position::new(7, 8),
+                    },
+                },
+                message: "related message".to_string(),
+            }]),
+            data: None,
+        }],
+        version: None,
+    }
+}
+
 /// For use with `test_definition`.
-/// Returns a different `Vec<Location>` based on `response_num`.
+/// Returns a different `Vec<GotoDefinitionResponse>` based on `response_num`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_definition_response(response_num: u32) -> Option<GotoDefinitionResponse> {
