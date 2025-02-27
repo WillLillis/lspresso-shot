@@ -1,12 +1,17 @@
 use anyhow::Result;
 use log::{error, info};
-use lsp_server::{Connection, Message, Request, RequestId, Response};
+use lsp_server::{Connection, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
-    request::{Formatting, GotoDefinition, References, Rename, Request as _},
-    InitializeParams, OneOf, ServerCapabilities,
+    notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
+    request::{
+        DocumentDiagnosticRequest, Formatting, GotoDefinition, References, Rename, Request as _,
+    },
+    DiagnosticOptions, DiagnosticServerCapabilities, InitializeParams, OneOf, ServerCapabilities,
+    TextDocumentSyncCapability, TextDocumentSyncKind, Uri, WorkDoneProgressOptions,
 };
 use test_server::responses::{
-    get_definition_response, get_formatting_response, get_references_response, get_rename_response,
+    get_definition_response, get_diagnostics_response, get_formatting_response,
+    get_references_response, get_rename_response,
 };
 
 /// Entry point of the lsp server. Connects to the client and enters the main loop
@@ -24,16 +29,28 @@ pub fn main() -> Result<()> {
     let (connection, _io_threads) = Connection::stdio();
 
     // Setup capabilities
-    let references_provider = Some(OneOf::Left(true));
-    let document_formatting_provider = Some(OneOf::Left(true));
-    let rename_provider = Some(OneOf::Left(true));
     let definition_provider = Some(OneOf::Left(true));
+    let diagnostic_provider = Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
+        identifier: Some("test_server".to_string()),
+        inter_file_dependencies: true,
+        workspace_diagnostics: true,
+        work_done_progress_options: WorkDoneProgressOptions {
+            work_done_progress: None,
+        },
+    }));
+    let document_formatting_provider = Some(OneOf::Left(true));
+    let references_provider = Some(OneOf::Left(true));
+    let rename_provider = Some(OneOf::Left(true));
+    // TODO: May need to revisit this later to test other sync kinds, i.e. incremental
+    let text_document_sync = Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL));
 
     let capabilities = ServerCapabilities {
         definition_provider,
+        diagnostic_provider,
         document_formatting_provider,
         references_provider,
         rename_provider,
+        text_document_sync,
         ..ServerCapabilities::default()
     };
     let server_capabilities = serde_json::to_value(capabilities).unwrap();
@@ -68,10 +85,7 @@ fn main_loop(connection: &Connection) -> Result<()> {
                 }
                 handle_request(req, connection)?;
             }
-            Message::Notification(_notif) => {
-                // unimplemented!();
-                // handle_notification(notif, connection)?;
-            }
+            Message::Notification(notif) => handle_notification(notif, connection)?,
             Message::Response(_resp) => {
                 // unimplemented!();
             }
@@ -86,6 +100,17 @@ where
     R::Params: serde::de::DeserializeOwned,
 {
     match req.extract(R::METHOD) {
+        Ok(value) => Ok(value),
+        Err(e) => Err(anyhow::anyhow!("Error: {e}")),
+    }
+}
+
+fn cast_notif<R>(notif: Notification) -> Result<R::Params>
+where
+    R: lsp_types::notification::Notification,
+    R::Params: serde::de::DeserializeOwned,
+{
+    match notif.extract(R::METHOD) {
         Ok(value) => Ok(value),
         Err(e) => Err(anyhow::anyhow!("Error: {e}")),
     }
@@ -106,6 +131,7 @@ where
 ///
 /// Panics if JSON encoding of a response fails or if a json request fails to cast
 /// into its equivalent in memory struct
+#[allow(clippy::too_many_lines)]
 pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
     match req.method.as_str() {
         References::METHOD => {
@@ -210,8 +236,45 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
             };
             return Ok(connection.sender.send(Message::Response(result))?);
         }
+        DocumentDiagnosticRequest::METHOD => {
+            let (id, params) = cast_req::<DocumentDiagnosticRequest>(req)
+                .expect("Failed to cast DocumentDiagnosticRequest request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                DocumentDiagnosticRequest::METHOD
+            );
+            send_diagnostic_resp(&params.text_document.uri, connection)?;
+        }
         method => error!("Unimplemented request format: {method:?}\n{req:?}"),
     }
 
     Ok(())
+}
+
+fn handle_notification(notif: Notification, connection: &Connection) -> Result<()> {
+    match notif.method.as_str() {
+        DidOpenTextDocument::METHOD => {
+            let did_open_params = cast_notif::<DidOpenTextDocument>(notif)?;
+            info!(
+                "Received `{}` notification: {did_open_params:?}",
+                DidOpenTextDocument::METHOD
+            );
+            send_diagnostic_resp(&did_open_params.text_document.uri, connection)?;
+        }
+        method => error!("Unimplemented notification format: {method:?}\n{notif:?}"),
+    }
+    Ok(())
+}
+
+// TODO: Move this once we refactor
+fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
+    let publish_params = get_diagnostics_response(uri);
+    let result = serde_json::to_value(&publish_params).unwrap();
+
+    let notif = Notification {
+        method: PublishDiagnostics::METHOD.to_string(),
+        params: result,
+    };
+
+    Ok(connection.sender.send(Message::Notification(notif))?)
 }
