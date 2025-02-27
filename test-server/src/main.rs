@@ -2,11 +2,11 @@ use anyhow::Result;
 use log::{error, info};
 use lsp_server::{Connection, Message, Request, RequestId, Response};
 use lsp_types::{
-    request::{Formatting, References, Rename, Request as _},
+    request::{Formatting, GotoDefinition, References, Rename, Request as _},
     InitializeParams, OneOf, ServerCapabilities,
 };
 use test_server::responses::{
-    get_formatting_response, get_references_response, get_rename_response,
+    get_definition_response, get_formatting_response, get_references_response, get_rename_response,
 };
 
 /// Entry point of the lsp server. Connects to the client and enters the main loop
@@ -27,8 +27,10 @@ pub fn main() -> Result<()> {
     let references_provider = Some(OneOf::Left(true));
     let document_formatting_provider = Some(OneOf::Left(true));
     let rename_provider = Some(OneOf::Left(true));
+    let definition_provider = Some(OneOf::Left(true));
 
     let capabilities = ServerCapabilities {
+        definition_provider,
         document_formatting_provider,
         references_provider,
         rename_provider,
@@ -174,6 +176,28 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
             };
             info!("response_num: {response_num}");
             let Some(resp) = get_rename_response(response_num) else {
+                error!("Invalid response number: {response_num}");
+                return Ok(());
+            };
+            let result = serde_json::to_value(&resp).unwrap();
+
+            let result = Response {
+                id,
+                result: Some(result),
+                error: None,
+            };
+            return Ok(connection.sender.send(Message::Response(result))?);
+        }
+        GotoDefinition::METHOD => {
+            let (id, params) =
+                cast_req::<GotoDefinition>(req).expect("Failed to cast GotoDefinition request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                GotoDefinition::METHOD
+            );
+            let response_num = params.text_document_position_params.position.line;
+            info!("response_num: {response_num}");
+            let Some(resp) = get_definition_response(response_num) else {
                 error!("Invalid response number: {response_num}");
                 return Ok(());
             };

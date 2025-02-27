@@ -1,14 +1,53 @@
 use std::{collections::HashMap, str::FromStr};
 
 use lsp_types::{
-    ChangeAnnotation, DocumentChanges, Location, Position, Range, TextDocumentEdit, TextEdit, Uri,
-    WorkspaceEdit,
+    ChangeAnnotation, DocumentChanges, GotoDefinitionResponse, Location, LocationLink, Position,
+    Range, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
 };
 
 use crate::get_source_path;
 
-/// For use with `test_rename`.
+/// For use with `test_definition`.
 /// Returns a different `Vec<Location>` based on `response_num`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_definition_response(response_num: u32) -> Option<GotoDefinitionResponse> {
+    match response_num {
+        0 => Some(GotoDefinitionResponse::Scalar(Location {
+            uri: Uri::from_str(&get_source_path()).unwrap(),
+            range: Range {
+                start: Position::new(1, 2),
+                end: Position::new(3, 4),
+            },
+        })),
+        1 => Some(GotoDefinitionResponse::Array(vec![Location {
+            uri: Uri::from_str(&get_source_path()).unwrap(),
+            range: Range {
+                start: Position::new(1, 2),
+                end: Position::new(3, 4),
+            },
+        }])),
+        2 => Some(GotoDefinitionResponse::Link(vec![LocationLink {
+            target_uri: Uri::from_str(&get_source_path()).unwrap(),
+            target_range: Range {
+                start: Position::new(1, 2),
+                end: Position::new(3, 4),
+            },
+            target_selection_range: Range {
+                start: Position::new(5, 6),
+                end: Position::new(7, 8),
+            },
+            origin_selection_range: Some(Range {
+                start: Position::new(9, 10),
+                end: Position::new(11, 12),
+            }),
+        }])),
+        _ => None,
+    }
+}
+
+/// For use with `test_rename`.
+/// Returns a different `Vec<WorkspaceEdit>` based on `response_num`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
