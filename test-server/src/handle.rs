@@ -1,0 +1,273 @@
+use anyhow::Result;
+use log::{error, info};
+use lsp_server::{Connection, Message, Notification, Request, RequestId, Response};
+use lsp_types::{
+    notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
+    request::{
+        DocumentDiagnosticRequest, Formatting, GotoDefinition, References, Rename, Request as _,
+    },
+    DocumentFormattingParams, GotoDefinitionParams, ReferenceParams, RenameParams, Uri,
+};
+
+use crate::responses::{
+    get_definition_response, get_diagnostics_response, get_formatting_response,
+    get_references_response, get_rename_response,
+};
+
+fn cast_req<R>(req: Request) -> Result<(RequestId, R::Params)>
+where
+    R: lsp_types::request::Request,
+    R::Params: serde::de::DeserializeOwned,
+{
+    match req.extract(R::METHOD) {
+        Ok(value) => Ok(value),
+        Err(e) => Err(anyhow::anyhow!("Error: {e}")),
+    }
+}
+
+fn cast_notif<R>(notif: Notification) -> Result<R::Params>
+where
+    R: lsp_types::notification::Notification,
+    R::Params: serde::de::DeserializeOwned,
+{
+    match notif.extract(R::METHOD) {
+        Ok(value) => Ok(value),
+        Err(e) => Err(anyhow::anyhow!("Error: {e}")),
+    }
+}
+
+/// Handles `Notification`s from the lsp client.
+///
+/// # Errors
+///
+/// Returns errors from any of the handler functions. The majority of error sources
+/// are failures to send a response via `connection`
+///
+/// # Panics
+///
+/// Panics if JSON encoding of a response fails or if a json request fails to cast
+/// into itsequivalent in memory struct
+pub fn handle_notification(notif: Notification, connection: &Connection) -> Result<()> {
+    match notif.method.as_str() {
+        DidOpenTextDocument::METHOD => {
+            let did_open_params = cast_notif::<DidOpenTextDocument>(notif)?;
+            info!(
+                "Received `{}` notification: {did_open_params:?}",
+                DidOpenTextDocument::METHOD
+            );
+            send_diagnostic_resp(&did_open_params.text_document.uri, connection)?;
+        }
+        method => error!("Unimplemented notification format: {method:?}\n{notif:?}"),
+    }
+    Ok(())
+}
+
+/// Handles `Request`s from the lsp client.
+///
+/// By convention, the `response_num` value specifying which pre-determined response
+/// to send back is taken from the first line number in `params`, if available.
+/// Data passed via other means will be specified in a comment
+///
+/// # Errors
+///
+/// Returns errors from any of the handler functions. The majority of error sources
+/// are failures to send a response via `connection`
+///
+/// # Panics
+///
+/// Panics if JSON encoding of a response fails or if a json request fails to cast
+/// into its equivalent in memory struct
+pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
+    match req.method.as_str() {
+        References::METHOD => {
+            let (id, params) =
+                cast_req::<References>(req).expect("Failed to cast References request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                References::METHOD
+            );
+            return handle_references(id, &params, connection);
+        }
+        Formatting::METHOD => {
+            let (id, params) =
+                cast_req::<Formatting>(req).expect("Failed to cast Formatting request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                Formatting::METHOD
+            );
+            return handle_formatting(id, &params, connection);
+        }
+        Rename::METHOD => {
+            let (id, params) = cast_req::<Rename>(req).expect("Failed to cast Rename request");
+            info!("Received `{}` request ({id}): {params:?}", Rename::METHOD);
+            return handle_rename(id, &params, connection);
+        }
+        GotoDefinition::METHOD => {
+            let (id, params) =
+                cast_req::<GotoDefinition>(req).expect("Failed to cast GotoDefinition request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                GotoDefinition::METHOD
+            );
+            handle_definition(id, &params, connection)?;
+        }
+        DocumentDiagnosticRequest::METHOD => {
+            let (id, params) = cast_req::<DocumentDiagnosticRequest>(req)
+                .expect("Failed to cast DocumentDiagnosticRequest request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                DocumentDiagnosticRequest::METHOD
+            );
+            send_diagnostic_resp(&params.text_document.uri, connection)?;
+        }
+        method => error!("Unimplemented request format: {method:?}\n{req:?}"),
+    }
+
+    Ok(())
+}
+
+fn handle_definition(
+    id: RequestId,
+    params: &GotoDefinitionParams,
+    connection: &Connection,
+) -> Result<()> {
+    let response_num = params.text_document_position_params.position.line;
+    info!("response_num: {response_num}");
+    let Some(resp) = get_definition_response(response_num) else {
+        error!("Invalid response number: {response_num}");
+        return Ok(());
+    };
+    let result = serde_json::to_value(&resp).unwrap();
+
+    let result = Response {
+        id,
+        result: Some(result),
+        error: None,
+    };
+    Ok(connection.sender.send(Message::Response(result))?)
+}
+
+/// Sends response to a `textDocument/formatting` request
+///
+/// # Errors
+///
+/// Returns `Err` if sending the notification fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `PublishDiagnosticsParams` fails.
+fn handle_rename(id: RequestId, params: &RenameParams, connection: &Connection) -> Result<()> {
+    // `response_num` passed via `params.new_name`
+    let Ok(response_num) = params.new_name.parse() else {
+        error!(
+            "Failed to parse `new_name` as `response_num`: {}",
+            params.new_name
+        );
+        return Ok(());
+    };
+    info!("response_num: {response_num}");
+    let Some(resp) = get_rename_response(response_num) else {
+        error!("Invalid response number: {response_num}");
+        return Ok(());
+    };
+    let result = serde_json::to_value(&resp).unwrap();
+
+    let result = Response {
+        id,
+        result: Some(result),
+        error: None,
+    };
+    Ok(connection.sender.send(Message::Response(result))?)
+}
+
+/// Sends response to a `textDocument/formatting` request
+///
+/// # Errors
+///
+/// Returns `Err` if sending the notification fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `PublishDiagnosticsParams` fails.
+fn handle_formatting(
+    id: RequestId,
+    params: &DocumentFormattingParams,
+    connection: &Connection,
+) -> Result<()> {
+    // `response_num` passed via `params.options.tab_size`
+    let response_num = params.options.tab_size;
+    info!("response_num: {response_num}");
+    let resp = get_formatting_response(response_num).map_or_else(
+        || {
+            // In this case, we wish to test `FormattingResponse::EndState`
+            // Send a  reply with no edits (so the start and end state of
+            // the file matches) to the client so it knows we got the request
+            // and proceeds with the comparison
+            info!("Sending response for `FormattingResponse::EndState`");
+            Vec::new()
+        },
+        |resp| {
+            info!("Sending response for `FormattingResponse::Response`");
+            resp
+        },
+    );
+    let result = serde_json::to_value(&resp).unwrap();
+
+    let result = Response {
+        id,
+        result: Some(result),
+        error: None,
+    };
+    Ok(connection.sender.send(Message::Response(result))?)
+}
+
+/// Sends a `textDocument/publishDiagnostic` notification to the client.
+///
+/// # Errors
+///
+/// Returns `Err` if sending the notification fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `PublishDiagnosticsParams` fails.
+pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
+    let publish_params = get_diagnostics_response(uri);
+    let result = serde_json::to_value(&publish_params).unwrap();
+
+    let notif = Notification {
+        method: PublishDiagnostics::METHOD.to_string(),
+        params: result,
+    };
+
+    Ok(connection.sender.send(Message::Notification(notif))?)
+}
+
+/// Sends a `textDocument/references` response to the client.
+///
+/// # Errors
+///
+/// Retruns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `Vec<Location>` fails.
+fn handle_references(
+    id: RequestId,
+    params: &ReferenceParams,
+    connection: &Connection,
+) -> Result<()> {
+    let response_num = params.text_document_position.position.line;
+    info!("response_num: {response_num}");
+    let Some(resp) = get_references_response(response_num) else {
+        error!("Invalid response number: {response_num}");
+        return Ok(());
+    };
+    let result = serde_json::to_value(&resp).unwrap();
+
+    let result = Response {
+        id,
+        result: Some(result),
+        error: None,
+    };
+    Ok(connection.sender.send(Message::Response(result))?)
+}
