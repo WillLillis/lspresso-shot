@@ -101,6 +101,7 @@ where
             .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
     )
     .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e.to_string()))?;
+    println!("Raw results: {raw_results}");
     let actual: R = serde_json::from_str(&raw_results).map_err(|e| {
         TestError::Serialization(test_case.test_id.clone(), format!("Results file -- {e}"))
     })?;
@@ -320,6 +321,8 @@ pub fn test_hover(mut test_case: TestCase, expected: Hover) -> TestResult<()> {
     }
     test_case.test_type = Some(TestType::Hover);
     let actual = test_inner(&test_case, None)?;
+    // TODO: Might be nice for end users to be able to do this somehow...
+    println!("Actual: {actual:#?}");
 
     if expected != actual {
         Err(Box::new(HoverMismatchError {

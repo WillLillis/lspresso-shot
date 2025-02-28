@@ -4,13 +4,15 @@ use lsp_server::{Connection, Message, Notification, Request, RequestId, Response
 use lsp_types::{
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
-        DocumentDiagnosticRequest, Formatting, GotoDefinition, References, Rename, Request as _,
+        DocumentDiagnosticRequest, Formatting, GotoDefinition, HoverRequest, References, Rename,
+        Request as _,
     },
-    DocumentFormattingParams, GotoDefinitionParams, ReferenceParams, RenameParams, Uri,
+    DocumentFormattingParams, GotoDefinitionParams, HoverParams, ReferenceParams, RenameParams,
+    Uri,
 };
 
 use crate::responses::{
-    get_definition_response, get_diagnostics_response, get_formatting_response,
+    get_definition_response, get_diagnostics_response, get_formatting_response, get_hover_response,
     get_references_response, get_rename_response,
 };
 
@@ -34,6 +36,19 @@ where
         Ok(value) => Ok(value),
         Err(e) => Err(anyhow::anyhow!("Error: {e}")),
     }
+}
+
+fn send_req_resp<R>(id: RequestId, resp: R, connection: &Connection) -> Result<()>
+where
+    R: serde::ser::Serialize,
+{
+    let result = serde_json::to_value(&resp).unwrap();
+    let result = Response {
+        id,
+        result: Some(result),
+        error: None,
+    };
+    Ok(connection.sender.send(Message::Response(result))?)
 }
 
 /// Handles `Notification`s from the lsp client.
@@ -120,10 +135,29 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
             );
             send_diagnostic_resp(&params.text_document.uri, connection)?;
         }
+        HoverRequest::METHOD => {
+            let (id, params) =
+                cast_req::<HoverRequest>(req).expect("Failed to cast `HoverRequest` request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                HoverRequest::METHOD
+            );
+            handle_hover(id, &params, connection)?;
+        }
         method => error!("Unimplemented request format: {method:?}\n{req:?}"),
     }
 
     Ok(())
+}
+
+fn handle_hover(id: RequestId, params: &HoverParams, connection: &Connection) -> Result<()> {
+    let response_num = params.text_document_position_params.position.line;
+    info!("response_num: {response_num}");
+    let Some(resp) = get_hover_response(response_num) else {
+        error!("Invalid response number: {response_num}");
+        return Ok(());
+    };
+    send_req_resp(id, resp, connection)
 }
 
 fn handle_definition(
