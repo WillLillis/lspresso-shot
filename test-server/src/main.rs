@@ -2,8 +2,7 @@ use anyhow::Result;
 use log::info;
 use lsp_server::{Connection, Message};
 use lsp_types::{
-    DiagnosticOptions, DiagnosticServerCapabilities, InitializeParams, OneOf, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
+    DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability, InitializeParams, OneOf, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions
 };
 use test_server::handle::{handle_notification, handle_request};
 
@@ -32,6 +31,7 @@ pub fn main() -> Result<()> {
         },
     }));
     let document_formatting_provider = Some(OneOf::Left(true));
+    let hover_provider = Some(HoverProviderCapability::Simple(true));
     let references_provider = Some(OneOf::Left(true));
     let rename_provider = Some(OneOf::Left(true));
     // TODO: May need to revisit this later to test other sync kinds, i.e. incremental
@@ -41,6 +41,7 @@ pub fn main() -> Result<()> {
         definition_provider,
         diagnostic_provider,
         document_formatting_provider,
+        hover_provider,
         references_provider,
         rename_provider,
         text_document_sync,

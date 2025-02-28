@@ -2,11 +2,98 @@ use std::{collections::HashMap, str::FromStr};
 
 use lsp_types::{
     ChangeAnnotation, CodeDescription, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
-    GotoDefinitionResponse, Location, LocationLink, Position, PublishDiagnosticsParams, Range,
+    GotoDefinitionResponse, Hover, HoverContents, LanguageString, Location, LocationLink,
+    MarkedString, MarkupContent, MarkupKind, Position, PublishDiagnosticsParams, Range,
     TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
 };
 
 use crate::get_source_path;
+
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_hover_response(response_num: u32) -> Option<Hover> {
+    match response_num {
+        0 => Some(Hover {
+            contents: HoverContents::Scalar(MarkedString::String(
+                "Scalar Marked String".to_string(),
+            )),
+            range: Some(Range {
+                start: Position::new(1, 2),
+                end: Position::new(3, 4),
+            }),
+        }),
+        1 => Some(Hover {
+            contents: HoverContents::Scalar(MarkedString::LanguageString(LanguageString {
+                language: "dummy-lang".to_string(),
+                value: "dummy-val".to_string(),
+            })),
+            range: Some(Range {
+                start: Position::new(5, 6),
+                end: Position::new(7, 8),
+            }),
+        }),
+        2 => Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::Markdown,
+                value: "Markup Content".to_string(),
+            }),
+            range: Some(Range {
+                start: Position::new(9, 10),
+                end: Position::new(11, 12),
+            }),
+        }),
+        3 => Some(Hover {
+            contents: HoverContents::Markup(MarkupContent {
+                kind: MarkupKind::PlainText,
+                value: "Plain Content".to_string(),
+            }),
+            range: Some(Range {
+                start: Position::new(13, 14),
+                end: Position::new(15, 16),
+            }),
+        }),
+        // NOTE: There's some serialization issue going on here,
+        // see: (TODO: Add issue link here once we have internet again)
+        // 4 => Some(Hover {
+        //     contents: HoverContents::Array(vec![
+        //         MarkedString::String("Array Marked String 1".to_string()),
+        //         MarkedString::String("Array Marked String 2".to_string()),
+        //     ]),
+        //     range: Some(Range {
+        //         start: Position::new(13, 14),
+        //         end: Position::new(15, 16),
+        //     }),
+        // }),
+        4 => Some(Hover {
+            contents: HoverContents::Array(vec![
+                MarkedString::String("Array Marked String 1".to_string()),
+                MarkedString::String("Array Marked String 2".to_string()),
+                MarkedString::String("Array Marked String 3".to_string()),
+            ]),
+            range: Some(Range {
+                start: Position::new(13, 14),
+                end: Position::new(15, 16),
+            }),
+        }),
+        5 => Some(Hover {
+            contents: HoverContents::Array(vec![
+                MarkedString::LanguageString(LanguageString {
+                    language: "dummy-lang".to_string(),
+                    value: "dummy-val1".to_string(),
+                }),
+                MarkedString::LanguageString(LanguageString {
+                    language: "dummy-lang".to_string(),
+                    value: "dummy-val2".to_string(),
+                }),
+            ]),
+            range: Some(Range {
+                start: Position::new(13, 14),
+                end: Position::new(15, 16),
+            }),
+        }),
+        _ => None,
+    }
+}
 
 // TODO: Figure out way to publish different diagnostics
 /// For use with `test_diagnostics`.
