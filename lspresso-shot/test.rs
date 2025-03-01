@@ -643,7 +643,7 @@ println!("format {local_variable} arguments");
 ```"#
                     .to_string(),
             })),
-            deprecated: Some(false),
+            deprecated: None,
             preselect: Some(true),
             sort_text: Some("7fffffff".to_string()),
             filter_text: Some("println!".to_string()),
@@ -663,7 +663,7 @@ println!("format {local_variable} arguments");
                 },
                 new_text: "println!($0)".to_string(),
             })),
-            additional_text_edits: Some(vec![]),
+            additional_text_edits: None,
             command: None,
             commit_characters: None,
             data: None,

@@ -30,11 +30,11 @@ jobs:
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-    # NOTE: There's nothing particularly special about 1.84.1, we just pin to a
+    # NOTE: There's nothing particularly special about 1.85, we just pin to a
     # specific version to avoid unexpected breakages with each update. We *should*
     # keep the project in sync with rustc/rust-analyzer as they release new versions
-    - name: Pin Rust to 1.84.1
-      run: rustup default '1.84.1'
+    - name: Pin Rust to 1.85
+      run: rustup default '1.85'
 
     - name: Add rust components
       run: |
