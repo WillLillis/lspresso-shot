@@ -121,7 +121,7 @@ is used with other editors' clients.
 ## Contributing
 
 - In addition to [neovim][nvim-repo], working on this project also requires having having
-[rust-analyzer][rust-analyzer] 1.84.1 on your `$PATH`, as it is used in the project's test suite.
+[rust-analyzer][rust-analyzer] 1.85 on your `$PATH`, as it is used in the project's test suite.
 
 [lsp-spec]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/
 [progress-token]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#progress
