@@ -82,6 +82,7 @@ pub fn get_completion_response(response_num: u32) -> Option<CompletionResponse> 
     }
 }
 
+/// For use with `test_hover`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_hover_response(response_num: u32) -> Option<Hover> {
@@ -126,7 +127,7 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
             }),
         }),
         // NOTE: There's some serialization issue going on here,
-        // see: (TODO: Add issue link here once we have internet again)
+        // see: https://github.com/serde-rs/json/issues/1244
         // 4 => Some(Hover {
         //     contents: HoverContents::Array(vec![
         //         MarkedString::String("Array Marked String 1".to_string()),
