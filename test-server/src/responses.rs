@@ -1,13 +1,86 @@
 use std::{collections::HashMap, str::FromStr};
 
 use lsp_types::{
-    ChangeAnnotation, CodeDescription, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
-    GotoDefinitionResponse, Hover, HoverContents, LanguageString, Location, LocationLink,
-    MarkedString, MarkupContent, MarkupKind, Position, PublishDiagnosticsParams, Range,
-    TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
+    ChangeAnnotation, CodeDescription, CompletionItem, CompletionItemKind,
+    CompletionItemLabelDetails, CompletionList, CompletionResponse, Diagnostic,
+    DiagnosticRelatedInformation, DocumentChanges, Documentation, GotoDefinitionResponse, Hover,
+    HoverContents, LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind,
+    Position, PublishDiagnosticsParams, Range, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
 };
 
 use crate::get_source_path;
+
+/// For use with `test_completion`.
+#[must_use]
+pub fn get_completion_response(response_num: u32) -> Option<CompletionResponse> {
+    let item1 = CompletionItem {
+        label: "label1".to_string(),
+        label_details: Some(CompletionItemLabelDetails {
+            detail: Some("detail1".to_string()),
+            description: Some("description1".to_string()),
+        }),
+        kind: Some(CompletionItemKind::TEXT),
+        detail: Some("detail1".to_string()),
+        documentation: Some(Documentation::String("doc string1".to_string())),
+        deprecated: Some(false),
+        preselect: Some(true),
+        sort_text: Some("sort text1".to_string()),
+        filter_text: Some("filter_text1".to_string()),
+        insert_text: Some("insert_text1".to_string()),
+        insert_text_format: None,
+        insert_text_mode: None,
+        text_edit: None,
+        additional_text_edits: None,
+        command: None,
+        commit_characters: None,
+        data: None,
+        tags: None,
+    };
+    let item2 = CompletionItem {
+        label: "label2".to_string(),
+        label_details: Some(CompletionItemLabelDetails {
+            detail: Some("detail2".to_string()),
+            description: Some("description2".to_string()),
+        }),
+        kind: Some(CompletionItemKind::TEXT),
+        detail: Some("detail2".to_string()),
+        documentation: Some(Documentation::String("doc string2".to_string())),
+        deprecated: Some(false),
+        preselect: Some(true),
+        sort_text: Some("sort text2".to_string()),
+        filter_text: Some("filter_text2".to_string()),
+        insert_text: Some("insert_text2".to_string()),
+        insert_text_format: None,
+        insert_text_mode: None,
+        text_edit: None,
+        additional_text_edits: None,
+        command: None,
+        commit_characters: None,
+        data: None,
+        tags: None,
+    };
+    match response_num {
+        0 => Some(CompletionResponse::List(CompletionList {
+            is_incomplete: true,
+            items: vec![item1],
+        })),
+        1 => Some(CompletionResponse::List(CompletionList {
+            is_incomplete: true,
+            items: vec![item1, item2],
+        })),
+        2 => Some(CompletionResponse::List(CompletionList {
+            is_incomplete: false,
+            items: vec![item1],
+        })),
+        3 => Some(CompletionResponse::List(CompletionList {
+            is_incomplete: false,
+            items: vec![item1, item2],
+        })),
+        4 => Some(CompletionResponse::Array(vec![item1])),
+        5 => Some(CompletionResponse::Array(vec![item1, item2])),
+        _ => None,
+    }
+}
 
 #[must_use]
 #[allow(clippy::missing_panics_doc)]

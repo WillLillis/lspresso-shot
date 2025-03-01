@@ -2,7 +2,9 @@ use anyhow::Result;
 use log::info;
 use lsp_server::{Connection, Message};
 use lsp_types::{
-    DiagnosticOptions, DiagnosticServerCapabilities, HoverProviderCapability, InitializeParams, OneOf, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions
+    CompletionOptions, CompletionOptionsCompletionItem, DiagnosticOptions,
+    DiagnosticServerCapabilities, HoverProviderCapability, InitializeParams, OneOf,
+    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
 };
 use test_server::handle::{handle_notification, handle_request};
 
@@ -30,6 +32,21 @@ pub fn main() -> Result<()> {
             work_done_progress: None,
         },
     }));
+    // TODO: We'll definitiely need to support different config options here, using
+    // language-specific trigger characters is very common for LSPs. Some initial thoughts:
+    //
+    // Provide a way to provide client capabilities as a parameter to setup a custom
+    // test server for a given test case. We'll write a wrapper that swaps in the capabilties,
+    // compiles the project, and runs the test. This will be very slow, so we should use
+    // it sparingly
+    let completion_provider = Some(CompletionOptions {
+        completion_item: Some(CompletionOptionsCompletionItem {
+            label_details_support: Some(true),
+        }),
+        trigger_characters: None,
+        all_commit_characters: None,
+        ..Default::default()
+    });
     let document_formatting_provider = Some(OneOf::Left(true));
     let hover_provider = Some(HoverProviderCapability::Simple(true));
     let references_provider = Some(OneOf::Left(true));
@@ -38,6 +55,7 @@ pub fn main() -> Result<()> {
     let text_document_sync = Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL));
 
     let capabilities = ServerCapabilities {
+        completion_provider,
         definition_provider,
         diagnostic_provider,
         document_formatting_provider,

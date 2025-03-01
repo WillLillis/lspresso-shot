@@ -3,10 +3,10 @@ mod tests {
     use std::{collections::HashMap, num::NonZeroU32, path::PathBuf, str::FromStr, time::Duration};
 
     use lsp_types::{
-        CodeDescription, CompletionItem, CompletionItemKind, CompletionTextEdit, Diagnostic,
-        DiagnosticRelatedInformation, DiagnosticSeverity, DiagnosticTag, DocumentChanges,
-        Documentation, FormattingOptions, GotoDefinitionResponse, Hover, InsertTextFormat,
-        Location, LocationLink, MarkupContent, NumberOrString, OneOf,
+        CodeDescription, CompletionItem, CompletionItemKind, CompletionList, CompletionResponse,
+        CompletionTextEdit, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity,
+        DiagnosticTag, DocumentChanges, Documentation, FormattingOptions, GotoDefinitionResponse,
+        Hover, InsertTextFormat, Location, LocationLink, MarkupContent, NumberOrString, OneOf,
         OptionalVersionedTextDocumentIdentifier, Position, Range, TextDocumentEdit, TextEdit, Uri,
         WorkspaceEdit,
     };
@@ -577,6 +577,39 @@ println!(\"format {local_variable} arguments\");
             })
         }
     ));
+    }
+
+    #[test]
+    fn dummy_completions() {
+        let mut response_num = 0;
+        while let Some(resp) = test_server::responses::get_completion_response(response_num) {
+            {
+                let comp_rsult = CompletionResult::Exact(resp.clone());
+                let source_file = TestFile::new(test_server::get_source_path(), "");
+                let completion_test_case = TestCase::new(get_dummy_server_path(), source_file)
+                    .cursor_pos(Some(Position::new(response_num, 0)))
+                    .timeout(Duration::from_secs(1))
+                    .cleanup(false);
+
+                lspresso_shot!(test_completion(completion_test_case, &comp_rsult));
+            }
+            {
+                let comp_rsult = match resp {
+                    CompletionResponse::Array(items)
+                    | CompletionResponse::List(CompletionList { items, .. }) => {
+                        CompletionResult::Contains(items)
+                    }
+                };
+                let source_file = TestFile::new(test_server::get_source_path(), "");
+                let completion_test_case = TestCase::new(get_dummy_server_path(), source_file)
+                    .cursor_pos(Some(Position::new(response_num, 0)))
+                    .timeout(Duration::from_secs(1))
+                    .cleanup(false);
+
+                lspresso_shot!(test_completion(completion_test_case, &comp_rsult));
+            }
+            response_num += 1;
+        }
     }
 
     // TODO: The end user experience for debugging completions test with CompletionResult::Contains

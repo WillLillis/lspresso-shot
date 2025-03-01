@@ -4,16 +4,16 @@ use lsp_server::{Connection, Message, Notification, Request, RequestId, Response
 use lsp_types::{
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
-        DocumentDiagnosticRequest, Formatting, GotoDefinition, HoverRequest, References, Rename,
-        Request as _,
+        Completion, DocumentDiagnosticRequest, Formatting, GotoDefinition, HoverRequest,
+        References, Rename, Request as _,
     },
-    DocumentFormattingParams, GotoDefinitionParams, HoverParams, ReferenceParams, RenameParams,
-    Uri,
+    CompletionParams, DocumentFormattingParams, GotoDefinitionParams, HoverParams, ReferenceParams,
+    RenameParams, Uri,
 };
 
 use crate::responses::{
-    get_definition_response, get_diagnostics_response, get_formatting_response, get_hover_response,
-    get_references_response, get_rename_response,
+    get_completion_response, get_definition_response, get_diagnostics_response,
+    get_formatting_response, get_hover_response, get_references_response, get_rename_response,
 };
 
 fn cast_req<R>(req: Request) -> Result<(RequestId, R::Params)>
@@ -144,12 +144,34 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
             );
             handle_hover(id, &params, connection)?;
         }
+        Completion::METHOD => {
+            let (id, params) =
+                cast_req::<Completion>(req).expect("Failed to cast `Completion` request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                Completion::METHOD
+            );
+            handle_completion(id, &params, connection)?;
+        }
         method => error!("Unimplemented request format: {method:?}\n{req:?}"),
     }
 
     Ok(())
 }
 
+fn handle_completion(
+    id: RequestId,
+    params: &CompletionParams,
+    connection: &Connection,
+) -> Result<()> {
+    let response_num = params.text_document_position.position.line;
+    info!("response_num: {response_num}");
+    let Some(resp) = get_completion_response(response_num) else {
+        error!("Invalid response number: {response_num}");
+        return Ok(());
+    };
+    send_req_resp(id, resp, connection)
+}
 fn handle_hover(id: RequestId, params: &HoverParams, connection: &Connection) -> Result<()> {
     let response_num = params.text_document_position_params.position.line;
     info!("response_num: {response_num}");

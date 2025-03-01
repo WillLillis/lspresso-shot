@@ -13,19 +13,24 @@ local function check_progress_result()
         ---@diagnostic disable-next-line: undefined-global
         SET_CURSOR_POSITION,
     }, 1000)
-    if completion_result and #completion_result >= 1 then
+    if completion_result and #completion_result >= 1 and completion_result[1].result
+        and (completion_result[1].result.items or #completion_result[1].result >= 1) then
         local results_file = io.open('RESULTS_FILE', "w")
         if not results_file then
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
             vim.cmd('qa!')
         end
-        for _, comp in ipairs(completion_result) do
-            if comp.result then
-                for _, item in ipairs(comp.result.items) do
-                    if item.documentation and item.documentation.value then
-                        item.documentation.value = string.gsub(item.documentation.value, "\\\\", "\\") -- HACK: find a better way?
-                    end
-                end
+        local items = nil
+        if completion_result[1].result.items then
+            -- `CompletionResponse::List`
+            items = completion_result[1].result.items
+        else
+            -- `CompletionResponse::Array`
+            items = completion_result[1].result
+        end
+        for _, item in ipairs(items) do
+            if item.documentation and item.documentation.value then
+                item.documentation.value = string.gsub(item.documentation.value, "\\\\", "\\") -- HACK: find a better way?
             end
         end
         -- HACK: Does this ever return more than one??? For now, let's just grab the first
