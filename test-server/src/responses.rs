@@ -89,7 +89,7 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
     match response_num {
         0 => Some(Hover {
             contents: HoverContents::Scalar(MarkedString::String(
-                "Scalar Marked String".to_string(),
+                "Scalar Marked String\nLine two".to_string(),
             )),
             range: Some(Range {
                 start: Position::new(1, 2),
@@ -99,7 +99,7 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
         1 => Some(Hover {
             contents: HoverContents::Scalar(MarkedString::LanguageString(LanguageString {
                 language: "dummy-lang".to_string(),
-                value: "dummy-val".to_string(),
+                value: "dummy-val\nLine two".to_string(),
             })),
             range: Some(Range {
                 start: Position::new(5, 6),
@@ -109,7 +109,7 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
         2 => Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::Markdown,
-                value: "Markup Content".to_string(),
+                value: "Markup Content\nMore content".to_string(),
             }),
             range: Some(Range {
                 start: Position::new(9, 10),
@@ -119,7 +119,7 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
         3 => Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::PlainText,
-                value: "Plain Content".to_string(),
+                value: "Plain Content\nPlain Jane".to_string(),
             }),
             range: Some(Range {
                 start: Position::new(13, 14),
@@ -140,9 +140,9 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
         // }),
         4 => Some(Hover {
             contents: HoverContents::Array(vec![
-                MarkedString::String("Array Marked String 1".to_string()),
-                MarkedString::String("Array Marked String 2".to_string()),
-                MarkedString::String("Array Marked String 3".to_string()),
+                MarkedString::String("Array Marked String 1\nExtra".to_string()),
+                MarkedString::String("Array Marked String 2\nExtra extra".to_string()),
+                MarkedString::String("Array Marked String 3\nJust kidding".to_string()),
             ]),
             range: Some(Range {
                 start: Position::new(13, 14),
@@ -153,11 +153,11 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
             contents: HoverContents::Array(vec![
                 MarkedString::LanguageString(LanguageString {
                     language: "dummy-lang".to_string(),
-                    value: "dummy-val1".to_string(),
+                    value: "dummy-val1\nDon't crash".to_string(),
                 }),
                 MarkedString::LanguageString(LanguageString {
                     language: "dummy-lang".to_string(),
-                    value: "dummy-val2".to_string(),
+                    value: "dummy-val2\nSeriously".to_string(),
                 }),
             ]),
             range: Some(Range {
