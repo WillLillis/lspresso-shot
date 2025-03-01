@@ -19,27 +19,28 @@ local function check_progress_result()
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
             vim.cmd('qa!')
         end
-        local cleaned = hover_result[1]
-        if cleaned.result.contents.value then
-            -- `HoverContents::Scalar`
-            ---@diagnostic disable: inject-field
-            cleaned.result.contents.value = string.gsub(cleaned.result.contents.value, "\\\\", "\\") -- HACK: find a better way?
-        elseif type(cleaned.result.contents) == "string" then
-            -- `HoverContents::Markup`
-            cleaned.result.contents = string.gsub(cleaned.result.contents, "\\\\", "\\") -- HACK: find a better way?
-        elseif cleaned.result.contents then
-            -- BUG: See comment in test-server/src/responses.rs:get_hover_response 
-            -- `HoverContents::Array`
-            for _, v in ipairs(cleaned.result.contents) do
-                if v.String then
-                    v = string.gsub(v.String, "\\\\", "\\") -- HACK: find a better way?
-                elseif v.LanguageString then
-                    v = string.gsub(v.LanguageString, "\\\\", "\\") -- HACK: find a better way?
+        local cleaned = hover_result[1].result
+        if type(cleaned.contents) == "string" then
+            cleaned.contents = string.gsub(cleaned.contents, "\\\\", "\\")
+        elseif type(cleaned.contents) == "table" and type(cleaned.contents.value) == "string" then
+            -- seems like a false positive, but maybe I'm doing something wrong?
+            ---@diagnostic disable-next-line: inject-field
+            cleaned.contents.value = string.gsub(cleaned.contents.value, "\\\\", "\\")
+        elseif #cleaned.contents >= 1 then
+            -- seems like a false positive, but maybe I'm doing something wrong?
+            ---@diagnostic disable-next-line: param-type-mismatch
+            for _, val in ipairs(cleaned.contents) do
+                if type(val) == "string" then
+                    -- `HoverContents::Array(Vec<MarkedString::String>)`
+                    val = string.gsub(val, "\\\\", "\\")
+                elseif type(val.value) == "string" then
+                    -- `HoverContents::Array(Vec<MarkedString::LanguageString>)`
+                    val.value = string.gsub(val.value, "\\\\", "\\")
                 end
             end
         end
         ---@diagnostic disable: need-check-nil
-        results_file:write(vim.json.encode(cleaned.result))
+        results_file:write(vim.json.encode(cleaned))
         results_file:close()
         vim.cmd('qa!')
         ---@diagnostic enable: need-check-nil
