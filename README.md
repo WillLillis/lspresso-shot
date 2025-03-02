@@ -92,19 +92,20 @@ To start though, let's focus on the following TODOs:
       have multiple predefined responses for each. The expected response type can be communicated
       from the test to the test server through one or more of the request params (i.e.
       line number).
-- [ ] Sync up test server test coverage with current rust-analyzer coverage
+- [x] Sync up test server test coverage with current rust-analyzer coverage
 - [x] `textDocument/hover`
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`
-- [ ] `textDocument/definition` (needs test coverage for other variants)
-- [ ] `textDocument/completion` (needs better ergonomics for failing cases)
+- [x] `textDocument/definition`
+- [x] `textDocument/completion`
 - [x] `textDocument/formatting`
 - [x] `textDocument/rename`
+- [ ] Figure out what methods we want to add next.
 
 ## Gotchas
 
 - If your server undergoes some sort of indexing process at startup before it's ready
-to service a given request, you need to account for this by specifying `ServerStartType::Progress(i32, String)`
+to service a given request, you need to account for this by specifying `ServerStartType::Progress(NonZeroU32, String)`
 to the test case. The `NonZeroU32` specifies *which* `end` message to issue the request
 after (in case there are multiple). The `String` provides the relevant [progress token][progress-token].
 
