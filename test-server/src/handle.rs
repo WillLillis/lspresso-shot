@@ -159,6 +159,15 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
     Ok(())
 }
 
+/// Sends response to a `textDocument/completion` request
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
 fn handle_completion(
     id: RequestId,
     params: &CompletionParams,
@@ -172,6 +181,16 @@ fn handle_completion(
     };
     send_req_resp(id, resp, connection)
 }
+
+/// Sends response to a `textDocument/hover` request
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
 fn handle_hover(id: RequestId, params: &HoverParams, connection: &Connection) -> Result<()> {
     let response_num = params.text_document_position_params.position.line;
     info!("response_num: {response_num}");
@@ -182,6 +201,15 @@ fn handle_hover(id: RequestId, params: &HoverParams, connection: &Connection) ->
     send_req_resp(id, resp, connection)
 }
 
+/// Sends response to a `textDocument/definition` request
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
 fn handle_definition(
     id: RequestId,
     params: &GotoDefinitionParams,
@@ -203,15 +231,15 @@ fn handle_definition(
     Ok(connection.sender.send(Message::Response(result))?)
 }
 
-/// Sends response to a `textDocument/formatting` request
+/// Sends response to a `textDocument/rename` request
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the notification fails.
+/// Returns `Err` if sending the response fails.
 ///
 /// # Panics
 ///
-/// Panics if serialization of `PublishDiagnosticsParams` fails.
+/// Panics if serialization of `params` fails.
 fn handle_rename(id: RequestId, params: &RenameParams, connection: &Connection) -> Result<()> {
     // `response_num` passed via `params.new_name`
     let Ok(response_num) = params.new_name.parse() else {
@@ -240,11 +268,11 @@ fn handle_rename(id: RequestId, params: &RenameParams, connection: &Connection) 
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the notification fails.
+/// Returns `Err` if sending the response fails.
 ///
 /// # Panics
 ///
-/// Panics if serialization of `PublishDiagnosticsParams` fails.
+/// Panics if serialization of `params` fails.
 fn handle_formatting(
     id: RequestId,
     params: &DocumentFormattingParams,
