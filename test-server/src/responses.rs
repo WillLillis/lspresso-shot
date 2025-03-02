@@ -127,7 +127,7 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
             }),
         }),
         // NOTE: There's some serialization issue going on here,
-        // see: https://github.com/serde-rs/json/issues/1244
+        // see https://github.com/serde-rs/json/issues/1244
         // 4 => Some(Hover {
         //     contents: HoverContents::Array(vec![
         //         MarkedString::String("Array Marked String 1".to_string()),
@@ -169,7 +169,8 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
     }
 }
 
-// TODO: Figure out way to publish different diagnostics
+// TODO: Figure out way to publish different diagnostics, how do we communicate
+// `response_num` to the server?
 /// For use with `test_diagnostics`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
@@ -245,7 +246,7 @@ pub fn get_definition_response(response_num: u32) -> Option<GotoDefinitionRespon
 }
 
 /// For use with `test_rename`.
-/// Returns a different `Vec<WorkspaceEdit>` based on `response_num`.
+/// Returns a different `WorkspaceEdit` based on `response_num`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {

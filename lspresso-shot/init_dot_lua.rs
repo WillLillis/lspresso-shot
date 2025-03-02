@@ -1,7 +1,7 @@
 use crate::types::{ServerStartType, TestCase, TestSetupError, TestSetupResult, TestType};
 
 /// Construct the contents of an `init.lua` file to test an lsp request corresponding
-/// to `test_type`
+/// to `test_type`. `custom_replacements`
 pub fn get_init_dot_lua(
     test_case: &TestCase,
     test_type: TestType,
@@ -27,9 +27,9 @@ pub fn get_init_dot_lua(
                 test_case.source_file.path.to_string_lossy().to_string(),
             )
         })?;
-    // Start out with some utilities, adding the relevant filetype and the attach
-    // logic, and the relevant `check_progress_result` function to invoke our request
-    // at the appropriate time
+    // Start out with some utilities, adding the relevant filetype, attach logic,
+    // and the relevant `check_progress_result` function to invoke our request at
+    // the appropriate time
     let mut raw_init = format!(
         "{}{}{}",
         include_str!("lua_templates/helpers.lua"),
@@ -118,7 +118,9 @@ fn get_attach_action(test_type: TestType) -> String {
 fn invoke_lsp_action(start_type: &ServerStartType) -> String {
     match start_type {
         // Directly invoke the action. Note we unconditionally end the test after the first try
-        ServerStartType::Simple => "check_progress_result()\nvim.cmd('qa!')".to_string(),
+        ServerStartType::Simple => {
+            format!("check_progress_result()\n{}vim.cmd('qa!')", " ".repeat(16))
+        }
         // Hook into `$/progress` messages
         ServerStartType::Progress(_, token_name) => {
             format!(

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use log::info;
+use log::{error, info};
 use lsp_server::{Connection, Message};
 use lsp_types::{
     CompletionOptions, CompletionOptionsCompletionItem, DiagnosticOptions,
@@ -70,7 +70,9 @@ pub fn main() -> Result<()> {
 
     // TODO: We can get the project's root directory here. If we need to communciate
     // something to the server outside of the request, we can drop in some config file
-    // to read
+    // to read. Maybe we can even hardcode a path for our own internal tests. A test case
+    // could serialize the `ServerCapabilities` struct,  the server then uses those
+    // capabilities, and we can avoid a rebuild!
 
     let params: InitializeParams = serde_json::from_value(initialization_params).unwrap();
     info!("Client initialization params: {:?}", params);
@@ -98,9 +100,7 @@ fn main_loop(connection: &Connection) -> Result<()> {
                 handle_request(req, connection)?;
             }
             Message::Notification(notif) => handle_notification(notif, connection)?,
-            Message::Response(_resp) => {
-                // unimplemented!();
-            }
+            Message::Response(resp) => error!("Unimplemented response received: {resp:?}"),
         }
     }
     Ok(())

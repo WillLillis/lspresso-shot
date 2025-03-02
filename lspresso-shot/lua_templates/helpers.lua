@@ -18,6 +18,8 @@ local function report_log(msg)
     end
 end
 
+-- TODO: Thos could definitely use some unit tests
+
 --- Extracts the relative path from a file:// URI
 ---@param uri string
 ---@return string
