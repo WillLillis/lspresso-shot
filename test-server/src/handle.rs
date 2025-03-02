@@ -61,7 +61,7 @@ where
 /// # Panics
 ///
 /// Panics if JSON encoding of a response fails or if a json request fails to cast
-/// into itsequivalent in memory struct
+/// into its equivalent in-memory struct
 pub fn handle_notification(notif: Notification, connection: &Connection) -> Result<()> {
     match notif.method.as_str() {
         DidOpenTextDocument::METHOD => {
@@ -72,7 +72,7 @@ pub fn handle_notification(notif: Notification, connection: &Connection) -> Resu
             );
             send_diagnostic_resp(&did_open_params.text_document.uri, connection)?;
         }
-        method => error!("Unimplemented notification format: {method:?}\n{notif:?}"),
+        method => error!("Unimplemented notification method: {method:?}\n{notif:?}"),
     }
     Ok(())
 }
@@ -91,7 +91,7 @@ pub fn handle_notification(notif: Notification, connection: &Connection) -> Resu
 /// # Panics
 ///
 /// Panics if JSON encoding of a response fails or if a json request fails to cast
-/// into its equivalent in memory struct
+/// into its equivalent in-memory struct
 pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
     match req.method.as_str() {
         References::METHOD => {
@@ -153,7 +153,7 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
             );
             handle_completion(id, &params, connection)?;
         }
-        method => error!("Unimplemented request format: {method:?}\n{req:?}"),
+        method => error!("Unimplemented request method: {method:?}\n{req:?}"),
     }
 
     Ok(())
@@ -221,14 +221,7 @@ fn handle_definition(
         error!("Invalid response number: {response_num}");
         return Ok(());
     };
-    let result = serde_json::to_value(&resp).unwrap();
-
-    let result = Response {
-        id,
-        result: Some(result),
-        error: None,
-    };
-    Ok(connection.sender.send(Message::Response(result))?)
+    send_req_resp(id, resp, connection)
 }
 
 /// Sends response to a `textDocument/rename` request
@@ -249,19 +242,11 @@ fn handle_rename(id: RequestId, params: &RenameParams, connection: &Connection) 
         );
         return Ok(());
     };
-    info!("response_num: {response_num}");
     let Some(resp) = get_rename_response(response_num) else {
         error!("Invalid response number: {response_num}");
         return Ok(());
     };
-    let result = serde_json::to_value(&resp).unwrap();
-
-    let result = Response {
-        id,
-        result: Some(result),
-        error: None,
-    };
-    Ok(connection.sender.send(Message::Response(result))?)
+    send_req_resp(id, resp, connection)
 }
 
 /// Sends response to a `textDocument/formatting` request
@@ -295,14 +280,7 @@ fn handle_formatting(
             resp
         },
     );
-    let result = serde_json::to_value(&resp).unwrap();
-
-    let result = Response {
-        id,
-        result: Some(result),
-        error: None,
-    };
-    Ok(connection.sender.send(Message::Response(result))?)
+    send_req_resp(id, resp, connection)
 }
 
 /// Sends a `textDocument/publishDiagnostic` notification to the client.
@@ -346,12 +324,5 @@ fn handle_references(
         error!("Invalid response number: {response_num}");
         return Ok(());
     };
-    let result = serde_json::to_value(&resp).unwrap();
-
-    let result = Response {
-        id,
-        result: Some(result),
-        error: None,
-    };
-    Ok(connection.sender.send(Message::Response(result))?)
+    send_req_resp(id, resp, connection)
 }

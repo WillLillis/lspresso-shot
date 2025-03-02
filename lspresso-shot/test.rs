@@ -18,8 +18,8 @@ mod tests {
         types::{CompletionResult, FormattingResult, ServerStartType, TestCase, TestFile},
     };
 
-    // NOTE: Timouts are set to ridiculous values for these to avoid issues with
-    // slow CI runners. For local testing, 5-15 seconds should be sufficient
+    // NOTE: Timouts are set to ridiculous values for the rust-analyzer tests in order to avoid
+    // issues with slow CI runners. For local testing, 5-15 seconds should be sufficient
 
     fn get_dummy_server_path() -> PathBuf {
         let mut proj_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -57,7 +57,6 @@ path = "src/main.rs""#,
             let source_file = TestFile::new(test_server::get_source_path(), "");
             let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
                 .cursor_pos(Some(Position::new(response_num, 0)))
-                .timeout(Duration::from_secs(1))
                 .cleanup(false);
 
             lspresso_shot!(test_references(reference_test_case, true, &refs,));
@@ -100,9 +99,8 @@ path = "src/main.rs""#,
     fn dummy_formatting_state() {
         let contents = "Some source contents";
         let source_file = TestFile::new(test_server::get_source_path(), contents);
-        let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .timeout(Duration::from_secs(1))
-            .cleanup(false);
+        let reference_test_case =
+            TestCase::new(get_dummy_server_path(), source_file).cleanup(false);
 
         lspresso_shot!(test_formatting(
             reference_test_case,
@@ -117,9 +115,8 @@ path = "src/main.rs""#,
         let mut response_num = 1;
         while let Some(edits) = test_server::responses::get_formatting_response(response_num) {
             let source_file = TestFile::new(test_server::get_source_path(), contents);
-            let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
-                .timeout(Duration::from_secs(1))
-                .cleanup(false);
+            let reference_test_case =
+                TestCase::new(get_dummy_server_path(), source_file).cleanup(false);
 
             let opts = Some(FormattingOptions {
                 tab_size: response_num,
@@ -214,7 +211,6 @@ let foo = 5;
             let source_file = TestFile::new(test_server::get_source_path(), "");
             let rename_test_case = TestCase::new(get_dummy_server_path(), source_file)
                 .cursor_pos(Some(Position::new(0, 0)))
-                .timeout(Duration::from_secs(1))
                 .cleanup(false);
 
             lspresso_shot!(test_rename(
@@ -274,7 +270,6 @@ let foo = 5;
             let source_file = TestFile::new(test_server::get_source_path(), "");
             let definition_test_case = TestCase::new(get_dummy_server_path(), source_file)
                 .cursor_pos(Some(Position::new(response_num, 0)))
-                .timeout(Duration::from_secs(1))
                 .cleanup(false);
 
             lspresso_shot!(test_definition(definition_test_case, &resp));
@@ -347,7 +342,6 @@ let foo = 5;
         let source_file = TestFile::new(test_server::get_source_path(), "");
         let diagnostics_test_case = TestCase::new(get_dummy_server_path(), source_file)
             .cursor_pos(Some(Position::new(0, 0)))
-            .timeout(Duration::from_secs(1))
             .cleanup(false);
 
         lspresso_shot!(test_diagnostics(diagnostics_test_case, &resp.diagnostics));
@@ -480,7 +474,6 @@ let foo = 5;
             let source_file = TestFile::new(test_server::get_source_path(), "");
             let definition_test_case = TestCase::new(get_dummy_server_path(), source_file)
                 .cursor_pos(Some(Position::new(response_num, 0)))
-                .timeout(Duration::from_secs(1))
                 .cleanup(false);
 
             lspresso_shot!(test_hover(definition_test_case, resp));
@@ -588,7 +581,6 @@ println!(\"format {local_variable} arguments\");
                 let source_file = TestFile::new(test_server::get_source_path(), "");
                 let completion_test_case = TestCase::new(get_dummy_server_path(), source_file)
                     .cursor_pos(Some(Position::new(response_num, 0)))
-                    .timeout(Duration::from_secs(1))
                     .cleanup(false);
 
                 lspresso_shot!(test_completion(completion_test_case, &comp_rsult));
@@ -603,7 +595,6 @@ println!(\"format {local_variable} arguments\");
                 let source_file = TestFile::new(test_server::get_source_path(), "");
                 let completion_test_case = TestCase::new(get_dummy_server_path(), source_file)
                     .cursor_pos(Some(Position::new(response_num, 0)))
-                    .timeout(Duration::from_secs(1))
                     .cleanup(false);
 
                 lspresso_shot!(test_completion(completion_test_case, &comp_rsult));

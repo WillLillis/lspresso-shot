@@ -1,9 +1,11 @@
-use std::collections::HashSet;
-use std::env::temp_dir;
-use std::fs;
-use std::num::NonZeroU32;
-use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::{
+    collections::HashSet,
+    env::temp_dir,
+    fs,
+    num::NonZeroU32,
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use anstyle::{AnsiColor, Color, Style};
 pub use lsp_types::{
@@ -117,7 +119,7 @@ impl TestCase {
             cursor_pos: None,
             other_files: Vec::new(),
             start_type: ServerStartType::Simple,
-            timeout: Duration::from_millis(2000),
+            timeout: Duration::from_secs(1),
             cleanup: true,
         }
     }
@@ -323,7 +325,8 @@ impl TestCase {
     ///
     /// # Panics
     ///
-    /// Will panic if a test source file path doesn't have a parent directory
+    /// Will panic if a test source file path doesn't have a parent directory (this
+    /// should not be possible)
     pub fn create_test(
         &self,
         test_type: TestType,
@@ -416,12 +419,6 @@ fn is_executable(server_path: &Path) -> bool {
     false
 }
 
-// TODO: Need to find a good way to test `Simple` server setup. rust-analyzer doesn't
-// support this obviously, so we can't use that. Once the project is stable enough
-// with a few of the request types, we can probably implement a *very* basic test
-// server to send back dummy responses to known test inputs. This way, we can get
-// complete coverage for all the  different ways results can be returned
-
 /// Indicates how the server initializes itself before it is ready to service
 /// requests
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -433,7 +430,7 @@ pub enum ServerStartType {
     /// the related request after the ith one is received.
     ///
     /// The inner `NonZeroU32` type indicates on which `end` `$/progress` message the
-    /// server is ready to respond to a particular request. Counting is 1-based.
+    /// server is ready to respond to a particular request.
     ///
     /// The inner `String` type contains the text of the relevant progress token
     /// (i.e. "rustAnalyzer/indexing").
@@ -528,6 +525,7 @@ fn paint(color: Option<impl Into<Color>>, text: &str) -> String {
     format!("{style}{text}{style:#}")
 }
 
+// TODO: Our rendering logic could probably use some cleanup/fxes
 fn compare_fields(
     f: &mut std::fmt::Formatter<'_>,
     indent: usize,
@@ -546,7 +544,7 @@ fn compare_fields(
         )?;
     } else {
         // TODO: Pull in some sort of diffing library to make this more readable,
-        // can be very difficult to spot what's off in long strings
+        // as it can be very difficult to spot what's off when comparing long strings
         let expected_render = if expected.is_string() {
             format!("\n{padding}    {expected}")
         } else {
@@ -661,19 +659,19 @@ fn write_fields_comparison<T: Serialize>(
 }
 
 // `textDocument/completion` is a bit different from other requests. Servers commonly
-// send a *bunch* of completion items, and rely on the editor's lsp client to filter
+// send a *bunch* of completion items and rely on the editor's lsp client to filter
 // them out/ display the most relevant ones first. This is fine, but it means that
 // doing a simple equality check for this isn't realistic and would be a serious
 // pain for library consumers. I'd like to experiment with the different ways we
 // can handle this, but for now we'll just allow for exact matching, and a simple
-// contains check.
+// "contains" check.
 #[derive(Debug, Clone)]
 pub enum CompletionResult {
     /// Expect this exact set of completion items in the provided order
     Exact(CompletionResponse),
     /// Expect to at least see these completion items in any order.
     /// NOTE: This discards the `CompletionList.is_incomplete` field and only
-    /// compares `items`
+    /// considers `CompletionList.items`
     Contains(Vec<CompletionItem>),
 }
 
@@ -873,9 +871,9 @@ impl std::fmt::Display for DiagnosticMismatchError {
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FormattingResult {
-    /// Check if the file's formatted state matches the contents
+    /// Check if the file's formatted state matches the expected contents
     EndState(String),
-    /// Check if the server's response matches
+    /// Check if the server's response matches the exected edits
     Response(Vec<TextEdit>),
 }
 

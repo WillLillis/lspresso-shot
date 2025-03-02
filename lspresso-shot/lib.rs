@@ -110,7 +110,7 @@ where
     Ok(actual)
 }
 
-/// Invokes neovim to run the test associated with the file stored at `init_dot_lua_path`,
+/// Invokes neovim to run the test with `test_case`'s associated `init.lua` file,
 /// opening `source_path`
 fn run_test(test_case: &TestCase, source_path: &Path) -> TestResult<()> {
     let init_dot_lua_path = test_case
@@ -166,7 +166,9 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestResult<()> {
 // results until we find something. There's no way (that I can tell) to distinguish
 // between an empty "not ready" and a true empty response -- the lua table just looks
 // like this: `{ {} }`
-// Do we even need to cover this use case?
+// Ok it looks like we can reviist this now that `$/progress` handling was updated
+// to look for a sepcific update message rather than polling everytime. I *think*
+// we can get rid of the the checks for empty results, and just return them as is.
 
 /// Tests the server's response to a 'textDocument/complection' request
 ///
