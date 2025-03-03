@@ -1,14 +1,14 @@
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, num::NonZeroU32, path::PathBuf, str::FromStr, time::Duration};
+    use std::{num::NonZeroU32, path::PathBuf, str::FromStr, time::Duration};
 
     use lsp_types::{
         CodeDescription, CompletionItem, CompletionItemKind, CompletionList, CompletionResponse,
         CompletionTextEdit, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity,
         DiagnosticTag, DocumentChanges, DocumentSymbol, DocumentSymbolResponse, Documentation,
-        FormattingOptions, GotoDefinitionResponse, Hover, InsertTextFormat, Location, LocationLink,
-        MarkupContent, NumberOrString, OneOf, OptionalVersionedTextDocumentIdentifier, Position,
-        Range, SymbolKind, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
+        GotoDefinitionResponse, Hover, InsertTextFormat, Location, LocationLink, MarkupContent,
+        NumberOrString, OneOf, OptionalVersionedTextDocumentIdentifier, Position, Range,
+        SymbolKind, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
     };
     use serde_json::Map;
     use test_server::send_response_num;
@@ -56,7 +56,7 @@ path = "src/main.rs""#,
         let mut response_num = 0;
         while let Some(syms) = test_server::responses::get_document_symbol_response(response_num) {
             let source_file = TestFile::new(test_server::get_source_path(), "");
-            let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
+            let doc_sym_test_case = TestCase::new(get_dummy_server_path(), source_file)
                 .cleanup(false)
                 .other_file(TestFile {
                     path: "../RESPONSE_NUM.txt".into(),
@@ -64,13 +64,13 @@ path = "src/main.rs""#,
                 });
             send_response_num(
                 response_num,
-                &reference_test_case
+                &doc_sym_test_case
                     .get_lspresso_dir()
                     .expect("Failed to get test case's root directory"),
             )
             .expect("Failed to send response num");
 
-            lspresso_shot!(test_document_symbol(reference_test_case, &syms,));
+            lspresso_shot!(test_document_symbol(doc_sym_test_case, &syms,));
             response_num += 1;
         }
     }
@@ -135,8 +135,15 @@ path = "src/main.rs""#,
         while let Some(refs) = test_server::responses::get_references_response(response_num) {
             let source_file = TestFile::new(test_server::get_source_path(), "");
             let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
-                .cursor_pos(Some(Position::new(response_num, 0)))
+                .cursor_pos(Some(Position::default()))
                 .cleanup(false);
+            send_response_num(
+                response_num,
+                &reference_test_case
+                    .get_lspresso_dir()
+                    .expect("Failed to get test case's root directory"),
+            )
+            .expect("Failed to send response num");
 
             lspresso_shot!(test_references(reference_test_case, true, &refs,));
             response_num += 1;
@@ -178,11 +185,17 @@ path = "src/main.rs""#,
     fn dummy_formatting_state() {
         let contents = "Some source contents";
         let source_file = TestFile::new(test_server::get_source_path(), contents);
-        let reference_test_case =
-            TestCase::new(get_dummy_server_path(), source_file).cleanup(false);
+        let format_test_case = TestCase::new(get_dummy_server_path(), source_file).cleanup(false);
+        send_response_num(
+            0,
+            &format_test_case
+                .get_lspresso_dir()
+                .expect("Failed to get test case's root directory"),
+        )
+        .expect("Failed to send response num");
 
         lspresso_shot!(test_formatting(
-            reference_test_case,
+            format_test_case,
             None,
             &FormattingResult::EndState(contents.to_string())
         ));
@@ -194,20 +207,19 @@ path = "src/main.rs""#,
         let mut response_num = 1;
         while let Some(edits) = test_server::responses::get_formatting_response(response_num) {
             let source_file = TestFile::new(test_server::get_source_path(), contents);
-            let reference_test_case =
+            let format_test_case =
                 TestCase::new(get_dummy_server_path(), source_file).cleanup(false);
+            send_response_num(
+                response_num,
+                &format_test_case
+                    .get_lspresso_dir()
+                    .expect("Failed to get test case's root directory"),
+            )
+            .expect("Failed to send response num");
 
-            let opts = Some(FormattingOptions {
-                tab_size: response_num,
-                insert_spaces: true,
-                properties: HashMap::new(),
-                trim_trailing_whitespace: None,
-                insert_final_newline: None,
-                trim_final_newlines: None,
-            });
             lspresso_shot!(test_formatting(
-                reference_test_case,
-                opts,
+                format_test_case,
+                None,
                 &FormattingResult::Response(edits)
             ));
             response_num += 1;
@@ -291,12 +303,15 @@ let foo = 5;
             let rename_test_case = TestCase::new(get_dummy_server_path(), source_file)
                 .cursor_pos(Some(Position::new(0, 0)))
                 .cleanup(false);
+            send_response_num(
+                response_num,
+                &rename_test_case
+                    .get_lspresso_dir()
+                    .expect("Failed to get test case's root directory"),
+            )
+            .expect("Failed to send response num");
 
-            lspresso_shot!(test_rename(
-                rename_test_case,
-                &response_num.to_string(),
-                &edits
-            ));
+            lspresso_shot!(test_rename(rename_test_case, "", &edits));
             response_num += 1;
         }
     }
@@ -348,8 +363,15 @@ let foo = 5;
         while let Some(resp) = test_server::responses::get_definition_response(response_num) {
             let source_file = TestFile::new(test_server::get_source_path(), "");
             let definition_test_case = TestCase::new(get_dummy_server_path(), source_file)
-                .cursor_pos(Some(Position::new(response_num, 0)))
+                .cursor_pos(Some(Position::default()))
                 .cleanup(false);
+            send_response_num(
+                response_num,
+                &definition_test_case
+                    .get_lspresso_dir()
+                    .expect("Failed to get test case's root directory"),
+            )
+            .expect("Failed to send response num");
 
             lspresso_shot!(test_definition(definition_test_case, &resp));
             response_num += 1;
@@ -414,13 +436,14 @@ let foo = 5;
         ));
     }
 
+    // TODO: Needs a response_num refactor
     #[test]
     fn dummy_diagnostics() {
         let uri = Uri::from_str(&test_server::get_source_path()).unwrap();
         let resp = test_server::responses::get_diagnostics_response(&uri);
         let source_file = TestFile::new(test_server::get_source_path(), "");
         let diagnostics_test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::new(0, 0)))
+            .cursor_pos(Some(Position::default()))
             .cleanup(false);
 
         lspresso_shot!(test_diagnostics(diagnostics_test_case, &resp.diagnostics));
@@ -551,11 +574,18 @@ let foo = 5;
         let mut response_num = 0;
         while let Some(resp) = test_server::responses::get_hover_response(response_num) {
             let source_file = TestFile::new(test_server::get_source_path(), "");
-            let definition_test_case = TestCase::new(get_dummy_server_path(), source_file)
-                .cursor_pos(Some(Position::new(response_num, 0)))
+            let hover_test_case = TestCase::new(get_dummy_server_path(), source_file)
+                .cursor_pos(Some(Position::default()))
                 .cleanup(false);
+            send_response_num(
+                response_num,
+                &hover_test_case
+                    .get_lspresso_dir()
+                    .expect("Failed to get test case's root directory"),
+            )
+            .expect("Failed to send response num");
 
-            lspresso_shot!(test_hover(definition_test_case, resp));
+            lspresso_shot!(test_hover(hover_test_case, resp));
             response_num += 1;
         }
     }
@@ -659,8 +689,15 @@ println!(\"format {local_variable} arguments\");
                 let comp_rsult = CompletionResult::Exact(resp.clone());
                 let source_file = TestFile::new(test_server::get_source_path(), "");
                 let completion_test_case = TestCase::new(get_dummy_server_path(), source_file)
-                    .cursor_pos(Some(Position::new(response_num, 0)))
+                    .cursor_pos(Some(Position::default()))
                     .cleanup(false);
+                send_response_num(
+                    response_num,
+                    &completion_test_case
+                        .get_lspresso_dir()
+                        .expect("Failed to get test case's root directory"),
+                )
+                .expect("Failed to send response num");
 
                 lspresso_shot!(test_completion(completion_test_case, &comp_rsult));
             }
@@ -673,8 +710,15 @@ println!(\"format {local_variable} arguments\");
                 };
                 let source_file = TestFile::new(test_server::get_source_path(), "");
                 let completion_test_case = TestCase::new(get_dummy_server_path(), source_file)
-                    .cursor_pos(Some(Position::new(response_num, 0)))
+                    .cursor_pos(Some(Position::default()))
                     .cleanup(false);
+                send_response_num(
+                    response_num,
+                    &completion_test_case
+                        .get_lspresso_dir()
+                        .expect("Failed to get test case's root directory"),
+                )
+                .expect("Failed to send response num");
 
                 lspresso_shot!(test_completion(completion_test_case, &comp_rsult));
             }
