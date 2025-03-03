@@ -3,8 +3,8 @@ mod test;
 pub mod types;
 
 use lsp_types::{
-    CompletionResponse, Diagnostic, FormattingOptions, GotoDefinitionResponse, Hover, Location,
-    TextEdit, WorkspaceEdit,
+    CompletionResponse, Diagnostic, DocumentSymbolResponse, FormattingOptions,
+    GotoDefinitionResponse, Hover, Location, TextEdit, WorkspaceEdit,
 };
 
 use std::{
@@ -17,8 +17,9 @@ use std::{
 
 use types::{
     CompletionMismatchError, CompletionResult, DefinitionMismatchError, DiagnosticMismatchError,
-    FormattingMismatchError, FormattingResult, HoverMismatchError, ReferencesMismatchError,
-    RenameMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
+    DocumentSymbolMismatchError, FormattingMismatchError, FormattingResult, HoverMismatchError,
+    ReferencesMismatchError, RenameMismatchError, TestCase, TestError, TestResult, TestSetupError,
+    TestType, TimeoutError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -237,6 +238,48 @@ pub fn test_diagnostics(mut test_case: TestCase, expected: &[Diagnostic]) -> Tes
         Err(DiagnosticMismatchError {
             test_id: test_case.test_id,
             expected: expected.to_vec(),
+            actual,
+        })?;
+    }
+
+    Ok(())
+}
+
+/// Tests the server's response to a 'textDocument/publishDiagnostics' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_document_symbol(
+    mut test_case: TestCase,
+    expected: &DocumentSymbolResponse,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::DocumentSymbol);
+    let actual: DocumentSymbolResponse = test_inner(&test_case, None)?;
+
+    // HACK: Since the two types of DocumentSymbolResponse are untagged, there's no
+    // way to differentiate between the two if we get an empty vector in response.
+    // Just treat this as a special case and say it's ok.
+    match (expected, &actual) {
+        (
+            DocumentSymbolResponse::Flat(flat_items),
+            DocumentSymbolResponse::Nested(nested_items),
+        )
+        | (
+            DocumentSymbolResponse::Nested(nested_items),
+            DocumentSymbolResponse::Flat(flat_items),
+        ) => {
+            if flat_items.is_empty() && nested_items.is_empty() {
+                return Ok(());
+            }
+        }
+        _ => {}
+    }
+    if *expected != actual {
+        Err(DocumentSymbolMismatchError {
+            test_id: test_case.test_id,
+            expected: expected.clone(),
             actual,
         })?;
     }

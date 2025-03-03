@@ -5,16 +5,17 @@ mod tests {
     use lsp_types::{
         CodeDescription, CompletionItem, CompletionItemKind, CompletionList, CompletionResponse,
         CompletionTextEdit, Diagnostic, DiagnosticRelatedInformation, DiagnosticSeverity,
-        DiagnosticTag, DocumentChanges, Documentation, FormattingOptions, GotoDefinitionResponse,
-        Hover, InsertTextFormat, Location, LocationLink, MarkupContent, NumberOrString, OneOf,
-        OptionalVersionedTextDocumentIdentifier, Position, Range, TextDocumentEdit, TextEdit, Uri,
-        WorkspaceEdit,
+        DiagnosticTag, DocumentChanges, DocumentSymbol, DocumentSymbolResponse, Documentation,
+        FormattingOptions, GotoDefinitionResponse, Hover, InsertTextFormat, Location, LocationLink,
+        MarkupContent, NumberOrString, OneOf, OptionalVersionedTextDocumentIdentifier, Position,
+        Range, SymbolKind, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
     };
     use serde_json::Map;
+    use test_server::send_response_num;
 
     use crate::{
-        lspresso_shot, test_completion, test_definition, test_diagnostics, test_formatting,
-        test_hover, test_references, test_rename,
+        lspresso_shot, test_completion, test_definition, test_diagnostics, test_document_symbol,
+        test_formatting, test_hover, test_references, test_rename,
         types::{CompletionResult, FormattingResult, ServerStartType, TestCase, TestFile},
     };
 
@@ -48,6 +49,84 @@ edition = "2021"
 name = "test"
 path = "src/main.rs""#,
         )
+    }
+
+    #[test]
+    fn dummy_document_symbol() {
+        let mut response_num = 0;
+        while let Some(syms) = test_server::responses::get_document_symbol_response(response_num) {
+            let source_file = TestFile::new(test_server::get_source_path(), "");
+            let reference_test_case = TestCase::new(get_dummy_server_path(), source_file)
+                .cleanup(false)
+                .other_file(TestFile {
+                    path: "../RESPONSE_NUM.txt".into(),
+                    contents: response_num.to_string(),
+                });
+            send_response_num(
+                response_num,
+                &reference_test_case
+                    .get_lspresso_dir()
+                    .expect("Failed to get test case's root directory"),
+            )
+            .expect("Failed to send response num");
+
+            lspresso_shot!(test_document_symbol(reference_test_case, &syms,));
+            response_num += 1;
+        }
+    }
+
+    #[test]
+    fn rust_analyzer_document_symbol() {
+        let source_file = TestFile::new(
+            "src/main.rs",
+            "pub fn main() {
+    let foo = 5;
+}",
+        );
+        let doc_sym_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                NonZeroU32::new(5).unwrap(),
+                "rustAnalyzer/Indexing".to_string(),
+            ))
+            .timeout(Duration::from_secs(20))
+            .cleanup(false)
+            .other_file(cargo_dot_toml());
+
+        lspresso_shot!(test_document_symbol(
+            doc_sym_test_case,
+            #[allow(deprecated)]
+            &DocumentSymbolResponse::Nested(vec![DocumentSymbol {
+                name: "main".to_string(),
+                detail: Some("fn()".to_string()),
+                kind: SymbolKind::FUNCTION,
+                tags: Some(Vec::new()),
+                deprecated: Some(false),
+                range: Range {
+                    start: Position::new(0, 0),
+                    end: Position::new(2, 1),
+                },
+                selection_range: Range {
+                    start: Position::new(0, 7),
+                    end: Position::new(0, 11),
+                },
+                children: Some(vec![DocumentSymbol {
+                    name: "foo".to_string(),
+                    detail: None,
+                    kind: SymbolKind::VARIABLE,
+                    tags: Some(Vec::new()),
+                    deprecated: Some(false),
+                    range: Range {
+                        start: Position::new(1, 4),
+                        end: Position::new(1, 16),
+                    },
+                    selection_range: Range {
+                        start: Position::new(1, 8),
+                        end: Position::new(1, 11),
+                    },
+                    children: None,
+                }]),
+            }]),
+        ));
     }
 
     #[test]

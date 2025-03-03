@@ -48,6 +48,7 @@ pub fn main() -> Result<()> {
         ..Default::default()
     });
     let document_formatting_provider = Some(OneOf::Left(true));
+    let document_symbol_provider = Some(OneOf::Left(true));
     let hover_provider = Some(HoverProviderCapability::Simple(true));
     let references_provider = Some(OneOf::Left(true));
     let rename_provider = Some(OneOf::Left(true));
@@ -59,6 +60,7 @@ pub fn main() -> Result<()> {
         definition_provider,
         diagnostic_provider,
         document_formatting_provider,
+        document_symbol_provider,
         hover_provider,
         references_provider,
         rename_provider,
