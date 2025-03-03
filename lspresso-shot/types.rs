@@ -8,6 +8,7 @@ use std::{
 };
 
 use anstyle::{AnsiColor, Color, Style};
+use lsp_types::DocumentSymbolResponse;
 pub use lsp_types::{
     CompletionItem, CompletionList, CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover,
     Location, Position, TextEdit, WorkspaceEdit,
@@ -27,6 +28,8 @@ pub enum TestType {
     Definition,
     /// Test `textDocument/publishDiagnostics` requests
     Diagnostic,
+    /// Test `textDocument/documentSymbol` requests
+    DocumentSymbol,
     /// Test `textDocument/formatting` requests
     Formatting,
     /// Test `textDocument/hover` requests
@@ -46,6 +49,7 @@ impl std::fmt::Display for TestType {
                 Self::Completion => "completion",
                 Self::Definition => "definition",
                 Self::Diagnostic => "publishDiagnostics",
+                Self::DocumentSymbol => "documentSymbol",
                 Self::Formatting => "formatting",
                 Self::Hover => "hover",
                 Self::References => "references",
@@ -475,6 +479,8 @@ pub enum TestError {
     #[error(transparent)]
     DiagnosticMismatch(#[from] DiagnosticMismatchError),
     #[error(transparent)]
+    DocumentSymbolMismatch(#[from] DocumentSymbolMismatchError),
+    #[error(transparent)]
     FormattingMismatch(#[from] FormattingMismatchError),
     #[error(transparent)]
     HoverMismatch(#[from] Box<HoverMismatchError>),
@@ -865,6 +871,25 @@ impl std::fmt::Display for DiagnosticMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Test {}: Incorrect Diagnostic response:", self.test_id)?;
         write_fields_comparison(f, "Diagnostics", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct DocumentSymbolMismatchError {
+    pub test_id: String,
+    pub expected: DocumentSymbolResponse,
+    pub actual: DocumentSymbolResponse,
+}
+
+impl std::fmt::Display for DocumentSymbolMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Document Symbol response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Document Symbols", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }

@@ -110,6 +110,7 @@ To start though, let's focus on the following TODOs:
 - [x] `textDocument/completion`
 - [x] `textDocument/formatting`
 - [x] `textDocument/rename`
+- [x] `textDocument/documentSymbol`
 - [ ] Figure out what methods we want to add next.
 
 ## Gotchas

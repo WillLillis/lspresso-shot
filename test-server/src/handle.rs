@@ -4,16 +4,20 @@ use lsp_server::{Connection, Message, Notification, Request, RequestId, Response
 use lsp_types::{
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
-        Completion, DocumentDiagnosticRequest, Formatting, GotoDefinition, HoverRequest,
-        References, Rename, Request as _,
+        Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, Formatting, GotoDefinition,
+        HoverRequest, References, Rename, Request as _,
     },
-    CompletionParams, DocumentFormattingParams, GotoDefinitionParams, HoverParams, ReferenceParams,
-    RenameParams, Uri,
+    CompletionParams, DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams,
+    HoverParams, ReferenceParams, RenameParams, Uri,
 };
 
-use crate::responses::{
-    get_completion_response, get_definition_response, get_diagnostics_response,
-    get_formatting_response, get_hover_response, get_references_response, get_rename_response,
+use crate::{
+    get_root_test_path, receive_response_num,
+    responses::{
+        get_completion_response, get_definition_response, get_diagnostics_response,
+        get_document_symbol_response, get_formatting_response, get_hover_response,
+        get_references_response, get_rename_response,
+    },
 };
 
 fn cast_req<R>(req: Request) -> Result<(RequestId, R::Params)>
@@ -153,10 +157,49 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
             );
             handle_completion(id, &params, connection)?;
         }
+        DocumentSymbolRequest::METHOD => {
+            let (id, params) = cast_req::<DocumentSymbolRequest>(req)
+                .expect("Failed to cast `Completion` request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                Completion::METHOD
+            );
+            handle_document_symbol(id, &params, connection)?;
+        }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),
     }
 
     Ok(())
+}
+
+/// Sends response to a `textDocument/completion` request
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
+fn handle_document_symbol(
+    id: RequestId,
+    params: &DocumentSymbolParams,
+    connection: &Connection,
+) -> Result<()> {
+    let Some(root_path) = get_root_test_path(&params.text_document.uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            params.text_document.uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
+    let Some(resp) = get_document_symbol_response(response_num) else {
+        error!("Invalid response number: {response_num}");
+        return Ok(());
+    };
+    send_req_resp(id, resp, connection)
 }
 
 /// Sends response to a `textDocument/completion` request

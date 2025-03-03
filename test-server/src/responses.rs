@@ -3,12 +3,56 @@ use std::{collections::HashMap, str::FromStr};
 use lsp_types::{
     ChangeAnnotation, CodeDescription, CompletionItem, CompletionItemKind,
     CompletionItemLabelDetails, CompletionList, CompletionResponse, Diagnostic,
-    DiagnosticRelatedInformation, DocumentChanges, Documentation, GotoDefinitionResponse, Hover,
-    HoverContents, LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind,
-    Position, PublishDiagnosticsParams, Range, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
+    DiagnosticRelatedInformation, DocumentChanges, DocumentSymbol, DocumentSymbolResponse,
+    Documentation, GotoDefinitionResponse, Hover, HoverContents, LanguageString, Location,
+    LocationLink, MarkedString, MarkupContent, MarkupKind, Position, PublishDiagnosticsParams,
+    Range, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit, Uri,
+    WorkspaceEdit,
 };
 
 use crate::get_source_path;
+
+/// For use with `test_doucment_symbol`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_document_symbol_response(response_num: u32) -> Option<DocumentSymbolResponse> {
+    #[allow(deprecated)]
+    match response_num {
+        0 => Some(DocumentSymbolResponse::Flat(vec![])),
+        1 => Some(DocumentSymbolResponse::Nested(vec![])),
+        2 => Some(DocumentSymbolResponse::Flat(vec![SymbolInformation {
+            name: "symbol name 1".to_string(),
+            kind: SymbolKind::FILE,
+            tags: None,
+            deprecated: None,
+            location: Location {
+                uri: Uri::from_str(&get_source_path()).unwrap(),
+                range: Range {
+                    start: Position::new(0, 1),
+                    end: Position::new(2, 3),
+                },
+            },
+            container_name: Some("container name 1".to_string()),
+        }])),
+        3 => Some(DocumentSymbolResponse::Nested(vec![DocumentSymbol {
+            name: "symbol name 2".to_string(),
+            detail: Some("detail".to_string()),
+            kind: SymbolKind::FUNCTION,
+            tags: Some(vec![SymbolTag::DEPRECATED]),
+            deprecated: Some(true),
+            range: Range {
+                start: Position::new(4, 5),
+                end: Position::new(6, 7),
+            },
+            selection_range: Range {
+                start: Position::new(5, 6),
+                end: Position::new(7, 8),
+            },
+            children: Some(vec![]),
+        }])),
+        _ => None,
+    }
+}
 
 /// For use with `test_completion`.
 #[must_use]
