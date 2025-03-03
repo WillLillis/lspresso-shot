@@ -83,10 +83,6 @@ pub fn handle_notification(notif: Notification, connection: &Connection) -> Resu
 
 /// Handles `Request`s from the lsp client.
 ///
-/// By convention, the `response_num` value specifying which pre-determined response
-/// to send back is taken from the first line number in `params`, if available.
-/// Data passed via other means will be specified in a comment
-///
 /// # Errors
 ///
 /// Returns errors from any of the handler functions. The majority of error sources
@@ -216,7 +212,16 @@ fn handle_completion(
     params: &CompletionParams,
     connection: &Connection,
 ) -> Result<()> {
-    let response_num = params.text_document_position.position.line;
+    let Some(root_path) = get_root_test_path(&params.text_document_position.text_document.uri)
+    else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            params.text_document_position.text_document.uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+
     info!("response_num: {response_num}");
     let Some(resp) = get_completion_response(response_num) else {
         error!("Invalid response number: {response_num}");
@@ -235,7 +240,21 @@ fn handle_completion(
 ///
 /// Panics if serialization of `params` fails.
 fn handle_hover(id: RequestId, params: &HoverParams, connection: &Connection) -> Result<()> {
-    let response_num = params.text_document_position_params.position.line;
+    let Some(root_path) =
+        get_root_test_path(&params.text_document_position_params.text_document.uri)
+    else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            params
+                .text_document_position_params
+                .text_document
+                .uri
+                .as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+
     info!("response_num: {response_num}");
     let Some(resp) = get_hover_response(response_num) else {
         error!("Invalid response number: {response_num}");
@@ -258,7 +277,20 @@ fn handle_definition(
     params: &GotoDefinitionParams,
     connection: &Connection,
 ) -> Result<()> {
-    let response_num = params.text_document_position_params.position.line;
+    let Some(root_path) =
+        get_root_test_path(&params.text_document_position_params.text_document.uri)
+    else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            params
+                .text_document_position_params
+                .text_document
+                .uri
+                .as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
     let Some(resp) = get_definition_response(response_num) else {
         error!("Invalid response number: {response_num}");
@@ -277,14 +309,16 @@ fn handle_definition(
 ///
 /// Panics if serialization of `params` fails.
 fn handle_rename(id: RequestId, params: &RenameParams, connection: &Connection) -> Result<()> {
-    // `response_num` passed via `params.new_name`
-    let Ok(response_num) = params.new_name.parse() else {
+    let Some(root_path) = get_root_test_path(&params.text_document_position.text_document.uri)
+    else {
         error!(
-            "Failed to parse `new_name` as `response_num`: {}",
-            params.new_name
+            "Failed to retrieve root path from provided uri: {}",
+            params.text_document_position.text_document.uri.as_str()
         );
         return Ok(());
     };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
     let Some(resp) = get_rename_response(response_num) else {
         error!("Invalid response number: {response_num}");
         return Ok(());
@@ -306,8 +340,15 @@ fn handle_formatting(
     params: &DocumentFormattingParams,
     connection: &Connection,
 ) -> Result<()> {
-    // `response_num` passed via `params.options.tab_size`
-    let response_num = params.options.tab_size;
+    let Some(root_path) = get_root_test_path(&params.text_document.uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            params.text_document.uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+
     info!("response_num: {response_num}");
     let resp = get_formatting_response(response_num).map_or_else(
         || {
@@ -361,7 +402,15 @@ fn handle_references(
     params: &ReferenceParams,
     connection: &Connection,
 ) -> Result<()> {
-    let response_num = params.text_document_position.position.line;
+    let Some(root_path) = get_root_test_path(&params.text_document_position.text_document.uri)
+    else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            params.text_document_position.text_document.uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
     let Some(resp) = get_references_response(response_num) else {
         error!("Invalid response number: {response_num}");

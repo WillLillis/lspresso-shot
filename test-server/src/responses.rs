@@ -413,6 +413,7 @@ pub fn get_references_response(response_num: u32) -> Option<Vec<Location>> {
 #[allow(clippy::missing_panics_doc)]
 pub fn get_formatting_response(response_num: u32) -> Option<Vec<TextEdit>> {
     match response_num {
+        // NOTE: The dummy tests rely on a `response_num` of 0 to return an empty edit response
         0 => Some(vec![]),
         1 => Some(vec![TextEdit {
             range: Range {
