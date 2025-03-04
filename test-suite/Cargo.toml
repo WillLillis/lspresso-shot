@@ -1,0 +1,23 @@
+[package]
+name = "test-suite"
+publish = false
+version = "0.1.0"
+description = "Tests for lspresso-shot"
+categories.workspace = true
+keywords.workspace = true
+readme.workspace = true
+repository.workspace = true
+license.workspace = true
+edition.workspace = true
+
+[dependencies]
+lspresso-shot = { path = "../lspresso-shot" }
+
+[dev-dependencies]
+test-server = { path = "../test-server" }
+lsp-types.workspace = true
+serde_json.workspace = true
+rstest = "0.25.0"
+
+[lints]
+workspace = true

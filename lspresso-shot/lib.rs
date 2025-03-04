@@ -1,5 +1,4 @@
 mod init_dot_lua;
-mod test;
 pub mod types;
 
 use lsp_types::{
@@ -96,7 +95,10 @@ where
 
     let results_file_path = test_case
         .get_results_file_path()
-        .map_err(|_| TestError::NoResults)?;
+        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+    if !results_file_path.exists() {
+        Err(TestError::NoResults)?;
+    }
     let raw_results = String::from_utf8(
         fs::read(&results_file_path)
             .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,

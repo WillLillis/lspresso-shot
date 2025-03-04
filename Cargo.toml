@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
-members = ["lspresso-shot", "test-server"]
-default-members = ["lspresso-shot"]
+members = ["lspresso-shot", "test-server", "test-suite"]
+default-members = ["lspresso-shot", "test-suite"]
 
 [workspace.package]
 version = "0.1.0"

@@ -213,84 +213,98 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
     }
 }
 
-// TODO: Figure out way to publish different diagnostics, how do we communicate
-// `response_num` to the server?
 /// For use with `test_diagnostics`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_diagnostics_response(uri: &Uri) -> PublishDiagnosticsParams {
-    PublishDiagnosticsParams {
-        uri: uri.clone(),
-        diagnostics: vec![Diagnostic {
-            range: Range {
-                start: Position::new(1, 2),
-                end: Position::new(3, 4),
-            },
-            severity: Some(lsp_types::DiagnosticSeverity::ERROR),
-            code: None,
-            code_description: Some(CodeDescription {
-                href: Uri::from_str(&get_source_path()).unwrap(),
-            }),
-            source: None,
-            message: "message".to_string(),
-            tags: None,
-            related_information: Some(vec![DiagnosticRelatedInformation {
-                location: Location {
-                    uri: uri.clone(),
-                    range: Range {
-                        start: Position::new(5, 6),
-                        end: Position::new(7, 8),
-                    },
+pub fn get_diagnostics_response(response_num: u32, uri: &Uri) -> Option<PublishDiagnosticsParams> {
+    let item = Diagnostic {
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        severity: Some(lsp_types::DiagnosticSeverity::ERROR),
+        code: None,
+        code_description: Some(CodeDescription {
+            href: Uri::from_str(&get_source_path()).unwrap(),
+        }),
+        source: None,
+        message: "message".to_string(),
+        tags: None,
+        related_information: Some(vec![DiagnosticRelatedInformation {
+            location: Location {
+                uri: uri.clone(),
+                range: Range {
+                    start: Position::new(5, 6),
+                    end: Position::new(7, 8),
                 },
-                message: "related message".to_string(),
-            }]),
-            data: None,
-        }],
-        version: None,
+            },
+            message: "related message".to_string(),
+        }]),
+        data: None,
+    };
+    match response_num {
+        0 => Some(PublishDiagnosticsParams {
+            uri: uri.clone(),
+            diagnostics: vec![],
+            version: None,
+        }),
+        1 => Some(PublishDiagnosticsParams {
+            uri: uri.clone(),
+            diagnostics: vec![item],
+            version: None,
+        }),
+        2 => Some(PublishDiagnosticsParams {
+            uri: uri.clone(),
+            diagnostics: vec![item.clone(), item],
+            version: None,
+        }),
+        _ => None,
     }
 }
 
 /// For use with `test_definition`.
-/// Returns a different `Vec<GotoDefinitionResponse>` based on `response_num`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_definition_response(response_num: u32) -> Option<GotoDefinitionResponse> {
+    let location_item = Location {
+        uri: Uri::from_str(&get_source_path()).unwrap(),
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+    };
+    let link_item = LocationLink {
+        target_uri: Uri::from_str(&get_source_path()).unwrap(),
+        target_range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        target_selection_range: Range {
+            start: Position::new(5, 6),
+            end: Position::new(7, 8),
+        },
+        origin_selection_range: Some(Range {
+            start: Position::new(9, 10),
+            end: Position::new(11, 12),
+        }),
+    };
     match response_num {
-        0 => Some(GotoDefinitionResponse::Scalar(Location {
-            uri: Uri::from_str(&get_source_path()).unwrap(),
-            range: Range {
-                start: Position::new(1, 2),
-                end: Position::new(3, 4),
-            },
-        })),
-        1 => Some(GotoDefinitionResponse::Array(vec![Location {
-            uri: Uri::from_str(&get_source_path()).unwrap(),
-            range: Range {
-                start: Position::new(1, 2),
-                end: Position::new(3, 4),
-            },
-        }])),
-        2 => Some(GotoDefinitionResponse::Link(vec![LocationLink {
-            target_uri: Uri::from_str(&get_source_path()).unwrap(),
-            target_range: Range {
-                start: Position::new(1, 2),
-                end: Position::new(3, 4),
-            },
-            target_selection_range: Range {
-                start: Position::new(5, 6),
-                end: Position::new(7, 8),
-            },
-            origin_selection_range: Some(Range {
-                start: Position::new(9, 10),
-                end: Position::new(11, 12),
-            }),
-        }])),
+        0 => Some(GotoDefinitionResponse::Scalar(location_item)),
+        1 => Some(GotoDefinitionResponse::Array(vec![location_item])),
+        2 => Some(GotoDefinitionResponse::Array(vec![
+            location_item.clone(),
+            location_item,
+        ])),
+        3 => Some(GotoDefinitionResponse::Link(vec![link_item])),
+        4 => Some(GotoDefinitionResponse::Link(vec![
+            link_item.clone(),
+            link_item,
+        ])),
         _ => None,
     }
 }
 
 /// For use with `test_rename`.
-/// Returns a different `WorkspaceEdit` based on `response_num`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
@@ -350,7 +364,6 @@ pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
 }
 
 /// For use with `test_references`.
-/// Returns a different `Vec<Location>` based on `response_num`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_references_response(response_num: u32) -> Option<Vec<Location>> {
@@ -408,7 +421,6 @@ pub fn get_references_response(response_num: u32) -> Option<Vec<Location>> {
 }
 
 /// For use with `test_formatting`.
-/// Returns a different `Vec<TextEdit>` based on `response_num`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_formatting_response(response_num: u32) -> Option<Vec<TextEdit>> {
