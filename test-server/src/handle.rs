@@ -168,7 +168,7 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
     Ok(())
 }
 
-/// Sends response to a `textDocument/completion` request
+/// Sends response to a `textDocument/documentSymbol` request
 ///
 /// # Errors
 ///
