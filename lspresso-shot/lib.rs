@@ -245,7 +245,7 @@ pub fn test_diagnostics(mut test_case: TestCase, expected: &[Diagnostic]) -> Tes
     Ok(())
 }
 
-/// Tests the server's response to a 'textDocument/publishDiagnostics' request
+/// Tests the server's response to a 'textDocument/documentSymbol' request
 ///
 /// # Errors
 ///

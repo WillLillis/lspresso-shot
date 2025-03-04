@@ -41,7 +41,6 @@ pub fn get_root_test_path(uri: &Uri) -> Option<PathBuf> {
 // brittle and much less explicit.
 /// Writes `response_num` to `path/RESPONSE_NUM.txt`
 ///
-///
 /// # Errors
 ///
 /// Will return `std::io::Error` if writing the file fails
