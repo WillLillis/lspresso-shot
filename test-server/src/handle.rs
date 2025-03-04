@@ -8,7 +8,8 @@ use lsp_types::{
         HoverRequest, References, Rename, Request as _,
     },
     CompletionParams, DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams,
-    HoverParams, ReferenceParams, RenameParams, Uri,
+    HoverOptions, HoverParams, HoverProviderCapability, ReferenceParams, RenameParams,
+    ServerCapabilities, Uri, WorkDoneProgressOptions,
 };
 
 use crate::{
@@ -92,7 +93,11 @@ pub fn handle_notification(notif: Notification, connection: &Connection) -> Resu
 ///
 /// Panics if JSON encoding of a response fails or if a json request fails to cast
 /// into its equivalent in-memory struct
-pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
+pub fn handle_request(
+    req: Request,
+    capabilities: &ServerCapabilities,
+    connection: &Connection,
+) -> Result<()> {
     match req.method.as_str() {
         References::METHOD => {
             let (id, params) =
@@ -142,7 +147,7 @@ pub fn handle_request(req: Request, connection: &Connection) -> Result<()> {
                 "Received `{}` request ({id}): {params:?}",
                 HoverRequest::METHOD
             );
-            handle_hover(id, &params, connection)?;
+            handle_hover(id, &params, capabilities, connection)?;
         }
         Completion::METHOD => {
             let (id, params) =
@@ -239,7 +244,12 @@ fn handle_completion(
 /// # Panics
 ///
 /// Panics if serialization of `params` fails.
-fn handle_hover(id: RequestId, params: &HoverParams, connection: &Connection) -> Result<()> {
+fn handle_hover(
+    id: RequestId,
+    params: &HoverParams,
+    capabilities: &ServerCapabilities,
+    connection: &Connection,
+) -> Result<()> {
     let Some(root_path) =
         get_root_test_path(&params.text_document_position_params.text_document.uri)
     else {
@@ -255,12 +265,29 @@ fn handle_hover(id: RequestId, params: &HoverParams, connection: &Connection) ->
     };
     let response_num = receive_response_num(&root_path)?;
 
+    let is_progress = matches!(
+        capabilities.hover_provider,
+        Some(HoverProviderCapability::Options(HoverOptions {
+            work_done_progress_options: WorkDoneProgressOptions {
+                work_done_progress: Some(true),
+            },
+        }))
+    );
+    if is_progress {
+        // TODO: Send a few mock progress responses before sending the data
+    }
+
     info!("response_num: {response_num}");
     let Some(resp) = get_hover_response(response_num) else {
         error!("Invalid response number: {response_num}");
         return Ok(());
     };
-    send_req_resp(id, resp, connection)
+    send_req_resp(id, resp, connection)?;
+
+    if is_progress {
+        // TODO: Send a progress done messages here
+    }
+    Ok(())
 }
 
 /// Sends response to a `textDocument/definition` request
@@ -377,7 +404,19 @@ fn handle_formatting(
 ///
 /// Panics if serialization of `PublishDiagnosticsParams` fails.
 pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
-    let publish_params = get_diagnostics_response(uri);
+    let Some(root_path) = get_root_test_path(uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
+    let Some(publish_params) = get_diagnostics_response(response_num, uri) else {
+        error!("Invalid response number: {response_num}");
+        return Ok(());
+    };
     let result = serde_json::to_value(&publish_params).unwrap();
 
     let notif = Notification {

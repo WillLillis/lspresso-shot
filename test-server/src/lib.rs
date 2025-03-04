@@ -1,10 +1,25 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
-use lsp_types::Uri;
+use lsp_types::{ServerCapabilities, Uri};
 
 pub mod handle;
 pub mod responses;
+
+/// Returns the path to the test server executable
+#[allow(clippy::missing_panics_doc)]
+#[must_use]
+pub fn get_dummy_server_path() -> PathBuf {
+    let mut proj_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .to_path_buf();
+    proj_dir.push("target");
+    proj_dir.push("debug");
+    proj_dir.push("test-server");
+
+    proj_dir
+}
 
 /// Returns `main.dummy`
 #[must_use]
@@ -36,9 +51,9 @@ pub fn get_root_test_path(uri: &Uri) -> Option<PathBuf> {
     Some(uri.into())
 }
 
-// NOTE: This could also be accomplished by adding the file as an "other file"
-// with path `../RESPONSE_NUM.txt` to the test case, but this seems a bit
-// brittle and much less explicit.
+// NOTE: This (and `send_capabilities`) could also be accomplished by adding the file
+// as an "other file" with path `../<filename>` to the test case, but this seems
+// a bit brittle and much less explicit.
 /// Writes `response_num` to `path/RESPONSE_NUM.txt`
 ///
 /// # Errors
@@ -49,6 +64,24 @@ pub fn send_response_num(response_num: u32, path: &Path) -> std::io::Result<()> 
     path.push("RESPONSE_NUM.txt");
 
     std::fs::write(path, response_num.to_string())
+}
+
+/// Serialized `capabilities` to JSON and writes them to `path/capabilities.json`
+///
+/// # Errors
+///
+/// Will return `std::io::Error` if writing the file fails
+///
+/// # Panics
+///
+/// Will panic if serialization of `capabilities` fails
+pub fn send_capabiltiies(capabilities: &ServerCapabilities, path: &Path) -> std::io::Result<()> {
+    let mut path = path.to_path_buf();
+    path.push("capabilities.json");
+    let capabilities_json =
+        serde_json::to_string_pretty(capabilities).expect("Failed to serialize capabilities");
+
+    std::fs::write(path, capabilities_json)
 }
 
 /// Reads a response number from `path/RESPONSE_NUM.txt`

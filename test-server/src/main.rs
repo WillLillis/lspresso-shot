@@ -1,12 +1,65 @@
-use anyhow::Result;
+use std::{
+    path::{Path, PathBuf},
+    str::FromStr as _,
+};
+
+use test_server::handle::{handle_notification, handle_request};
+
+use anyhow::{anyhow, Result};
 use log::{error, info};
 use lsp_server::{Connection, Message};
-use lsp_types::{
-    CompletionOptions, CompletionOptionsCompletionItem, DiagnosticOptions,
-    DiagnosticServerCapabilities, HoverProviderCapability, InitializeParams, OneOf,
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, WorkDoneProgressOptions,
-};
-use test_server::handle::{handle_notification, handle_request};
+use lsp_types::{InitializeParams, ServerCapabilities};
+
+fn get_capabilities(path: &Path) -> Result<ServerCapabilities> {
+    let capabilities_json = std::fs::read_to_string(path)?;
+    let capabilities: ServerCapabilities = serde_json::from_str(&capabilities_json)?;
+
+    Ok(capabilities)
+}
+
+// Yoinked from asm-lsp
+/// Attempts to find the project's root directory given its `InitializeParams`
+// 1. if we have workspace folders, then iterate through them and assign the first valid one to
+//    the root path
+// 2. If we don't have worksace folders or none of them is a valid path, check the (deprecated)
+//    root_uri field
+// 3. If both workspace folders and root_uri didn't provide a path, check the (deprecated)
+//    root_path field
+fn get_project_root(params: &InitializeParams) -> Option<PathBuf> {
+    // first check workspace folders
+    if let Some(folders) = &params.workspace_folders {
+        // if there's multiple, just visit in order until we find a valid folder
+        for folder in folders {
+            let Ok(parsed) = PathBuf::from_str(folder.uri.path().as_str());
+            if let Ok(parsed_path) = parsed.canonicalize() {
+                info!("Detected project root: {}", parsed_path.display());
+                return Some(parsed_path);
+            }
+        }
+    }
+
+    // if workspace folders weren't set or came up empty, we check the root_uri
+    #[allow(deprecated)]
+    if let Some(root_uri) = &params.root_uri {
+        let Ok(parsed) = PathBuf::from_str(root_uri.path().as_str());
+        if let Ok(parsed_path) = parsed.canonicalize() {
+            info!("Detected project root: {}", parsed_path.display());
+            return Some(parsed_path);
+        }
+    }
+
+    // if both `workspace_folders` and `root_uri` weren't set or came up empty, we check the root_path
+    #[allow(deprecated)]
+    if let Some(root_path) = &params.root_path {
+        let Ok(parsed) = PathBuf::from_str(root_path.as_str());
+        if let Ok(parsed_path) = parsed.canonicalize() {
+            return Some(parsed_path);
+        }
+    }
+
+    error!("Failed to detect project root");
+    None
+}
 
 /// Entry point of the lsp server. Connects to the client and enters the main loop
 ///
@@ -22,64 +75,30 @@ pub fn main() -> Result<()> {
     info!("Starting test-server");
     let (connection, _io_threads) = Connection::stdio();
 
-    // Setup capabilities
-    let definition_provider = Some(OneOf::Left(true));
-    let diagnostic_provider = Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
-        identifier: Some("test_server".to_string()),
-        inter_file_dependencies: true,
-        workspace_diagnostics: true,
-        work_done_progress_options: WorkDoneProgressOptions {
-            work_done_progress: None,
-        },
-    }));
-    // TODO: We'll definitiely need to support different config options here, using
-    // language-specific trigger characters is very common for LSPs. Some initial thoughts:
-    //
-    // Provide a way to provide client capabilities as a parameter to setup a custom
-    // test server for a given test case. We'll write a wrapper that swaps in the capabilties,
-    // compiles the project, and runs the test. This will be very slow, so we should use
-    // it sparingly
-    let completion_provider = Some(CompletionOptions {
-        completion_item: Some(CompletionOptionsCompletionItem {
-            label_details_support: Some(true),
-        }),
-        trigger_characters: None,
-        all_commit_characters: None,
-        ..Default::default()
-    });
-    let document_formatting_provider = Some(OneOf::Left(true));
-    let document_symbol_provider = Some(OneOf::Left(true));
-    let hover_provider = Some(HoverProviderCapability::Simple(true));
-    let references_provider = Some(OneOf::Left(true));
-    let rename_provider = Some(OneOf::Left(true));
-    // TODO: May need to revisit this later to test other sync kinds, i.e. incremental
-    let text_document_sync = Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL));
-
-    let capabilities = ServerCapabilities {
-        completion_provider,
-        definition_provider,
-        diagnostic_provider,
-        document_formatting_provider,
-        document_symbol_provider,
-        hover_provider,
-        references_provider,
-        rename_provider,
-        text_document_sync,
-        ..ServerCapabilities::default()
+    info!("Initializing test-server");
+    let (id, init_params) = connection.initialize_start()?;
+    let init_params: InitializeParams = serde_json::from_value(init_params).unwrap();
+    info!("Client initialization params: {init_params:?}");
+    let Some(root_path) = get_project_root(&init_params) else {
+        return Err(anyhow!("Failed to detect project root"));
     };
-    let server_capabilities = serde_json::to_value(capabilities).unwrap();
-    let initialization_params = connection.initialize(server_capabilities)?;
+    // Invariant: The `src` directory passed to the test server as the root path
+    // should always be contained within an lspresso-shot test case directory
+    let mut capabilities_path = root_path.parent().unwrap().to_path_buf();
+    capabilities_path.push("capabilities.json");
+    let server_capabilities = get_capabilities(&capabilities_path)?;
+    info!("Server capabilities: {server_capabilities:?}");
+    let initialize_data = serde_json::json!({
+        "capabilities": server_capabilities,
+        "serverInfo": {
+            "name": "test-server",
+            "version": "0.1.0",
+        },
+    });
+    connection.initialize_finish(id, initialize_data)?;
+    info!("Initialization complete");
 
-    // TODO: We can get the project's root directory here. If we need to communciate
-    // something to the server outside of the request, we can drop in some config file
-    // to read. Maybe we can even hardcode a path for our own internal tests. A test case
-    // could serialize the `ServerCapabilities` struct,  the server then uses those
-    // capabilities, and we can avoid a rebuild!
-
-    let params: InitializeParams = serde_json::from_value(initialization_params).unwrap();
-    info!("Client initialization params: {:?}", params);
-
-    main_loop(&connection)?;
+    main_loop(&connection, &server_capabilities)?;
 
     // HACK: the `writer` thread of `connection` hangs on joining more often than
     // not. Need to investigate this further, but for now just skipping the join
@@ -90,7 +109,8 @@ pub fn main() -> Result<()> {
     Ok(())
 }
 
-fn main_loop(connection: &Connection) -> Result<()> {
+/// The test server's main loop.
+fn main_loop(connection: &Connection, capabilities: &ServerCapabilities) -> Result<()> {
     info!("Starting main loop...");
     for msg in &connection.receiver {
         match msg {
@@ -99,7 +119,7 @@ fn main_loop(connection: &Connection) -> Result<()> {
                     info!("Recieved shutdown request");
                     return Ok(());
                 }
-                handle_request(req, connection)?;
+                handle_request(req, capabilities, connection)?;
             }
             Message::Notification(notif) => handle_notification(notif, connection)?,
             Message::Response(resp) => error!("Unimplemented response received: {resp:?}"),
