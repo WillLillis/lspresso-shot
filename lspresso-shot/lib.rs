@@ -81,6 +81,9 @@ impl Drop for RunnerGuard<'_> {
     }
 }
 
+// TODO: Consider allowing some "allow empty" flag to be passed in for
+// potentially empty types. If `true`, we don't deserialize if the results file
+// is empty, and instead manually pass in our own handmade empty struct
 fn test_inner<R>(test_case: &TestCase, replacements: Option<&Vec<(&str, String)>>) -> TestResult<R>
 where
     R: serde::de::DeserializeOwned,

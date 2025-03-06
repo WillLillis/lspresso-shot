@@ -40,7 +40,7 @@ JSON_OPTIONS
             textDocument = vim.lsp.util.make_text_document_params(0),
             options = format_opts
         }, 1000)
-        if formatting_result and #formatting_result >= 1 and formatting_result[1].result and #formatting_result[1].result >= 1 then
+        if formatting_result and #formatting_result >= 1 and formatting_result[1].result then
             local results_file = io.open('RESULTS_FILE', 'w')
             if not results_file then
                 report_error('Could not open results file') ---@diagnostic disable-line: undefined-global

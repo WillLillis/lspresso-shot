@@ -20,7 +20,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_references_simple(#[values(1, 2, 3)] response_num: u32) {
+    fn test_server_references_simple(#[values(0, 1, 2, 3)] response_num: u32) {
         let refs = test_server::responses::get_references_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
