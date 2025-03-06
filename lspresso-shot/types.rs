@@ -217,14 +217,26 @@ impl TestCase {
                 self.executable_path.clone(),
             ))?;
         }
-        if self.source_file.path.to_string_lossy().is_empty() {
-            Err(TestSetupError::InvalidFilePath(String::new()))?;
+
+        self.validate_path(&self.source_file.path)?;
+        for TestFile { ref path, .. } in &self.other_files {
+            self.validate_path(path)?;
         }
 
-        for TestFile { ref path, .. } in &self.other_files {
-            if path.to_string_lossy().is_empty() {
-                Err(TestSetupError::InvalidFilePath(String::new()))?;
-            }
+        Ok(())
+    }
+
+    /// Validate the user-provided path a test case file
+    fn validate_path(&self, input_path: &Path) -> Result<(), TestSetupError> {
+        let test_case_root = self.get_source_file_path("")?;
+        let full_path = self.get_source_file_path(input_path)?;
+        if full_path.to_string_lossy().is_empty()
+            || input_path.is_absolute()
+            || !full_path.starts_with(test_case_root)
+        {
+            Err(TestSetupError::InvalidFilePath(
+                input_path.to_string_lossy().to_string(),
+            ))?;
         }
 
         Ok(())
