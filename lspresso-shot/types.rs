@@ -124,7 +124,7 @@ impl TestCase {
             other_files: Vec::new(),
             start_type: ServerStartType::Simple,
             timeout: Duration::from_secs(1),
-            cleanup: true,
+            cleanup: false,
         }
     }
 

@@ -26,7 +26,7 @@ mod test {
     fn test_server_document_symbol_simple(#[values(0, 1, 2, 3)] response_num: u32) {
         let syms = test_server::responses::get_document_symbol_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file).cleanup(false);
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -51,7 +51,6 @@ mod test {
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
-            .cleanup(false)
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_document_symbol(

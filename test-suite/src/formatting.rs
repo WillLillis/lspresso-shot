@@ -23,7 +23,7 @@ mod test {
     fn test_server_formatting_state_simple() {
         let contents = "Some source contents";
         let source_file = TestFile::new(test_server::get_source_path(), contents);
-        let test_case = TestCase::new(get_dummy_server_path(), source_file).cleanup(false);
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -43,7 +43,7 @@ mod test {
     fn test_server_formatting_response_simple(#[values(1, 2, 3)] response_num: u32) {
         let edits = test_server::responses::get_formatting_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_source_path(), "Some source contents");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file).cleanup(false);
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -72,7 +72,6 @@ let foo = 5;
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
-            .cleanup(false)
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_formatting(
@@ -102,7 +101,6 @@ let foo = 5;
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
-            .cleanup(false)
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_formatting(

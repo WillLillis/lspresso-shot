@@ -26,8 +26,7 @@ mod test {
         let resp = test_server::responses::get_definition_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_source_path(), "");
         let definition_test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()))
-            .cleanup(false);
+            .cursor_pos(Some(Position::default()));
         let test_case_root = definition_test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -54,7 +53,6 @@ mod test {
             ))
             .cursor_pos(Some(Position::new(2, 5)))
             .timeout(Duration::from_secs(20))
-            .cleanup(false)
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_definition(
