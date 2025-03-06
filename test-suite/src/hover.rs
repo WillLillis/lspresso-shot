@@ -43,8 +43,7 @@ mod test {
         let resp = test_server::responses::get_hover_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()))
-            .cleanup(false);
+            .cursor_pos(Some(Position::default()));
 
         let test_case_root = test_case
             .get_lspresso_dir()
@@ -70,7 +69,6 @@ mod test {
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
-            .cleanup(false)
             .cursor_pos(Some(Position::new(1, 5)))
             .other_file(cargo_dot_toml());
 

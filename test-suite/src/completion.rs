@@ -40,8 +40,7 @@ mod test {
         let comp_result = CompletionResult::Exact(resp);
         let source_file = TestFile::new(test_server::get_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()))
-            .cleanup(false);
+            .cursor_pos(Some(Position::default()));
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -63,8 +62,7 @@ mod test {
         };
         let source_file = TestFile::new(test_server::get_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()))
-            .cleanup(false);
+            .cursor_pos(Some(Position::default()));
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -177,7 +175,6 @@ println!("format {local_variable} arguments");
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
-            .cleanup(false)
             .cursor_pos(Some(Position::new(1, 9)))
             .other_file(cargo_dot_toml());
 

@@ -39,8 +39,7 @@ mod tests {
         let resp = test_server::responses::get_diagnostics_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()))
-            .cleanup(false);
+            .cursor_pos(Some(Position::default()));
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case root directory");
@@ -62,7 +61,6 @@ mod tests {
         );
         let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
             .timeout(Duration::from_secs(20))
-            .cleanup(false)
             .other_file(cargo_dot_toml());
 
         let mut data_map = Map::new();
@@ -133,7 +131,6 @@ mod tests {
         );
         let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
             .timeout(Duration::from_secs(20))
-            .cleanup(false)
             .other_file(cargo_dot_toml());
 
         let mut data_map = Map::new();

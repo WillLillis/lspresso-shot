@@ -27,8 +27,7 @@ mod test {
         let edits = test_server::responses::get_rename_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::new(0, 0)))
-            .cleanup(false);
+            .cursor_pos(Some(Position::new(0, 0)));
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -54,7 +53,6 @@ mod test {
             ))
             .cursor_pos(Some(Position::new(1, 9)))
             .timeout(Duration::from_secs(20))
-            .cleanup(false)
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_rename(
