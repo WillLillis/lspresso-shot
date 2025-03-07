@@ -2,7 +2,7 @@
 mod test {
     use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
-    use crate::test_helpers::cargo_dot_toml;
+    use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
         lspresso_shot, test_references,
         types::{ServerStartType, TestCase, TestFile},
@@ -19,6 +19,21 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_server_references_simple_empty() {
+        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file)
+            .cursor_pos(Some(Position::default()));
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&references_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_references(test_case, true, None));
+    }
+
     #[rstest]
     fn test_server_references_simple(#[values(0, 1, 2, 3)] response_num: u32) {
         let refs = test_server::responses::get_references_response(response_num).unwrap();
@@ -32,7 +47,7 @@ mod test {
         send_capabiltiies(&references_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_references(test_case, true, &refs,));
+        lspresso_shot!(test_references(test_case, true, Some(&refs)));
     }
 
     #[test]
@@ -55,13 +70,13 @@ mod test {
         lspresso_shot!(test_references(
             reference_test_case,
             true,
-            &vec![Location {
+            Some(&vec![Location {
                 uri: Uri::from_str("src/main.rs").unwrap(),
                 range: Range {
                     start: Position::new(1, 8),
                     end: Position::new(1, 11)
                 },
-            }]
+            }])
         ));
     }
 }

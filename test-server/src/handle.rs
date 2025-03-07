@@ -43,11 +43,12 @@ where
     }
 }
 
-fn send_req_resp<R>(id: RequestId, resp: R, connection: &Connection) -> Result<()>
+fn send_req_resp<R>(id: RequestId, resp: Option<R>, connection: &Connection) -> Result<()>
 where
-    R: serde::ser::Serialize,
+    R: serde::ser::Serialize + std::fmt::Debug,
 {
-    let result = serde_json::to_value(&resp).unwrap();
+    info!("Sending response for request {id}: {resp:#?}");
+    let result = serde_json::to_value(resp).unwrap();
     let result = Response {
         id,
         result: Some(result),
@@ -196,10 +197,7 @@ fn handle_document_symbol(
     };
     let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
-    let Some(resp) = get_document_symbol_response(response_num) else {
-        error!("Invalid response number: {response_num}");
-        return Ok(());
-    };
+    let resp = get_document_symbol_response(response_num);
     send_req_resp(id, resp, connection)
 }
 
@@ -228,10 +226,7 @@ fn handle_completion(
     let response_num = receive_response_num(&root_path)?;
 
     info!("response_num: {response_num}");
-    let Some(resp) = get_completion_response(response_num) else {
-        error!("Invalid response number: {response_num}");
-        return Ok(());
-    };
+    let resp = get_completion_response(response_num);
     send_req_resp(id, resp, connection)
 }
 
@@ -278,10 +273,7 @@ fn handle_hover(
     }
 
     info!("response_num: {response_num}");
-    let Some(resp) = get_hover_response(response_num) else {
-        error!("Invalid response number: {response_num}");
-        return Ok(());
-    };
+    let resp = get_hover_response(response_num);
     send_req_resp(id, resp, connection)?;
 
     if is_progress {
@@ -319,10 +311,7 @@ fn handle_definition(
     };
     let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
-    let Some(resp) = get_definition_response(response_num) else {
-        error!("Invalid response number: {response_num}");
-        return Ok(());
-    };
+    let resp = get_definition_response(response_num);
     send_req_resp(id, resp, connection)
 }
 
@@ -346,10 +335,7 @@ fn handle_rename(id: RequestId, params: &RenameParams, connection: &Connection) 
     };
     let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
-    let Some(resp) = get_rename_response(response_num) else {
-        error!("Invalid response number: {response_num}");
-        return Ok(());
-    };
+    let resp = get_rename_response(response_num);
     send_req_resp(id, resp, connection)
 }
 
@@ -377,20 +363,7 @@ fn handle_formatting(
     let response_num = receive_response_num(&root_path)?;
 
     info!("response_num: {response_num}");
-    let resp = get_formatting_response(response_num).map_or_else(
-        || {
-            // In this case, we wish to test `FormattingResponse::EndState`
-            // Send a  reply with no edits (so the start and end state of
-            // the file matches) to the client so it knows we got the request
-            // and proceeds with the comparison
-            info!("Sending response for `FormattingResponse::EndState`");
-            Vec::new()
-        },
-        |resp| {
-            info!("Sending response for `FormattingResponse::Response`");
-            resp
-        },
-    );
+    let resp = get_formatting_response(response_num);
     send_req_resp(id, resp, connection)
 }
 
@@ -413,10 +386,8 @@ pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
     };
     let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
-    let Some(publish_params) = get_diagnostics_response(response_num, uri) else {
-        error!("Invalid response number: {response_num}");
-        return Ok(());
-    };
+    let publish_params = get_diagnostics_response(response_num, uri);
+    info!("Sending diagnostics: {publish_params:?}");
     let result = serde_json::to_value(&publish_params).unwrap();
 
     let notif = Notification {
@@ -451,9 +422,6 @@ fn handle_references(
     };
     let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
-    let Some(resp) = get_references_response(response_num) else {
-        error!("Invalid response number: {response_num}");
-        return Ok(());
-    };
+    let resp = get_references_response(response_num);
     send_req_resp(id, resp, connection)
 }

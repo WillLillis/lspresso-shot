@@ -18,7 +18,21 @@ local function report_log(msg)
     end
 end
 
--- TODO: Thos could definitely use some unit tests
+--- Creates `empty` in the test case root directory
+---@diagnostic disable-next-line: unused-local, unused-function
+local function mark_empty_file()
+    local empty_file = io.open('EMPTY_PATH', "w")
+    if not empty_file then
+        report_error('Could not open empty file') ---@diagnostic disable-line: undefined-global
+        vim.cmd('qa!')
+    end
+    ---@diagnostic disable: need-check-nil
+    empty_file:write('')
+    empty_file:close()
+    ---@diagnostic enable: need-check-nil
+end
+
+-- TODO: This could definitely use some unit tests
 
 --- Extracts the relative path from a file:// URI
 ---@param uri string

@@ -8,10 +8,9 @@ use std::{
 };
 
 use anstyle::{AnsiColor, Color, Style};
-use lsp_types::DocumentSymbolResponse;
 pub use lsp_types::{
-    CompletionItem, CompletionList, CompletionResponse, Diagnostic, GotoDefinitionResponse, Hover,
-    Location, Position, TextEdit, WorkspaceEdit,
+    CompletionItem, CompletionList, CompletionResponse, Diagnostic, DocumentSymbolResponse,
+    GotoDefinitionResponse, Hover, Location, Position, TextEdit, WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -272,6 +271,21 @@ impl TestCase {
         Ok(lspresso_dir)
     }
 
+    /// Returns the path to the *empty* result file for test `self.test_id`,
+    /// creating parent directories along the way. This file will always be
+    /// empty, but its existance marks an empty result resturned by the server.
+    ///
+    /// `/tmp/lspresso-shot/<test_id>/empty`
+    ///
+    /// # Errors
+    ///
+    /// Returns `std::io::Error` if the the test directory can't be created
+    pub fn get_empty_file_path(&self) -> std::io::Result<PathBuf> {
+        let mut lspresso_dir = self.get_lspresso_dir()?;
+        lspresso_dir.push("empty");
+        Ok(lspresso_dir)
+    }
+
     /// Returns the path to a source file for test `test_id`,
     /// creating parent directories along the way
     ///
@@ -470,12 +484,12 @@ pub enum TestSetupError {
     #[error("Cursor position must be specified for {0} tests")]
     InvalidCursorPosition(TestType),
     #[error("{0}")]
-    IO(String),
+    IO(std::io::Error),
 }
 
 impl From<std::io::Error> for TestSetupError {
     fn from(value: std::io::Error) -> Self {
-        Self::IO(value.to_string())
+        Self::IO(value)
     }
 }
 
@@ -484,6 +498,10 @@ pub type TestResult<T> = Result<T, TestError>;
 // NOTE: Certain variants' inner types are `Box`ed because they are large
 #[derive(Debug, Error)]
 pub enum TestError {
+    #[error("Test {0}: Expected `None`, got:\n{1}")]
+    ExpectedNone(String, String),
+    #[error("Test {0}: Expected valid results, got `None`")]
+    ExpectedSome(String),
     #[error(transparent)]
     CompletionMismatch(#[from] CompletionMismatchError),
     #[error(transparent)]
@@ -507,9 +525,9 @@ pub enum TestError {
     #[error("Test {0}: Neovim Error\n{1}")]
     Neovim(String, String),
     #[error("Test {0}: IO Error\n{1}")]
-    IO(String, String),
+    IO(String, std::io::Error),
     #[error("Test {0}: UTF8 Error\n{1}")]
-    Utf8(String, String),
+    Utf8(String, std::string::FromUtf8Error),
     #[error("Test {0}: Serialization Error\n{1}")]
     Serialization(String, serde_json::Error),
     #[error(transparent)]

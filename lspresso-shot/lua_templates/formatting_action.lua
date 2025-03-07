@@ -33,14 +33,16 @@ JSON_OPTIONS
         ---@diagnostic disable: need-check-nil
         results_file:write('"' .. formatted .. '"')
         results_file:close()
-        vim.cmd('qa!')
         ---@diagnostic enable: need-check-nil
     else
         local formatting_result = vim.lsp.buf_request_sync(0, 'textDocument/formatting', {
             textDocument = vim.lsp.util.make_text_document_params(0),
             options = format_opts
         }, 1000)
-        if formatting_result and #formatting_result >= 1 and formatting_result[1].result then
+        if not formatting_result then
+            ---@diagnostic disable-next-line: undefined-global
+            report_log('No valid formatting result returned: ' .. vim.inspect(formatting_result) .. '\n')
+        elseif formatting_result and #formatting_result >= 1 and formatting_result[1].result then
             local results_file = io.open('RESULTS_FILE', 'w')
             if not results_file then
                 report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
@@ -50,11 +52,11 @@ JSON_OPTIONS
             ---@diagnostic disable: need-check-nil
             results_file:write(vim.json.encode(formatting_result[1].result))
             results_file:close()
-            vim.cmd('qa!')
             ---@diagnostic enable: need-check-nil
         else
             ---@diagnostic disable-next-line: undefined-global
-            report_log('No valid formatting result returned: ' .. vim.inspect(formatting_result) .. '\n')
+            mark_empty_file() ---@diagnostic disable-line: undefined-global
         end
     end
+    vim.cmd('qa!')
 end

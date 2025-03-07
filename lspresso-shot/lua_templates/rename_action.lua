@@ -16,9 +16,12 @@ local function check_progress_result()
         ---@diagnostic enable: undefined-global
     }, 1000)
 
-    -- TODO: This is the logic for parsing a `WorkSpaceEdit` object. We may want
-    -- to pull this into a helper eventually for use with other test types
-    if rename_result and #rename_result >= 1 and rename_result[1].result then
+    if not rename_result then
+        ---@diagnostic disable-next-line: undefined-global
+        report_log('No valid rename result returned: ' .. vim.inspect(rename_result) .. '\n') ---@diagnostic disable-line: undefined-global
+    elseif rename_result and #rename_result >= 1 and rename_result[1].result then
+        -- TODO: This is the logic for parsing a `WorkSpaceEdit` object. We may want
+        -- to pull this into a helper eventually for use with other test types
         local results_file = io.open('RESULTS_FILE', 'w')
         if not results_file then
             ---@diagnostic disable-next-line: undefined-global
@@ -38,7 +41,6 @@ local function check_progress_result()
             ---@diagnostic disable: need-check-nil
             results_file:write(vim.json.encode(rename_result[1].result))
             results_file:close()
-            vim.cmd('qa!')
             ---@diagnostic enable: need-check-nil
         elseif rename_result[1].result.changes then
             -- `WorkSpaceEdit.doucument_changes` is `Some`
@@ -59,7 +61,6 @@ local function check_progress_result()
             ---@diagnostic disable: need-check-nil
             results_file:write(vim.json.encode(result))
             results_file:close()
-            vim.cmd('qa!')
             ---@diagnostic enable: need-check-nil
         elseif rename_result[1].result.changeAnnotations then
             -- `WorkSpaceEdit.change_annotations` is `Some`
@@ -76,10 +77,11 @@ local function check_progress_result()
             ---@diagnostic disable: need-check-nil
             results_file:write(vim.json.encode(result))
             results_file:close()
-            vim.cmd('qa!')
             ---@diagnostic enable: need-check-nil
         end
+    else
+        ---@diagnostic disable-next-line: undefined-global
+        mark_empty_file() ---@diagnostic disable-line: undefined-global
     end
-    ---@diagnostic disable-next-line: undefined-global
-    report_log('No valid rename result returned: ' .. vim.inspect(rename_result) .. '\n') ---@diagnostic disable-line: undefined-global
+    vim.cmd('qa!')
 end
