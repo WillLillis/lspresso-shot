@@ -500,8 +500,8 @@ pub enum TestError {
     ReferencesMismatch(#[from] ReferencesMismatchError),
     #[error(transparent)]
     RenameMismatch(#[from] Box<RenameMismatchError>),
-    #[error("No results were written")]
-    NoResults,
+    #[error("Test {0}: No results were written")]
+    NoResults(String),
     #[error(transparent)]
     Setup(#[from] TestSetupError),
     #[error("Test {0}: Neovim Error\n{1}")]

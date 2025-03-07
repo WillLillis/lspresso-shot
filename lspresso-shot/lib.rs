@@ -100,7 +100,7 @@ where
         .get_results_file_path()
         .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
     if !results_file_path.exists() {
-        Err(TestError::NoResults)?;
+        Err(TestError::NoResults(test_case.test_id.clone()))?;
     }
     let raw_results = String::from_utf8(
         fs::read(&results_file_path)
