@@ -317,7 +317,7 @@ pub fn get_definition_response(response_num: u32) -> Option<GotoDefinitionRespon
 pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
     match response_num {
         0 => Some(WorkspaceEdit {
-            changes: None,
+            changes: Some(HashMap::new()),
             document_changes: None,
             change_annotations: None,
         }),
@@ -350,7 +350,12 @@ pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
             }])),
             change_annotations: None,
         }),
-        3 => {
+        3 => Some(WorkspaceEdit {
+            changes: None,
+            document_changes: Some(DocumentChanges::Edits(vec![])),
+            change_annotations: None,
+        }),
+        4 => {
             let mut changes = HashMap::new();
             changes.insert(
                 get_source_path(),
@@ -366,6 +371,11 @@ pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
                 change_annotations: Some(changes),
             })
         }
+        5 => Some(WorkspaceEdit {
+            changes: None,
+            document_changes: None,
+            change_annotations: Some(HashMap::new()),
+        }),
         _ => None,
     }
 }

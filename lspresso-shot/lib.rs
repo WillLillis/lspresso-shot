@@ -107,9 +107,8 @@ where
             .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
     )
     .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e.to_string()))?;
-    let actual: R = serde_json::from_str(&raw_results).map_err(|e| {
-        TestError::Serialization(test_case.test_id.clone(), format!("Results file -- {e}"))
-    })?;
+    let actual: R = serde_json::from_str(&raw_results)
+        .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e))?;
 
     test_case.do_cleanup();
 
@@ -447,10 +446,36 @@ pub fn test_rename(
         Err(TestSetupError::InvalidCursorPosition(TestType::Rename))?;
     }
     test_case.test_type = Some(TestType::Rename);
-    let actual: WorkspaceEdit = test_inner(
+    let actual = match test_inner::<WorkspaceEdit>(
         &test_case,
         Some(&vec![("NEW_NAME", format!("newName = '{new_name}'"))]),
-    )?;
+    ) {
+        Ok(edits) => edits,
+        Err(TestError::Serialization(test_id, e)) => {
+            // HACK: Comparing against the stringified error is rather hacky,
+            // but the error object's `code` field isn't accessible. In this case,
+            // we return the expected object
+            let e_str = e.to_string();
+            if e_str.eq("invalid type: sequence, expected a map at line 1 column 11") {
+                // NOTE: The JSON is as follows: `{"changes":[]}`
+                WorkspaceEdit {
+                    changes: Some(HashMap::new()),
+                    document_changes: None,
+                    change_annotations: None,
+                }
+            } else if e_str.eq("invalid type: sequence, expected a map at line 1 column 21") {
+                // NOTE: The JSON is as follows: `{"changeAnnotations":[]}`
+                WorkspaceEdit {
+                    changes: None,
+                    document_changes: None,
+                    change_annotations: Some(HashMap::new()),
+                }
+            } else {
+                Err(TestError::Serialization(test_id, e))?
+            }
+        }
+        Err(e) => Err(e)?,
+    };
 
     if *expected != actual {
         Err(Box::new(RenameMismatchError {
