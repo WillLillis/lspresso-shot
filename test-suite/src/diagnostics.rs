@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use std::{str::FromStr as _, time::Duration};
+    use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
     use crate::test_helpers::cargo_dot_toml;
     use lspresso_shot::{
         lspresso_shot, test_diagnostics,
-        types::{TestCase, TestFile},
+        types::{ServerStartType, TestCase, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
@@ -34,7 +34,7 @@ mod tests {
     }
 
     #[rstest]
-    fn test_server_diagnostics(#[values(1, 2)] response_num: u32) {
+    fn test_server_diagnostics(#[values(0, 1, 2)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_source_path()).unwrap();
         let resp = test_server::responses::get_diagnostics_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_source_path(), "");
@@ -50,7 +50,6 @@ mod tests {
         lspresso_shot!(test_diagnostics(test_case, &resp.diagnostics));
     }
 
-    // NOTE:: Specifying the start type is ignored for diagnostics tests
     #[test]
     fn rust_analyzer_multi_diagnostics() {
         let source_file = TestFile::new(
@@ -60,6 +59,10 @@ mod tests {
 }",
         );
         let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                NonZeroU32::new(2).unwrap(),
+                String::new(),
+            ))
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
 
@@ -130,6 +133,10 @@ mod tests {
 }"#,
         );
         let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                NonZeroU32::new(2).unwrap(),
+                String::new(),
+            ))
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
 

@@ -230,7 +230,12 @@ pub fn test_definition(
 // since diagnostics are requested via a `textDocument/publishDiagnostics` notification instead
 // of a request. The `vim.lsp.buf_notify` method only returns a boolean to indicate success,
 // so we can't access the actual data.
-/// Tests the server's response to a 'textDocument/publishDiagnostics' request
+/// Tests the server's response to a 'textDocument/publishDiagnostics' request.
+///
+/// Specifying a `ServerStartType::Progress` for a diagnostics test is overloaded to
+/// determine which `DiagnosticChanged` autocmd to use. This can be useful if your
+/// server sends multiple `textDocument/publishDiagnostics` notifications before
+/// fully analyzing a source file.
 ///
 /// # Errors
 ///
