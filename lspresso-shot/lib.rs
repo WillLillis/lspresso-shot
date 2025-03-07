@@ -215,6 +215,19 @@ pub fn test_definition(
     test_case.test_type = Some(TestType::Definition);
     let actual: GotoDefinitionResponse = test_inner(&test_case, None)?;
 
+    // HACK: Since the `GotoDefinitionResponse` is untagged, there's no way to differentiate
+    // between the `Array` and `Link` if we get an empty vector in response. Just
+    // treat this as a special case and say it's ok.
+    match (expected, &actual) {
+        (GotoDefinitionResponse::Array(array_items), GotoDefinitionResponse::Link(link_items))
+        | (GotoDefinitionResponse::Link(link_items), GotoDefinitionResponse::Array(array_items)) => {
+            if array_items.is_empty() && link_items.is_empty() {
+                return Ok(());
+            }
+        }
+        _ => {}
+    }
+
     if *expected != actual {
         Err(Box::new(DefinitionMismatchError {
             test_id: test_case.test_id,

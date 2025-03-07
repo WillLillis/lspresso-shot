@@ -289,17 +289,19 @@ pub fn get_definition_response(response_num: u32) -> Option<GotoDefinitionRespon
         }),
     };
     match response_num {
-        0 => Some(GotoDefinitionResponse::Scalar(location_item)),
+        0 => Some(GotoDefinitionResponse::Array(vec![])),
         1 => Some(GotoDefinitionResponse::Array(vec![location_item])),
         2 => Some(GotoDefinitionResponse::Array(vec![
             location_item.clone(),
             location_item,
         ])),
-        3 => Some(GotoDefinitionResponse::Link(vec![link_item])),
-        4 => Some(GotoDefinitionResponse::Link(vec![
+        3 => Some(GotoDefinitionResponse::Link(vec![])),
+        4 => Some(GotoDefinitionResponse::Link(vec![link_item])),
+        5 => Some(GotoDefinitionResponse::Link(vec![
             link_item.clone(),
             link_item,
         ])),
+        6 => Some(GotoDefinitionResponse::Scalar(location_item)),
         _ => None,
     }
 }
