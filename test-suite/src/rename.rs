@@ -2,7 +2,7 @@
 mod test {
     use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
-    use crate::test_helpers::cargo_dot_toml;
+    use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
         lspresso_shot, test_rename,
         types::{ServerStartType, TestCase, TestFile},
@@ -22,6 +22,21 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_server_rename_simple_empty() {
+        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file)
+            .cursor_pos(Some(Position::new(0, 0)));
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&rename_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_rename(test_case, "", None));
+    }
+
     #[rstest]
     fn test_server_rename_simple(#[values(0, 1, 2, 3, 4, 5)] response_num: u32) {
         let edits = test_server::responses::get_rename_response(response_num).unwrap();
@@ -35,7 +50,7 @@ mod test {
         send_capabiltiies(&rename_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_rename(test_case, "", &edits));
+        lspresso_shot!(test_rename(test_case, "", Some(&edits)));
     }
 
     #[test]
@@ -58,7 +73,7 @@ mod test {
         lspresso_shot!(test_rename(
             rename_test_case,
             "bar",
-            &WorkspaceEdit {
+            Some(&WorkspaceEdit {
                 changes: None,
                 document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {
                     text_document: OptionalVersionedTextDocumentIdentifier {
@@ -74,7 +89,7 @@ mod test {
                     })]
                 }])),
                 change_annotations: None
-            }
+            })
         ));
     }
 }

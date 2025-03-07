@@ -12,7 +12,11 @@ local function check_progress_result()
         textDocument = vim.lsp.util.make_text_document_params(0),
         ---@diagnostic disable-next-line: undefined-global
     }, 1000)
-    if doc_sym_result and #doc_sym_result >= 1 and doc_sym_result[1].result then
+
+    if not doc_sym_result then
+        ---@diagnostic disable-next-line: undefined-global
+        report_log('No valid document symbol result returned: ' .. vim.inspect(doc_sym_result) .. '\n')
+    elseif doc_sym_result and #doc_sym_result >= 1 and doc_sym_result[1].result then
         local results_file = io.open('RESULTS_FILE', 'w')
         if not results_file then
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
@@ -28,10 +32,10 @@ local function check_progress_result()
         ---@diagnostic disable: need-check-nil
         results_file:write(vim.json.encode(doc_sym_result[1].result))
         results_file:close()
-        vim.cmd('qa!')
         ---@diagnostic enable: need-check-nil
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid hover result returned: ' .. vim.inspect(doc_sym_result) .. '\n')
+        mark_empty_file() ---@diagnostic disable-line: undefined-global
     end
+    vim.cmd('qa!')
 end

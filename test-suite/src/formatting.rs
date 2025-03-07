@@ -2,7 +2,7 @@
 mod test {
     use std::{num::NonZeroU32, time::Duration};
 
-    use crate::test_helpers::cargo_dot_toml;
+    use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
         lspresso_shot, test_formatting,
         types::{FormattingResult, ServerStartType, TestCase, TestFile},
@@ -27,16 +27,31 @@ mod test {
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
-        // NOTE: Sending a `response_num` of 0 indicates an empty edit response
-        send_response_num(0, &test_case_root).expect("Failed to send response num");
+        // NOTE: Sending a `None` empty edit response simplifies things here,
+        // since the start and end statesof the source file are the same
+        send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
         send_capabiltiies(&formatting_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_formatting(
             test_case,
             None,
-            &FormattingResult::EndState(contents.to_string())
+            Some(&FormattingResult::EndState(contents.to_string()))
         ));
+    }
+
+    #[test]
+    fn test_server_formatting_response_empty_simple() {
+        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&formatting_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_formatting(test_case, None, None));
     }
 
     #[rstest]
@@ -54,7 +69,7 @@ mod test {
         lspresso_shot!(test_formatting(
             test_case,
             None,
-            &FormattingResult::Response(edits)
+            Some(&FormattingResult::Response(edits))
         ));
     }
 
@@ -77,13 +92,13 @@ let foo = 5;
         lspresso_shot!(test_formatting(
             test_case,
             None,
-            &FormattingResult::EndState(
+            Some(&FormattingResult::EndState(
                 "pub fn main() {
     let foo = 5;
 }
 "
                 .to_string()
-            )
+            ))
         ));
     }
 
@@ -106,7 +121,7 @@ let foo = 5;
         lspresso_shot!(test_formatting(
             test_case,
             None,
-            &FormattingResult::Response(vec![
+            Some(&FormattingResult::Response(vec![
                 TextEdit {
                     new_text: "    ".to_string(),
                     range: Range {
@@ -121,7 +136,7 @@ let foo = 5;
                         end: Position::new(2, 1),
                     }
                 }
-            ]),
+            ])),
         ));
     }
 }

@@ -34,7 +34,7 @@ fn it_does_the_hover_thing() {
 
     lspresso_shot!(test_hover(
         hover_test_case,
-        Hover {
+        Some(&Hover {
             range: Some(Range {
                 start: lsp_types::Position {
                     line: 1,
@@ -49,7 +49,7 @@ fn it_does_the_hover_thing() {
                 kind: lsp_types::MarkupKind::Markdown,
                 value: "Hover window contents here".to_string(),
             })
-        }
+        })
     ));
 }
 ```

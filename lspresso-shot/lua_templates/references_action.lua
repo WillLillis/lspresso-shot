@@ -15,7 +15,10 @@ local function check_progress_result()
         SET_CONTEXT
         ---@diagnostic enable: undefined-global
     }, 1000)
-    if reference_result and #reference_result >= 1 and reference_result[1].result then
+    if not reference_result then
+        ---@diagnostic disable-next-line: undefined-global
+        report_log('No valid reference result returned: ' .. vim.inspect(reference_result) .. '\n') ---@diagnostic disable-line: undefined-global
+    elseif reference_result and #reference_result >= 1 and reference_result[1].result then
         local results_file = io.open('RESULTS_FILE', 'w')
         if not results_file then
             ---@diagnostic disable-next-line: undefined-global
@@ -33,10 +36,10 @@ local function check_progress_result()
         ---@diagnostic disable: need-check-nil
         results_file:write(vim.json.encode(refs))
         results_file:close()
-        vim.cmd('qa!')
         ---@diagnostic enable: need-check-nil
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid reference result returned: ' .. vim.inspect(reference_result) .. '\n') ---@diagnostic disable-line: undefined-global
+        mark_empty_file() ---@diagnostic disable-line: undefined-global
     end
+    vim.cmd('qa!')
 end

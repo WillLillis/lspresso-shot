@@ -13,7 +13,11 @@ local function check_progress_result()
         ---@diagnostic disable-next-line: undefined-global
         SET_CURSOR_POSITION,
     }, 1000)
-    if definition_results and #definition_results > 0 and definition_results[1].result then
+
+    if not definition_results then
+        ---@diagnostic disable-next-line: undefined-global
+        report_log('No valid definition result returned: ' .. vim.inspect(definition_results) .. '\n')
+    elseif definition_results and #definition_results > 0 and definition_results[1].result then
         local results_file = io.open('RESULTS_FILE', "w")
         if not results_file then
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
@@ -49,7 +53,7 @@ local function check_progress_result()
         ---@diagnostic enable: need-check-nil
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid definition result returned: ' .. vim.inspect(definition_results) .. '\n')
+        mark_empty_file() ---@diagnostic disable-line: undefined-global
     end
     vim.cmd('qa!')
 end

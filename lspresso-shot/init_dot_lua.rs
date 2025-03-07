@@ -11,6 +11,7 @@ pub fn get_init_dot_lua(
     let root_path = test_case.get_lspresso_dir()?;
     let error_path = test_case.get_error_file_path()?;
     let log_path = test_case.get_log_file_path()?;
+    let empty_path = test_case.get_empty_file_path()?;
     let source_extension = test_case
         .source_file
         .path
@@ -75,6 +76,7 @@ pub fn get_init_dot_lua(
         .replace("ROOT_PATH", root_path.to_str().unwrap())
         .replace("ERROR_PATH", error_path.to_str().unwrap())
         .replace("LOG_PATH", log_path.to_str().unwrap())
+        .replace("EMPTY_PATH", empty_path.to_str().unwrap())
         .replace("FILE_EXTENSION", source_extension)
         .replace("SET_CURSOR_POSITION", &set_cursor_position)
         .replace(

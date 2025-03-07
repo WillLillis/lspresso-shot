@@ -2,7 +2,7 @@
 mod test {
     use std::{num::NonZeroU32, time::Duration};
 
-    use crate::test_helpers::cargo_dot_toml;
+    use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
         lspresso_shot, test_completion,
         types::{CompletionResult, ServerStartType, TestCase, TestFile},
@@ -34,6 +34,21 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_server_completion_exact_empty_simple() {
+        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file)
+            .cursor_pos(Some(Position::default()));
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&completion_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_completion(test_case, None));
+    }
+
     #[rstest]
     fn test_server_completion_exact_simple(#[values(0, 1, 2, 3, 4, 5)] response_num: u32) {
         let resp = test_server::responses::get_completion_response(response_num).unwrap();
@@ -48,7 +63,7 @@ mod test {
         send_capabiltiies(&completion_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_completion(test_case, &comp_result));
+        lspresso_shot!(test_completion(test_case, Some(&comp_result)));
     }
 
     #[rstest]
@@ -70,7 +85,7 @@ mod test {
         send_capabiltiies(&completion_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_completion(test_case, &comp_result));
+        lspresso_shot!(test_completion(test_case, Some(&comp_result)));
     }
 
     // TODO: The end user experience for debugging completions test with CompletionResult::Contains
@@ -178,6 +193,6 @@ println!("format {local_variable} arguments");
             .cursor_pos(Some(Position::new(1, 9)))
             .other_file(cargo_dot_toml());
 
-        lspresso_shot!(test_completion(test_case, &expected_comps));
+        lspresso_shot!(test_completion(test_case, Some(&expected_comps)));
     }
 }

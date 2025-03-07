@@ -2,7 +2,7 @@
 mod tests {
     use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
-    use crate::test_helpers::cargo_dot_toml;
+    use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
         lspresso_shot, test_diagnostics,
         types::{ServerStartType, TestCase, TestFile},
@@ -33,8 +33,24 @@ mod tests {
         }
     }
 
+    #[ignore = "https://github.com/neovim/neovim/pull/32776"]
+    #[test]
+    fn test_server_diagnostics_simple_empty() {
+        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file)
+            .cursor_pos(Some(Position::default()));
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case root directory");
+        send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&diagnostic_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_diagnostics(test_case, None));
+    }
+
     #[rstest]
-    fn test_server_diagnostics(#[values(0, 1, 2)] response_num: u32) {
+    fn test_server_diagnostics_simple(#[values(0, 1, 2)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_source_path()).unwrap();
         let resp = test_server::responses::get_diagnostics_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_source_path(), "");
@@ -47,7 +63,7 @@ mod tests {
         send_capabiltiies(&diagnostic_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_diagnostics(test_case, &resp.diagnostics));
+        lspresso_shot!(test_diagnostics(test_case, Some(&resp.diagnostics)));
     }
 
     #[test]
@@ -84,7 +100,7 @@ mod tests {
         };
         lspresso_shot!(test_diagnostics(
             diagnostic_test_case,
-            &vec![
+            Some(&vec![
                 Diagnostic {
                     range,
                     severity: Some(DiagnosticSeverity::WARNING),
@@ -119,11 +135,10 @@ mod tests {
                     tags: None,
                     data: None,
                 }
-            ],
+            ]),
         ));
     }
 
-    // NOTE:: Specifying the start type is ignored for diagnostics tests
     #[test]
     fn rust_analyzer_diagnostics() {
         let source_file = TestFile::new(
@@ -147,7 +162,7 @@ mod tests {
         );
         lspresso_shot!(test_diagnostics(
             diagnostic_test_case,
-            &vec![Diagnostic {
+            Some(&vec![Diagnostic {
                 range: Range {
                     start: Position {
                         line: 1,
@@ -169,7 +184,7 @@ mod tests {
                 related_information: None,
                 tags: None,
                 data: Some(serde_json::Value::Object(data_map)),
-            }],
+            }]),
         ));
     }
 }

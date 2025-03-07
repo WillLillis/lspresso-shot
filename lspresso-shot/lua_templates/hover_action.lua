@@ -13,7 +13,11 @@ local function check_progress_result()
         ---@diagnostic disable-next-line: undefined-global
         SET_CURSOR_POSITION,
     }, 1000)
-    if hover_result and #hover_result >= 1 and hover_result[1].result and hover_result[1].result.range then
+
+    if not hover_result then
+        ---@diagnostic disable-next-line: undefined-global
+        report_log('No valid hover result returned: ' .. vim.inspect(hover_result) .. '\n')
+    elseif hover_result and #hover_result >= 1 and hover_result[1].result and hover_result[1].result.range then
         local results_file = io.open('RESULTS_FILE', 'w')
         if not results_file then
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
@@ -42,10 +46,10 @@ local function check_progress_result()
         ---@diagnostic disable: need-check-nil
         results_file:write(vim.json.encode(cleaned))
         results_file:close()
-        vim.cmd('qa!')
         ---@diagnostic enable: need-check-nil
     else
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid hover result returned: ' .. vim.inspect(hover_result) .. '\n')
+        mark_empty_file() ---@diagnostic disable-line: undefined-global
     end
+    vim.cmd('qa!')
 end

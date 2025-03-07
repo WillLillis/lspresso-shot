@@ -2,7 +2,7 @@
 mod test {
     use std::{num::NonZeroU32, time::Duration};
 
-    use crate::test_helpers::cargo_dot_toml;
+    use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
         lspresso_shot, test_document_symbol,
         types::{ServerStartType, TestCase, TestFile},
@@ -22,6 +22,20 @@ mod test {
         }
     }
 
+    #[test]
+    fn test_server_document_symbol_simple_empty() {
+        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&document_symbol_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_document_symbol(test_case, None));
+    }
+
     #[rstest]
     fn test_server_document_symbol_simple(#[values(0, 1, 2, 3)] response_num: u32) {
         let syms = test_server::responses::get_document_symbol_response(response_num).unwrap();
@@ -34,7 +48,7 @@ mod test {
         send_capabiltiies(&document_symbol_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_document_symbol(test_case, &syms,));
+        lspresso_shot!(test_document_symbol(test_case, Some(&syms)));
     }
 
     #[test]
@@ -56,7 +70,7 @@ mod test {
         lspresso_shot!(test_document_symbol(
             doc_sym_test_case,
             #[allow(deprecated)]
-            &DocumentSymbolResponse::Nested(vec![DocumentSymbol {
+            Some(&DocumentSymbolResponse::Nested(vec![DocumentSymbol {
                 name: "main".to_string(),
                 detail: Some("fn()".to_string()),
                 kind: SymbolKind::FUNCTION,
@@ -86,7 +100,7 @@ mod test {
                     },
                     children: None,
                 }]),
-            }]),
+            }])),
         ));
     }
 }
