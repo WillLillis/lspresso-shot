@@ -13,8 +13,7 @@ local function check_progress_result()
         ---@diagnostic disable-next-line: undefined-global
         SET_CURSOR_POSITION,
     }, 1000)
-    if definition_results and #definition_results > 0 and definition_results[1].result
-        and (#definition_results[1].result > 0 or definition_results[1].result.uri) then
+    if definition_results and #definition_results > 0 and definition_results[1].result then
         local results_file = io.open('RESULTS_FILE', "w")
         if not results_file then
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
