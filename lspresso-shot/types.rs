@@ -511,7 +511,7 @@ pub enum TestError {
     #[error("Test {0}: UTF8 Error\n{1}")]
     Utf8(String, String),
     #[error("Test {0}: Serialization Error\n{1}")]
-    Serialization(String, String),
+    Serialization(String, serde_json::Error),
     #[error(transparent)]
     TimeoutExceeded(TimeoutError),
 }
