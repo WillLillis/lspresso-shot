@@ -106,22 +106,27 @@ pub fn get_completion_response(response_num: u32) -> Option<CompletionResponse> 
     match response_num {
         0 => Some(CompletionResponse::List(CompletionList {
             is_incomplete: true,
-            items: vec![item1],
+            items: vec![],
         })),
         1 => Some(CompletionResponse::List(CompletionList {
             is_incomplete: true,
-            items: vec![item1, item2],
+            items: vec![item1],
         })),
         2 => Some(CompletionResponse::List(CompletionList {
-            is_incomplete: false,
-            items: vec![item1],
+            is_incomplete: true,
+            items: vec![item1, item2],
         })),
         3 => Some(CompletionResponse::List(CompletionList {
             is_incomplete: false,
+            items: vec![item1],
+        })),
+        4 => Some(CompletionResponse::List(CompletionList {
+            is_incomplete: false,
             items: vec![item1, item2],
         })),
-        4 => Some(CompletionResponse::Array(vec![item1])),
-        5 => Some(CompletionResponse::Array(vec![item1, item2])),
+        5 => Some(CompletionResponse::Array(vec![])),
+        6 => Some(CompletionResponse::Array(vec![item1])),
+        7 => Some(CompletionResponse::Array(vec![item1, item2])),
         _ => None,
     }
 }

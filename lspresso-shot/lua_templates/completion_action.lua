@@ -13,8 +13,7 @@ local function check_progress_result()
         ---@diagnostic disable-next-line: undefined-global
         SET_CURSOR_POSITION,
     }, 1000)
-    if completion_result and #completion_result >= 1 and completion_result[1].result
-        and (completion_result[1].result.items or #completion_result[1].result >= 1) then
+    if completion_result and #completion_result >= 1 and completion_result[1].result then
         local results_file = io.open('RESULTS_FILE', "w")
         if not results_file then
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
