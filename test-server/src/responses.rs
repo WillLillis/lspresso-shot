@@ -188,17 +188,24 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
         //     }),
         // }),
         4 => Some(Hover {
+            contents: HoverContents::Array(vec![]),
+            range: Some(Range {
+                start: Position::new(17, 18),
+                end: Position::new(19, 20),
+            }),
+        }),
+        5 => Some(Hover {
             contents: HoverContents::Array(vec![
                 MarkedString::String("Array Marked String 1\nExtra".to_string()),
                 MarkedString::String("Array Marked String 2\nExtra extra".to_string()),
                 MarkedString::String("Array Marked String 3\nJust kidding".to_string()),
             ]),
             range: Some(Range {
-                start: Position::new(13, 14),
-                end: Position::new(15, 16),
+                start: Position::new(21, 22),
+                end: Position::new(23, 24),
             }),
         }),
-        5 => Some(Hover {
+        6 => Some(Hover {
             contents: HoverContents::Array(vec![
                 MarkedString::LanguageString(LanguageString {
                     language: "dummy-lang".to_string(),
