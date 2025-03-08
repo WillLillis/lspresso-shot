@@ -20,62 +20,16 @@ local function check_progress_result()
         ---@diagnostic disable-next-line: undefined-global
         report_log('No valid rename result returned: ' .. vim.inspect(rename_result) .. '\n') ---@diagnostic disable-line: undefined-global
     elseif rename_result and #rename_result >= 1 and rename_result[1].result then
-        -- TODO: This is the logic for parsing a `WorkSpaceEdit` object. We may want
-        -- to pull this into a helper eventually for use with other test types
         local results_file = io.open('RESULTS_FILE', 'w')
         if not results_file then
             ---@diagnostic disable-next-line: undefined-global
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
             vim.cmd('qa!')
         end
-        if rename_result[1].result.documentChanges then
-            -- `WorkSpaceEdit.changes` is `Some`
-            local doc_changes = rename_result[1].result.documentChanges
-            for i, edit in ipairs(doc_changes) do
-                ---@diagnostic disable-next-line: undefined-global
-                local relative_path = extract_relative_path(edit.textDocument.uri) ---@diagnostic disable-line: undefined-global
-                doc_changes[i].textDocument.uri = relative_path
-            end
-
-            ---@diagnostic disable: need-check-nil
-            results_file:write(vim.json.encode(rename_result[1].result))
-            results_file:close()
-            ---@diagnostic enable: need-check-nil
-        elseif rename_result[1].result.changes then
-            -- `WorkSpaceEdit.doucument_changes` is `Some`
-            local result = rename_result[1].result
-            -- Create a copy of the HashMap table with relative paths as the keys
-            local all_edits = {}
-            for uri, text_edits in pairs(rename_result[1].result.changes) do
-                ---@diagnostic disable-next-line: undefined-global
-                local relative_path = extract_relative_path(uri) ---@diagnostic disable-line: undefined-global
-                local uri_edits = {}
-                for _, text_edit in ipairs(text_edits) do
-                    uri_edits[#uri_edits + 1] = text_edit
-                end
-                all_edits[relative_path] = uri_edits
-            end
-            result.changes = all_edits
-            ---@diagnostic disable: need-check-nil
-            results_file:write(vim.json.encode(result))
-            results_file:close()
-            ---@diagnostic enable: need-check-nil
-        elseif rename_result[1].result.changeAnnotations then
-            -- `WorkSpaceEdit.change_annotations` is `Some`
-            local result = rename_result[1].result
-            -- Create a copy of the HashMap table with relative paths as the keys
-            local all_annotations = {}
-            for uri, annotation in pairs(rename_result[1].result.changeAnnotations) do
-                ---@diagnostic disable-next-line: undefined-global
-                local relative_path = extract_relative_path(uri) ---@diagnostic disable-line: undefined-global
-                all_annotations[relative_path] = annotation
-            end
-            result.changeAnnotations = all_annotations
-            ---@diagnostic disable: need-check-nil
-            results_file:write(vim.json.encode(result, { escape_slash = true }))
-            results_file:close()
-            ---@diagnostic enable: need-check-nil
-        end
+        ---@diagnostic disable: need-check-nil
+        results_file:write(vim.json.encode(rename_result[1].result))
+        results_file:close()
+        ---@diagnostic enable: need-check-nil
     else
         ---@diagnostic disable-next-line: undefined-global
         mark_empty_file() ---@diagnostic disable-line: undefined-global
