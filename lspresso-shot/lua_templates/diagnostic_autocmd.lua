@@ -21,7 +21,6 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
             for _, diagnostic in pairs(diagnostics_result) do
                 report_log('Parsing diagnostic ' .. vim.inspect(diagnostic) .. '\n') ---@diagnostic disable-line: undefined-global
                 local result = diagnostic.user_data.lsp
-                result.message = string.gsub(result.message, "\\\\", "\\") -- HACK: find a better way?
                 if result.relatedInformation then
                     for info_idx, info in pairs(result.relatedInformation) do
                         if info.location.uri then
@@ -37,7 +36,7 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
             end
 
             ---@diagnostic disable: need-check-nil
-            results_file:write(vim.json.encode(diagnostics))
+            results_file:write(vim.json.encode(diagnostics, { escape_slash = true }))
             results_file:close()
             ---@diagnostic enable: need-check-nil
         else

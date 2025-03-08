@@ -23,22 +23,8 @@ local function check_progress_result()
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
             vim.cmd('qa!')
         end
-        local items = nil
-        if completion_result[1].result.items then
-            -- `CompletionResponse::List`
-            items = completion_result[1].result.items
-        else
-            -- `CompletionResponse::Array`
-            items = completion_result[1].result
-        end
-        for _, item in ipairs(items) do
-            if item.documentation and item.documentation.value then
-                item.documentation.value = string.gsub(item.documentation.value, "\\\\", "\\") -- HACK: find a better way?
-            end
-        end
-        -- HACK: Does this ever return more than one??? For now, let's just grab the first
         ---@diagnostic disable: need-check-nil
-        results_file:write(vim.json.encode(completion_result[1].result))
+        results_file:write(vim.json.encode(completion_result[1].result, { escape_slash = true }))
         results_file:close()
         ---@diagnostic enable: need-check-nil
     else

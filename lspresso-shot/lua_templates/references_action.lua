@@ -32,9 +32,8 @@ local function check_progress_result()
             refs[i].uri = relative_path
         end
 
-        --- NOTE: Does this ever return more than one result? Just use the first for now
         ---@diagnostic disable: need-check-nil
-        results_file:write(vim.json.encode(refs))
+        results_file:write(vim.json.encode(refs, { escape_slash = true }))
         results_file:close()
         ---@diagnostic enable: need-check-nil
     else

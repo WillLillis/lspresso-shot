@@ -48,7 +48,7 @@ local function check_progress_result()
         end
 
         ---@diagnostic disable: need-check-nil
-        results_file:write(vim.json.encode(definition_results[1].result))
+        results_file:write(vim.json.encode(definition_results[1].result, { escape_slash = true }))
         results_file:close()
         ---@diagnostic enable: need-check-nil
     else
