@@ -24,29 +24,6 @@ local function check_progress_result()
             vim.cmd('qa!')
         end
 
-        if definition_results[1].result.uri then
-            report_log('Received `GotoDefinitionResponse::Scalar') ---@diagnostic disable-line: undefined-global
-            report_log('Setting `result.uri` field to relative path\n') ---@diagnostic disable-line: undefined-global
-            definition_results[1].result.uri = extract_relative_path(definition_results[1].result.uri) ---@diagnostic disable-line: undefined-global
-        else
-            for _, def in ipairs(definition_results) do
-                if def.result then
-                    for _, res in ipairs(def.result) do
-                        if res.targetUri then
-                            report_log('Received `GotoDefinitionResponse::Link') ---@diagnostic disable-line: undefined-global
-                            report_log('Setting `result.targetUri` field to relative path\n') ---@diagnostic disable-line: undefined-global
-                            res.targetUri = extract_relative_path(res.targetUri) ---@diagnostic disable-line: undefined-global
-                        elseif res.uri then
-                            -- TODO: Needs a test
-                            report_log('Received `GotoDefinitionResponse::Array') ---@diagnostic disable-line: undefined-global
-                            report_log('Setting `result.uri` field to relative path\n') ---@diagnostic disable-line: undefined-global
-                            res.uri = extract_relative_path(res.uri) ---@diagnostic disable-line: undefined-global
-                        end
-                    end
-                end
-            end
-        end
-
         ---@diagnostic disable: need-check-nil
         results_file:write(vim.json.encode(definition_results[1].result, { escape_slash = true }))
         results_file:close()

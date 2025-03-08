@@ -17,22 +17,8 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
             end
 
             local diagnostics = {}
-
             for _, diagnostic in pairs(diagnostics_result) do
-                report_log('Parsing diagnostic ' .. vim.inspect(diagnostic) .. '\n') ---@diagnostic disable-line: undefined-global
-                local result = diagnostic.user_data.lsp
-                if result.relatedInformation then
-                    for info_idx, info in pairs(result.relatedInformation) do
-                        if info.location.uri then
-                            report_log('Setting `location.uri` field to relative path\n') ---@diagnostic disable-line: undefined-global
-                            ---@diagnostic disable: undefined-global
-                            result.relatedInformation[info_idx].location.uri = extract_relative_path(info.location.uri)
-                            ---@diagnostic enable: undefined-global
-                        end
-                    end
-                end
-
-                table.insert(diagnostics, result)
+                table.insert(diagnostics, diagnostic.user_data.lsp)
             end
 
             ---@diagnostic disable: need-check-nil

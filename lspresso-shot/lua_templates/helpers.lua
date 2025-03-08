@@ -31,27 +31,3 @@ local function mark_empty_file()
     empty_file:close()
     ---@diagnostic enable: need-check-nil
 end
-
--- TODO: This could definitely use some unit tests
-
---- Extracts the relative path from a file:// URI
----@param uri string
----@return string
----@diagnostic disable-next-line: unused-local, unused-function
-local function extract_relative_path(uri)
-    local path = nil
-    -- TODO: Check for other URI schemes?
-    if string.sub(uri, 1, 7) == 'file://' then
-        path = vim.uri_to_fname(uri)
-    else
-        path = uri
-    end
-    -- Only strip the start if the server returns an absolute path
-    if string.sub(path, 1, string.len('PARENT_PATH')) == 'PARENT_PATH' then
-        return string.sub(path,
-            string.len('PARENT_PATH') + 1,
-            string.len(path))
-    else
-        return path
-    end
-end

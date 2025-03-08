@@ -22,12 +22,6 @@ local function check_progress_result()
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
             vim.cmd('qa!')
         end
-        for _, sym in ipairs(doc_sym_result[1].result) do
-            if sym.location and sym.location.uri then
-                ---@diagnostic disable-next-line: undefined-global
-                sym.location.uri = extract_relative_path(sym.location.uri)
-            end
-        end
 
         ---@diagnostic disable: need-check-nil
         results_file:write(vim.json.encode(doc_sym_result[1].result, { escape_slash = true }))

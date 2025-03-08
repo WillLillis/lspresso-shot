@@ -25,15 +25,9 @@ local function check_progress_result()
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
             vim.cmd('qa!')
         end
-        local refs = reference_result[1].result
-        for i, ref in ipairs(refs) do
-            ---@diagnostic disable-next-line: undefined-global
-            local relative_path = extract_relative_path(ref.uri) ---@diagnostic disable-line: undefined-global
-            refs[i].uri = relative_path
-        end
 
         ---@diagnostic disable: need-check-nil
-        results_file:write(vim.json.encode(refs, { escape_slash = true }))
+        results_file:write(vim.json.encode(reference_result[1].result, { escape_slash = true }))
         results_file:close()
         ---@diagnostic enable: need-check-nil
     else
