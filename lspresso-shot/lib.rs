@@ -324,7 +324,7 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestResult<()> {
     let _guard = RunnerGuard::new(lock, cvar); // Ensures proper decrement on exit
 
     let start = std::time::Instant::now();
-    let mut child = Command::new("nvim")
+    let mut child = Command::new(&test_case.nvim_path)
         .arg("-u")
         .arg(init_dot_lua_path)
         .arg("--noplugin")
