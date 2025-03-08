@@ -48,9 +48,8 @@ JSON_OPTIONS
                 report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
                 vim.cmd('qa!')
             end
-            --- NOTE: Does this ever return more than one result? Just use the first for now
             ---@diagnostic disable: need-check-nil
-            results_file:write(vim.json.encode(formatting_result[1].result))
+            results_file:write(vim.json.encode(formatting_result[1].result, { escape_slash = true }))
             results_file:close()
             ---@diagnostic enable: need-check-nil
         else

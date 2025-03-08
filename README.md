@@ -59,7 +59,8 @@ That's it!
 ## Dependencies:
 
 Neovim must be available on your `$PATH`. See the project's [documentation][nvim-install-docs]
-for installation instructions. (TODO: Figure out what versions are compatible)
+for installation instructions. Versions at or later than 517ecb85f58ed6ac8b4d5443931612e75e7c7dc2
+are necessary.
 
 ## Examples:
 
