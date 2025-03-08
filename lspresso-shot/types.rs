@@ -84,6 +84,7 @@ impl TestFile {
 /// - `test_type`: internal marker for the test type to be run, *not to be set by
 ///    the user.
 /// - `executable_path`: path to the language server's executable.
+/// - `nvim_path`: path to/command for the Neovim executable. The default is "nvim".
 /// - `source_file`: the source file to be opened by Neovim.
 /// - `cursor_pos`: the position of the cursor within `source_contents` when the
 ///    lsp request being tested is executed.
@@ -97,6 +98,7 @@ pub struct TestCase {
     pub test_id: String,
     pub test_type: Option<TestType>,
     pub executable_path: PathBuf,
+    pub nvim_path: PathBuf,
     pub source_file: TestFile,
     pub cursor_pos: Option<Position>,
     pub other_files: Vec<TestFile>,
@@ -113,11 +115,16 @@ pub struct TestCase {
 // Maybe just add it for files, return Err otherwise
 
 impl TestCase {
+    /// Create a new `TestCase`
     pub fn new<P1: Into<PathBuf>>(executable_path: P1, source_file: TestFile) -> Self {
+        let nvim_path = std::env::var("LSPRESSO_NVIM")
+            .unwrap_or_else(|_| "nvim".into())
+            .into();
         Self {
             test_id: Self::generate_test_id(),
             test_type: None,
             executable_path: executable_path.into(),
+            nvim_path,
             source_file,
             cursor_pos: None,
             other_files: Vec::new(),
@@ -138,6 +145,13 @@ impl TestCase {
     #[must_use]
     pub fn exeutable_path<P: Into<PathBuf>>(mut self, path: P) -> Self {
         self.executable_path = path.into();
+        self
+    }
+
+    /// Change the nvim path used in the test case
+    #[must_use]
+    pub fn nvim_path<P: Into<PathBuf>>(mut self, path: P) -> Self {
+        self.nvim_path = path.into();
         self
     }
 
@@ -208,8 +222,8 @@ impl TestCase {
     /// Returns `TestSetupError` if `nvim` isn't executable, the provided server
     /// isn't executable, or if an invalid test file path is found
     pub fn validate(&self) -> Result<(), TestSetupError> {
-        if !is_executable(&PathBuf::from("nvim")) {
-            Err(TestSetupError::InvalidNeovim)?;
+        if !is_executable(&self.nvim_path) {
+            Err(TestSetupError::InvalidNeovim(self.nvim_path.clone()))?;
         }
         if !is_executable(&self.executable_path) {
             Err(TestSetupError::InvalidServerCommand(
@@ -475,8 +489,8 @@ pub enum TestSetupError {
     MissingFileExtension(String),
     #[error("The server command/path \"{}\" is not executable", ._0.display())]
     InvalidServerCommand(PathBuf),
-    #[error("The command \"nvim\" is not executable")]
-    InvalidNeovim,
+    #[error("The neovim command \"{}\" is not executable", ._0.display())]
+    InvalidNeovim(PathBuf),
     #[error("The extension of source file \"{0}\" is invalid")]
     InvalidFileExtension(String),
     #[error("Source file path \"{0}\" is invalid")]
