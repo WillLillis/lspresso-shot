@@ -329,19 +329,19 @@ pub fn test_definition(
 /// server sends multiple `textDocument/publishDiagnostics` notifications before
 /// fully analyzing a source file.
 ///
+/// An `Option` is not used for `expected` because the LSP spec does not allow for
+/// nil parameters in the `textDocument/publishDiagnostics` notification.
+///
 /// # Errors
 ///
 /// Returns `TestError` if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
-pub fn test_diagnostics(
-    mut test_case: TestCase,
-    expected: Option<&Vec<Diagnostic>>,
-) -> TestResult<()> {
+pub fn test_diagnostics(mut test_case: TestCase, expected: &Vec<Diagnostic>) -> TestResult<()> {
     test_case.test_type = Some(TestType::Diagnostic);
     collect_results(
         &test_case,
         None,
-        expected,
+        Some(expected),
         |expected: &Vec<Diagnostic>, actual: &Vec<Diagnostic>| {
             if expected != actual {
                 Err(DiagnosticMismatchError {

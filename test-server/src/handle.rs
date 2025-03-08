@@ -386,7 +386,10 @@ pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
     };
     let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
-    let publish_params = get_diagnostics_response(response_num, uri);
+    let Some(publish_params) = get_diagnostics_response(response_num, uri) else {
+        error!("Invalid response number: {response_num}");
+        return Ok(());
+    };
     info!("Sending diagnostics: {publish_params:?}");
     let result = serde_json::to_value(&publish_params).unwrap();
 
