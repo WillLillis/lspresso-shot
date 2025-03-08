@@ -81,10 +81,10 @@ files
 - [ ] Clean up Lua logic (I'm unfamiliar with the neovim API)
     - Add Lua unit tests? (Do we roll our own/ is there an easy framework?)
 - [x] Add CI and whatnot (Improvements to current lua workflow?)
-- [ ] Rework treatement of "empty" results. This should allow for test cases in
+- [x] Rework treatement of "empty" results. This should allow for test cases in
 which *no* results are expected to be returned. After this refactor, both the rust-analyzer
 and dummy test cases should be augmented to match.
-- [ ] For organizational purposes, we may want a separate test file for each request
+- [x] For organizational purposes, we may want a separate test file for each request
 type. We'll definitely want to add more test coverage for each method. In addition,
 as consumers run into issues, we'll add additional regression tests.
 - [ ] Provide a means to optionally specify the path to nvim. This will be necessary
