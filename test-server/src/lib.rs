@@ -23,7 +23,7 @@ pub fn get_dummy_server_path() -> PathBuf {
 
 /// Returns `main.dummy`
 #[must_use]
-pub fn get_source_path() -> String {
+pub fn get_dummy_source_path() -> String {
     "main.dummy".to_string()
 }
 
@@ -51,9 +51,6 @@ pub fn get_root_test_path(uri: &Uri) -> Option<PathBuf> {
     Some(uri.into())
 }
 
-// NOTE: This (and `send_capabilities`) could also be accomplished by adding the file
-// as an "other file" with path `../<filename>` to the test case, but this seems
-// a bit brittle and much less explicit.
 /// Writes `response_num` to `path/RESPONSE_NUM.txt`
 ///
 /// # Errors

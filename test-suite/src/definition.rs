@@ -23,7 +23,7 @@ mod test {
 
     #[test]
     fn test_server_definition_empty_simple() {
-        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let definition_test_case = TestCase::new(get_dummy_server_path(), source_file)
             .cursor_pos(Some(Position::default()));
         let test_case_root = definition_test_case
@@ -39,7 +39,7 @@ mod test {
     #[rstest]
     fn test_server_definition_simple(#[values(0, 1, 2, 3, 4, 5, 6)] response_num: u32) {
         let resp = test_server::responses::get_definition_response(response_num).unwrap();
-        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let definition_test_case = TestCase::new(get_dummy_server_path(), source_file)
             .cursor_pos(Some(Position::default()));
         let test_case_root = definition_test_case

@@ -68,29 +68,17 @@ are necessary.
 for examples of how to use the library.
 - TODO: Add asm-lsp/other LSPs here once it's being used.
 
-## Checklist/TODOs:
+## TODOs/Ideas:
 
-- [x] Refactor to use the type definitions from the [lsp-types](https://github.com/gluon-lang/lsp-types)
-crate
-- [x] Use neovim's builtin api to serialize lsp responses into JSON rather than
-hand-encoding information to TOML
-- [x] Try to find a better way to determine when a `$/progress`-style server has
-fully started up, rather than the current polling approach
-- [x] Place Lua logic into dedicated files rather than as strings within the Rust
-files
 - [ ] Clean up Lua logic (I'm unfamiliar with the neovim API)
     - Add Lua unit tests? (Do we roll our own/ is there an easy framework?)
 - [x] Add CI and whatnot (Improvements to current lua workflow?)
-- [x] Rework treatement of "empty" results. This should allow for test cases in
-which *no* results are expected to be returned. After this refactor, both the rust-analyzer
-and dummy test cases should be augmented to match.
-- [x] For organizational purposes, we may want a separate test file for each request
-type. We'll definitely want to add more test coverage for each method. In addition,
-as consumers run into issues, we'll add additional regression tests.
-- [x] Provide a means to optionally specify the path to nvim. This will be necessary
-if there is a version mismatch between the user's personal installation and the version
-required by the lib. Also, users may not want to add nvim to their path. Maybe an
-environmental variable could help here?
+- [ ] It may be possible to extend this library's functionality as a CLI tool.
+    - Users could specify test cases through JSON, which we can then deserialize
+    and run the testing logic on as normal. 
+    - This would allow lspresso-shot to be used with non-Rust LSPs, which would be nice.
+    - It probably doesn't make sense to work on this logic until the library internals
+    are more flushed out.
 
 As an eventual end goal, we'd obviously like to provide test coverage for *all* LSP methods.
 To start though, let's focus on the following TODOs:
@@ -125,6 +113,10 @@ after (in case there are multiple). The `String` provides the relevant [progress
 of responses returned by a given language server, primarily removing newlines. Your expected
 response may need to be minimally altered from what you originally expect in order for tests
 to pass.
+
+- **Uri fields**: If a response contains a Uri field with an absolute path, this field
+will be sanitizd to a relative path up to the test case's root directory. Your test case's
+expected results may need to be adjusted to reflect this.
 
 - **Variance in LSP client implementation**: The [LSP Spec][lsp-spec] is somewhat loosely defined,
 leaving plenty of room for client implementations to behave differently from one another. This

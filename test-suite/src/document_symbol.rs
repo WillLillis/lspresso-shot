@@ -24,7 +24,7 @@ mod test {
 
     #[test]
     fn test_server_document_symbol_simple_empty() {
-        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
@@ -39,7 +39,7 @@ mod test {
     #[rstest]
     fn test_server_document_symbol_simple(#[values(0, 1, 2, 3)] response_num: u32) {
         let syms = test_server::responses::get_document_symbol_response(response_num).unwrap();
-        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()

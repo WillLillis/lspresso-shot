@@ -26,9 +26,9 @@ fn get_capabilities(path: &Path) -> Result<ServerCapabilities> {
 // 3. If both workspace folders and root_uri didn't provide a path, check the (deprecated)
 //    root_path field
 fn get_project_root(params: &InitializeParams) -> Option<PathBuf> {
-    // first check workspace folders
+    // First check workspace folders
     if let Some(folders) = &params.workspace_folders {
-        // if there's multiple, just visit in order until we find a valid folder
+        // If there's multiple, just visit in order until we find a valid folder
         for folder in folders {
             let Ok(parsed) = PathBuf::from_str(folder.uri.path().as_str());
             if let Ok(parsed_path) = parsed.canonicalize() {
@@ -38,7 +38,7 @@ fn get_project_root(params: &InitializeParams) -> Option<PathBuf> {
         }
     }
 
-    // if workspace folders weren't set or came up empty, we check the root_uri
+    // If workspace folders weren't set or came up empty, we check the root_uri
     #[allow(deprecated)]
     if let Some(root_uri) = &params.root_uri {
         let Ok(parsed) = PathBuf::from_str(root_uri.path().as_str());
@@ -48,11 +48,12 @@ fn get_project_root(params: &InitializeParams) -> Option<PathBuf> {
         }
     }
 
-    // if both `workspace_folders` and `root_uri` weren't set or came up empty, we check the root_path
+    // If both `workspace_folders` and `root_uri` weren't set or came up empty, we check the root_path
     #[allow(deprecated)]
     if let Some(root_path) = &params.root_path {
         let Ok(parsed) = PathBuf::from_str(root_path.as_str());
         if let Ok(parsed_path) = parsed.canonicalize() {
+            info!("Detected project root: {}", parsed_path.display());
             return Some(parsed_path);
         }
     }
@@ -116,7 +117,6 @@ fn main_loop(connection: &Connection, capabilities: &ServerCapabilities) -> Resu
         match msg {
             Message::Request(req) => {
                 if connection.handle_shutdown(&req)? {
-                    info!("Recieved shutdown request");
                     return Ok(());
                 }
                 handle_request(req, capabilities, connection)?;

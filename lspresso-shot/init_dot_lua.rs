@@ -1,7 +1,7 @@
 use crate::types::{ServerStartType, TestCase, TestSetupError, TestSetupResult, TestType};
 
 /// Construct the contents of an `init.lua` file to test an lsp request corresponding
-/// to `test_type`. `custom_replacements`
+/// to `test_type`.
 pub fn get_init_dot_lua(
     test_case: &TestCase,
     test_type: TestType,
@@ -17,7 +17,7 @@ pub fn get_init_dot_lua(
         .path
         .extension()
         .ok_or_else(|| {
-            // NOTE: use `.unwrap_or("*")` here instead to cover files without extensions?
+            // NOTE: use `.unwrap_or("*")` here somehow instead to cover files without extensions?
             TestSetupError::MissingFileExtension(
                 test_case.source_file.path.to_string_lossy().to_string(),
             )

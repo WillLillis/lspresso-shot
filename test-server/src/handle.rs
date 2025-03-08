@@ -62,12 +62,12 @@ where
 /// # Errors
 ///
 /// Returns errors from any of the handler functions. The majority of error sources
-/// are failures to send a response via `connection`
+/// are failures to send a response via `connection`.
 ///
 /// # Panics
 ///
 /// Panics if JSON encoding of a response fails or if a json request fails to cast
-/// into its equivalent in-memory struct
+/// into its equivalent in-memory struct.
 pub fn handle_notification(notif: Notification, connection: &Connection) -> Result<()> {
     match notif.method.as_str() {
         DidOpenTextDocument::METHOD => {
@@ -83,17 +83,51 @@ pub fn handle_notification(notif: Notification, connection: &Connection) -> Resu
     Ok(())
 }
 
+/// Sends a `textDocument/publishDiagnostic` notification to the client.
+///
+/// # Errors
+///
+/// Returns `Err` if sending the notification fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `PublishDiagnosticsParams` fails.
+pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
+    let Some(root_path) = get_root_test_path(uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
+    let Some(publish_params) = get_diagnostics_response(response_num, uri) else {
+        error!("Invalid response number: {response_num}");
+        return Ok(());
+    };
+    info!("Sending diagnostics: {publish_params:?}");
+    let result = serde_json::to_value(&publish_params).unwrap();
+
+    let notif = Notification {
+        method: PublishDiagnostics::METHOD.to_string(),
+        params: result,
+    };
+
+    Ok(connection.sender.send(Message::Notification(notif))?)
+}
+
 /// Handles `Request`s from the lsp client.
 ///
 /// # Errors
 ///
 /// Returns errors from any of the handler functions. The majority of error sources
-/// are failures to send a response via `connection`
+/// are failures to send a response via `connection`.
 ///
 /// # Panics
 ///
 /// Panics if JSON encoding of a response fails or if a json request fails to cast
-/// into its equivalent in-memory struct
+/// into its equivalent in-memory struct.
 pub fn handle_request(
     req: Request,
     capabilities: &ServerCapabilities,
@@ -174,34 +208,7 @@ pub fn handle_request(
     Ok(())
 }
 
-/// Sends response to a `textDocument/documentSymbol` request
-///
-/// # Errors
-///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
-fn handle_document_symbol(
-    id: RequestId,
-    params: &DocumentSymbolParams,
-    connection: &Connection,
-) -> Result<()> {
-    let Some(root_path) = get_root_test_path(&params.text_document.uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            params.text_document.uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_document_symbol_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `textDocument/completion` request
+/// Sends response to a `textDocument/completion` request.
 ///
 /// # Errors
 ///
@@ -215,11 +222,11 @@ fn handle_completion(
     params: &CompletionParams,
     connection: &Connection,
 ) -> Result<()> {
-    let Some(root_path) = get_root_test_path(&params.text_document_position.text_document.uri)
-    else {
+    let uri = &params.text_document_position.text_document.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
         error!(
             "Failed to retrieve root path from provided uri: {}",
-            params.text_document_position.text_document.uri.as_str()
+            uri.as_str()
         );
         return Ok(());
     };
@@ -230,7 +237,92 @@ fn handle_completion(
     send_req_resp(id, resp, connection)
 }
 
-/// Sends response to a `textDocument/hover` request
+/// Sends response to a `textDocument/definition` request.
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
+fn handle_definition(
+    id: RequestId,
+    params: &GotoDefinitionParams,
+    connection: &Connection,
+) -> Result<()> {
+    let uri = &params.text_document_position_params.text_document.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
+    let resp = get_definition_response(response_num);
+    send_req_resp(id, resp, connection)
+}
+
+/// Sends response to a `textDocument/documentSymbol` request.
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
+fn handle_document_symbol(
+    id: RequestId,
+    params: &DocumentSymbolParams,
+    connection: &Connection,
+) -> Result<()> {
+    let uri = &params.text_document.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
+    let resp = get_document_symbol_response(response_num);
+    send_req_resp(id, resp, connection)
+}
+
+/// Sends response to a `textDocument/formatting` request.
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
+fn handle_formatting(
+    id: RequestId,
+    params: &DocumentFormattingParams,
+    connection: &Connection,
+) -> Result<()> {
+    let uri = &params.text_document.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+
+    info!("response_num: {response_num}");
+    let resp = get_formatting_response(response_num);
+    send_req_resp(id, resp, connection)
+}
+
+/// Sends response to a `textDocument/hover` request.
 ///
 /// # Errors
 ///
@@ -245,16 +337,11 @@ fn handle_hover(
     capabilities: &ServerCapabilities,
     connection: &Connection,
 ) -> Result<()> {
-    let Some(root_path) =
-        get_root_test_path(&params.text_document_position_params.text_document.uri)
-    else {
+    let uri = &params.text_document_position_params.text_document.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
         error!(
             "Failed to retrieve root path from provided uri: {}",
-            params
-                .text_document_position_params
-                .text_document
-                .uri
-                .as_str()
+            uri.as_str()
         );
         return Ok(());
     };
@@ -282,125 +369,6 @@ fn handle_hover(
     Ok(())
 }
 
-/// Sends response to a `textDocument/definition` request
-///
-/// # Errors
-///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
-fn handle_definition(
-    id: RequestId,
-    params: &GotoDefinitionParams,
-    connection: &Connection,
-) -> Result<()> {
-    let Some(root_path) =
-        get_root_test_path(&params.text_document_position_params.text_document.uri)
-    else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            params
-                .text_document_position_params
-                .text_document
-                .uri
-                .as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_definition_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `textDocument/rename` request
-///
-/// # Errors
-///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
-fn handle_rename(id: RequestId, params: &RenameParams, connection: &Connection) -> Result<()> {
-    let Some(root_path) = get_root_test_path(&params.text_document_position.text_document.uri)
-    else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            params.text_document_position.text_document.uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_rename_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `textDocument/formatting` request
-///
-/// # Errors
-///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
-fn handle_formatting(
-    id: RequestId,
-    params: &DocumentFormattingParams,
-    connection: &Connection,
-) -> Result<()> {
-    let Some(root_path) = get_root_test_path(&params.text_document.uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            params.text_document.uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-
-    info!("response_num: {response_num}");
-    let resp = get_formatting_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends a `textDocument/publishDiagnostic` notification to the client.
-///
-/// # Errors
-///
-/// Returns `Err` if sending the notification fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `PublishDiagnosticsParams` fails.
-pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let Some(publish_params) = get_diagnostics_response(response_num, uri) else {
-        error!("Invalid response number: {response_num}");
-        return Ok(());
-    };
-    info!("Sending diagnostics: {publish_params:?}");
-    let result = serde_json::to_value(&publish_params).unwrap();
-
-    let notif = Notification {
-        method: PublishDiagnostics::METHOD.to_string(),
-        params: result,
-    };
-
-    Ok(connection.sender.send(Message::Notification(notif))?)
-}
-
 /// Sends a `textDocument/references` response to the client.
 ///
 /// # Errors
@@ -415,16 +383,40 @@ fn handle_references(
     params: &ReferenceParams,
     connection: &Connection,
 ) -> Result<()> {
-    let Some(root_path) = get_root_test_path(&params.text_document_position.text_document.uri)
-    else {
+    let uri = &params.text_document_position.text_document.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
         error!(
             "Failed to retrieve root path from provided uri: {}",
-            params.text_document_position.text_document.uri.as_str()
+            uri.as_str()
         );
         return Ok(());
     };
     let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
     let resp = get_references_response(response_num);
+    send_req_resp(id, resp, connection)
+}
+
+/// Sends response to a `textDocument/rename` request.
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
+fn handle_rename(id: RequestId, params: &RenameParams, connection: &Connection) -> Result<()> {
+    let uri = &params.text_document_position.text_document.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
+    let resp = get_rename_response(response_num);
     send_req_resp(id, resp, connection)
 }

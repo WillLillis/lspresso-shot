@@ -22,7 +22,7 @@ mod test {
     #[test]
     fn test_server_formatting_state_simple() {
         let contents = "Some source contents";
-        let source_file = TestFile::new(test_server::get_source_path(), contents);
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), contents);
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
@@ -42,7 +42,7 @@ mod test {
 
     #[test]
     fn test_server_formatting_response_empty_simple() {
-        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
@@ -57,7 +57,8 @@ mod test {
     #[rstest]
     fn test_server_formatting_response_simple(#[values(0, 1, 2, 3)] response_num: u32) {
         let edits = test_server::responses::get_formatting_response(response_num).unwrap();
-        let source_file = TestFile::new(test_server::get_source_path(), "Some source contents");
+        let source_file =
+            TestFile::new(test_server::get_dummy_source_path(), "Some source contents");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()

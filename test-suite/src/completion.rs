@@ -36,7 +36,7 @@ mod test {
 
     #[test]
     fn test_server_completion_exact_empty_simple() {
-        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
             .cursor_pos(Some(Position::default()));
         let test_case_root = test_case
@@ -53,7 +53,7 @@ mod test {
     fn test_server_completion_exact_simple(#[values(0, 1, 2, 3, 4, 5)] response_num: u32) {
         let resp = test_server::responses::get_completion_response(response_num).unwrap();
         let comp_result = CompletionResult::Exact(resp);
-        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
             .cursor_pos(Some(Position::default()));
         let test_case_root = test_case
@@ -75,7 +75,7 @@ mod test {
                 CompletionResult::Contains(items)
             }
         };
-        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
             .cursor_pos(Some(Position::default()));
         let test_case_root = test_case

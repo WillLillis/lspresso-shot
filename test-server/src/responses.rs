@@ -10,9 +10,9 @@ use lsp_types::{
     WorkspaceEdit,
 };
 
-use crate::get_source_path;
+use crate::get_dummy_source_path;
 
-/// For use with `test_doucment_symbol`.
+/// For use with `test_document_symbol`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_document_symbol_response(response_num: u32) -> Option<DocumentSymbolResponse> {
@@ -26,7 +26,7 @@ pub fn get_document_symbol_response(response_num: u32) -> Option<DocumentSymbolR
             tags: None,
             deprecated: None,
             location: Location {
-                uri: Uri::from_str(&get_source_path()).unwrap(),
+                uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
                 range: Range {
                     start: Position::new(0, 1),
                     end: Position::new(2, 3),
@@ -175,8 +175,7 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
                 end: Position::new(15, 16),
             }),
         }),
-        // NOTE: There's some serialization issue going on here,
-        // see https://github.com/serde-rs/json/issues/1244
+        // BUG: https://github.com/serde-rs/json/issues/1244
         // 4 => Some(Hover {
         //     contents: HoverContents::Array(vec![
         //         MarkedString::String("Array Marked String 1".to_string()),
@@ -237,7 +236,7 @@ pub fn get_diagnostics_response(response_num: u32, uri: &Uri) -> Option<PublishD
         severity: Some(lsp_types::DiagnosticSeverity::ERROR),
         code: None,
         code_description: Some(CodeDescription {
-            href: Uri::from_str(&get_source_path()).unwrap(),
+            href: Uri::from_str(&get_dummy_source_path()).unwrap(),
         }),
         source: None,
         message: "message".to_string(),
@@ -279,14 +278,14 @@ pub fn get_diagnostics_response(response_num: u32, uri: &Uri) -> Option<PublishD
 #[allow(clippy::missing_panics_doc)]
 pub fn get_definition_response(response_num: u32) -> Option<GotoDefinitionResponse> {
     let location_item = Location {
-        uri: Uri::from_str(&get_source_path()).unwrap(),
+        uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
         range: Range {
             start: Position::new(1, 2),
             end: Position::new(3, 4),
         },
     };
     let link_item = LocationLink {
-        target_uri: Uri::from_str(&get_source_path()).unwrap(),
+        target_uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
         target_range: Range {
             start: Position::new(1, 2),
             end: Position::new(3, 4),
@@ -331,7 +330,7 @@ pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
         1 => {
             let mut changes = HashMap::new();
             changes.insert(
-                Uri::from_str(&get_source_path()).unwrap(),
+                Uri::from_str(&get_dummy_source_path()).unwrap(),
                 vec![TextEdit {
                     range: Range {
                         start: Position::new(1, 2),
@@ -350,7 +349,7 @@ pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
             changes: None,
             document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {
                 text_document: lsp_types::OptionalVersionedTextDocumentIdentifier {
-                    uri: Uri::from_str(&get_source_path()).unwrap(),
+                    uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
                     version: None,
                 },
                 edits: Vec::new(),
@@ -365,7 +364,7 @@ pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
         4 => {
             let mut changes = HashMap::new();
             changes.insert(
-                get_source_path(),
+                get_dummy_source_path(),
                 ChangeAnnotation {
                     label: "label".to_string(),
                     needs_confirmation: None,
@@ -391,7 +390,7 @@ pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_references_response(response_num: u32) -> Option<Vec<Location>> {
-    let uri = Uri::from_str(&get_source_path()).unwrap();
+    let uri = Uri::from_str(&get_dummy_source_path()).unwrap();
     match response_num {
         0 => Some(vec![]),
         1 => Some(vec![Location {

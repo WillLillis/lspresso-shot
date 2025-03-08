@@ -35,9 +35,9 @@ mod tests {
 
     #[rstest]
     fn test_server_diagnostics_simple(#[values(0, 1, 2)] response_num: u32) {
-        let uri = Uri::from_str(&test_server::get_source_path()).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let resp = test_server::responses::get_diagnostics_response(response_num, &uri).unwrap();
-        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
             .cursor_pos(Some(Position::default()));
         let test_case_root = test_case

@@ -107,15 +107,9 @@ pub struct TestCase {
     pub cleanup: bool,
 }
 
-// TODO: Add some sort of `from_path` method for `TestCase`. Allows a user to point
-// to a file or directory and automatically convert it into a `TestCase` instance.
-// We need to be *very* careful in the case of directories, as the size could blow
-// up easily. Might be smart to set some sort of limit on total capacity and return an
-// error if converting a path would exceed it. What should this upper bound be?
-// Maybe just add it for files, return Err otherwise
-
 impl TestCase {
-    /// Create a new `TestCase`
+    /// Create a new `TestCase`. `self.nvim_path` is assigned to the contents of `LSPRESSO_NVIM`
+    /// if it is set, otherwise "nvim".
     pub fn new<P1: Into<PathBuf>>(executable_path: P1, source_file: TestFile) -> Self {
         let nvim_path = std::env::var("LSPRESSO_NVIM")
             .unwrap_or_else(|_| "nvim".into())

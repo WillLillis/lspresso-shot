@@ -37,8 +37,25 @@ mod test {
     }
 
     #[test]
+    fn test_server_hover_simple_empty_no_extension() {
+        // let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file)
+            .cursor_pos(Some(Position::default()));
+
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&hover_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_hover(test_case, None));
+    }
+
+    #[test]
     fn test_server_hover_simple_empty() {
-        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
             .cursor_pos(Some(Position::default()));
 
@@ -55,7 +72,7 @@ mod test {
     #[rstest]
     fn test_server_hover_simple(#[values(0, 1, 2, 3, 4, 5)] response_num: u32) {
         let resp = test_server::responses::get_hover_response(response_num).unwrap();
-        let source_file = TestFile::new(test_server::get_source_path(), "");
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
             .cursor_pos(Some(Position::default()));
 
