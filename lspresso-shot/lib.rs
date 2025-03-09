@@ -2,9 +2,10 @@ mod init_dot_lua;
 pub mod types;
 
 use lsp_types::{
-    request::GotoDeclarationResponse, CompletionResponse, Diagnostic, DocumentChangeOperation,
-    DocumentChanges, DocumentSymbolResponse, FormattingOptions, GotoDefinitionResponse, Hover,
-    Location, ResourceOp, TextEdit, Uri, WorkspaceEdit,
+    request::{GotoDeclarationResponse, GotoTypeDefinitionResponse},
+    CompletionResponse, Diagnostic, DocumentChangeOperation, DocumentChanges,
+    DocumentSymbolResponse, FormattingOptions, GotoDefinitionResponse, Hover, Location, ResourceOp,
+    TextEdit, Uri, WorkspaceEdit,
 };
 
 use std::{
@@ -20,7 +21,7 @@ use types::{
     CompletionMismatchError, CompletionResult, DeclarationMismatchError, DefinitionMismatchError,
     DiagnosticMismatchError, DocumentSymbolMismatchError, FormattingMismatchError,
     FormattingResult, HoverMismatchError, ReferencesMismatchError, RenameMismatchError, TestCase,
-    TestError, TestResult, TestSetupError, TestType, TimeoutError,
+    TestError, TestResult, TestSetupError, TestType, TimeoutError, TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -794,4 +795,50 @@ pub fn test_rename(
         assert!(empty.is_none());
         Ok(())
     }
+}
+
+/// Tests the server's response to a 'textDocument/typeDefinition' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+pub fn test_type_definition(
+    mut test_case: TestCase,
+    expected: Option<&GotoTypeDefinitionResponse>,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(
+            TestType::TypeDefinition,
+        ))?;
+    }
+    test_case.test_type = Some(TestType::TypeDefinition);
+    collect_results(&test_case, None, expected, |expected, actual| {
+        // HACK: Since the `GotoTypeDefinitionResponse` is untagged, there's no way
+        // to differentiate between the `Array` and `Link` if we get an empty vector
+        // in response. Just treat this as a special case and say it's ok.
+        match (expected, actual) {
+            (
+                GotoTypeDefinitionResponse::Array(array_items),
+                GotoTypeDefinitionResponse::Link(link_items),
+            )
+            | (
+                GotoTypeDefinitionResponse::Link(link_items),
+                GotoTypeDefinitionResponse::Array(array_items),
+            ) => {
+                if array_items.is_empty() && link_items.is_empty() {
+                    return Ok(());
+                }
+            }
+            _ => {}
+        }
+
+        if *expected != *actual {
+            Err(Box::new(TypeDefinitionMismatchError {
+                test_id: test_case.test_id.clone(),
+                expected: expected.clone(),
+                actual: actual.clone(),
+            }))?;
+        }
+        Ok(())
+    })
 }

@@ -46,7 +46,8 @@ pub fn get_init_dot_lua(
         | TestType::Formatting
         | TestType::Hover
         | TestType::References
-        | TestType::Rename => {
+        | TestType::Rename
+        | TestType::TypeDefinition => {
             raw_init = raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type));
         }
         TestType::Diagnostic => {
@@ -114,6 +115,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::Hover => include_str!("lua_templates/hover_action.lua"),
         TestType::References => include_str!("lua_templates/references_action.lua"),
         TestType::Rename => include_str!("lua_templates/rename_action.lua"),
+        TestType::TypeDefinition => include_str!("lua_templates/type_definition_action.lua"),
     }
     .to_string()
 }
