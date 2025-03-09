@@ -1,6 +1,7 @@
 pub mod test_helpers;
 
 mod completion;
+mod declaration;
 mod definition;
 mod diagnostics;
 mod document_symbol;

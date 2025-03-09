@@ -83,23 +83,16 @@ for examples of how to use the library.
 As an eventual end goal, we'd obviously like to provide test coverage for *all* LSP methods.
 To start though, let's focus on the following TODOs:
 
-- [x] Create a *very* simple test server so we can ensure coverage of all type variants
-    - The basic thought here is to have the server's response defined so that it can
-      be accessed on the Rust side by both the testing library and test server.
-    - There will be a simple event loop, matching against each covered request type.
-    - For methods with multiple return types (i.e. `textDocument/completion`, we'll
-      have multiple predefined responses for each. The expected response type can be communicated
-      from the test to the test server through one or more of the request params (i.e.
-      line number).
 - [x] Sync up test server test coverage with current rust-analyzer coverage
+- [x] `textDocument/completion`
+- [x] `textDocument/declaration`
+- [x] `textDocument/definition`
+- [x] `textDocument/documentSymbol`
+- [x] `textDocument/formatting`
 - [x] `textDocument/hover`
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`
-- [x] `textDocument/definition`
-- [x] `textDocument/completion`
-- [x] `textDocument/formatting`
 - [x] `textDocument/rename`
-- [x] `textDocument/documentSymbol`
 - [ ] Figure out what methods we want to add next.
 
 ## Gotchas

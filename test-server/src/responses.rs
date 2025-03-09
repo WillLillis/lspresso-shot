@@ -1,8 +1,8 @@
 use std::{collections::HashMap, str::FromStr};
 
 use lsp_types::{
-    ChangeAnnotation, CodeDescription, CompletionItem, CompletionItemKind,
-    CompletionItemLabelDetails, CompletionList, CompletionResponse, Diagnostic,
+    request::GotoDeclarationResponse, ChangeAnnotation, CodeDescription, CompletionItem,
+    CompletionItemKind, CompletionItemLabelDetails, CompletionList, CompletionResponse, Diagnostic,
     DiagnosticRelatedInformation, DocumentChanges, DocumentSymbol, DocumentSymbolResponse,
     Documentation, GotoDefinitionResponse, Hover, HoverContents, LanguageString, Location,
     LocationLink, MarkedString, MarkupContent, MarkupKind, Position, PublishDiagnosticsParams,
@@ -271,6 +271,16 @@ pub fn get_diagnostics_response(response_num: u32, uri: &Uri) -> Option<PublishD
         }),
         _ => None,
     }
+}
+
+/// For use with `test_declaration`.
+///
+/// Since `textDocument/definition` and `textDocument/declaration` have the same response,
+/// this just wraps `get_definition_response`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_declaration_response(response_num: u32) -> Option<GotoDeclarationResponse> {
+    get_definition_response(response_num)
 }
 
 /// For use with `test_definition`.
