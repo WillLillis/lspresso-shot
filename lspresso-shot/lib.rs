@@ -2,9 +2,9 @@ mod init_dot_lua;
 pub mod types;
 
 use lsp_types::{
-    CompletionResponse, Diagnostic, DocumentChangeOperation, DocumentChanges,
-    DocumentSymbolResponse, FormattingOptions, GotoDefinitionResponse, Hover, Location, ResourceOp,
-    TextEdit, Uri, WorkspaceEdit,
+    request::GotoDeclarationResponse, CompletionResponse, Diagnostic, DocumentChangeOperation,
+    DocumentChanges, DocumentSymbolResponse, FormattingOptions, GotoDefinitionResponse, Hover,
+    Location, ResourceOp, TextEdit, Uri, WorkspaceEdit,
 };
 
 use std::{
@@ -17,10 +17,10 @@ use std::{
 };
 
 use types::{
-    CompletionMismatchError, CompletionResult, DefinitionMismatchError, DiagnosticMismatchError,
-    DocumentSymbolMismatchError, FormattingMismatchError, FormattingResult, HoverMismatchError,
-    ReferencesMismatchError, RenameMismatchError, TestCase, TestError, TestResult, TestSetupError,
-    TestType, TimeoutError,
+    CompletionMismatchError, CompletionResult, DeclarationMismatchError, DefinitionMismatchError,
+    DiagnosticMismatchError, DocumentSymbolMismatchError, FormattingMismatchError,
+    FormattingResult, HoverMismatchError, ReferencesMismatchError, RenameMismatchError, TestCase,
+    TestError, TestResult, TestSetupError, TestType, TimeoutError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -404,6 +404,50 @@ pub fn test_completion(
                 expected: (*expected).clone(),
                 actual: actual.clone(),
             })?;
+        }
+        Ok(())
+    })
+}
+
+/// Tests the server's response to a 'textDocument/declaration' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+pub fn test_declaration(
+    mut test_case: TestCase,
+    expected: Option<&GotoDeclarationResponse>,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(TestType::Declaration))?;
+    }
+    test_case.test_type = Some(TestType::Declaration);
+    collect_results(&test_case, None, expected, |expected, actual| {
+        // HACK: Since the `GotoDeclarationResponse` is untagged, there's no way to differentiate
+        // between the `Array` and `Link` if we get an empty vector in response. Just
+        // treat this as a special case and say it's ok.
+        match (expected, actual) {
+            (
+                GotoDeclarationResponse::Array(array_items),
+                GotoDeclarationResponse::Link(link_items),
+            )
+            | (
+                GotoDeclarationResponse::Link(link_items),
+                GotoDeclarationResponse::Array(array_items),
+            ) => {
+                if array_items.is_empty() && link_items.is_empty() {
+                    return Ok(());
+                }
+            }
+            _ => {}
+        }
+
+        if *expected != *actual {
+            Err(Box::new(DeclarationMismatchError {
+                test_id: test_case.test_id.clone(),
+                expected: expected.clone(),
+                actual: actual.clone(),
+            }))?;
         }
         Ok(())
     })

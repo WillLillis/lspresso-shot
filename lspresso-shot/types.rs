@@ -8,9 +8,11 @@ use std::{
 };
 
 use anstyle::{AnsiColor, Color, Style};
+// NOTE: Is re-exporting these types really necessary?
 pub use lsp_types::{
-    CompletionItem, CompletionList, CompletionResponse, Diagnostic, DocumentSymbolResponse,
-    GotoDefinitionResponse, Hover, Location, Position, TextEdit, WorkspaceEdit,
+    request::GotoDeclarationResponse, CompletionItem, CompletionList, CompletionResponse,
+    Diagnostic, DocumentSymbolResponse, GotoDefinitionResponse, Hover, Location, Position,
+    TextEdit, WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -23,6 +25,8 @@ use crate::init_dot_lua::get_init_dot_lua;
 pub enum TestType {
     /// Test `textDocument/completion` requests
     Completion,
+    /// Test `textDocument/declaration` requests
+    Declaration,
     /// Test `textDocument/definition` requests
     Definition,
     /// Test `textDocument/publishDiagnostics` requests
@@ -46,6 +50,7 @@ impl std::fmt::Display for TestType {
             "textDocument/{}",
             match self {
                 Self::Completion => "completion",
+                Self::Declaration => "declaration",
                 Self::Definition => "definition",
                 Self::Diagnostic => "publishDiagnostics",
                 Self::DocumentSymbol => "documentSymbol",
@@ -406,7 +411,6 @@ fn is_executable(server_path: &Path) -> bool {
             #[cfg(unix)]
             {
                 // On Unix, check the `x` bit
-                use std::fs;
                 use std::os::unix::fs::PermissionsExt;
                 let metadata = fs::metadata(path).unwrap();
                 metadata.permissions().mode() & 0o111 != 0
@@ -512,6 +516,8 @@ pub enum TestError {
     ExpectedSome(String),
     #[error(transparent)]
     CompletionMismatch(#[from] CompletionMismatchError),
+    #[error(transparent)]
+    DeclarationMismatch(#[from] Box<DeclarationMismatchError>),
     #[error(transparent)]
     DefinitionMismatch(#[from] Box<DefinitionMismatchError>),
     #[error(transparent)]
@@ -875,6 +881,25 @@ impl std::fmt::Display for CompletionMismatchError {
             },
         };
 
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct DeclarationMismatchError {
+    pub test_id: String,
+    pub expected: GotoDeclarationResponse,
+    pub actual: GotoDeclarationResponse,
+}
+
+impl std::fmt::Display for DeclarationMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect GotoDeclaration response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "GotoDeclaration", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }

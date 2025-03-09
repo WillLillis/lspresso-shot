@@ -4,8 +4,8 @@ use lsp_server::{Connection, Message, Notification, Request, RequestId, Response
 use lsp_types::{
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
-        Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, Formatting, GotoDefinition,
-        HoverRequest, References, Rename, Request as _,
+        Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, Formatting, GotoDeclaration,
+        GotoDeclarationParams, GotoDefinition, HoverRequest, References, Rename, Request as _,
     },
     CompletionParams, DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams,
     HoverOptions, HoverParams, HoverProviderCapability, ReferenceParams, RenameParams,
@@ -15,9 +15,9 @@ use lsp_types::{
 use crate::{
     get_root_test_path, receive_response_num,
     responses::{
-        get_completion_response, get_definition_response, get_diagnostics_response,
-        get_document_symbol_response, get_formatting_response, get_hover_response,
-        get_references_response, get_rename_response,
+        get_completion_response, get_declaration_response, get_definition_response,
+        get_diagnostics_response, get_document_symbol_response, get_formatting_response,
+        get_hover_response, get_references_response, get_rename_response,
     },
 };
 
@@ -134,37 +134,14 @@ pub fn handle_request(
     connection: &Connection,
 ) -> Result<()> {
     match req.method.as_str() {
-        References::METHOD => {
+        Completion::METHOD => {
             let (id, params) =
-                cast_req::<References>(req).expect("Failed to cast References request");
+                cast_req::<Completion>(req).expect("Failed to cast `Completion` request");
             info!(
                 "Received `{}` request ({id}): {params:?}",
-                References::METHOD
+                Completion::METHOD
             );
-            return handle_references(id, &params, connection);
-        }
-        Formatting::METHOD => {
-            let (id, params) =
-                cast_req::<Formatting>(req).expect("Failed to cast Formatting request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                Formatting::METHOD
-            );
-            return handle_formatting(id, &params, connection);
-        }
-        Rename::METHOD => {
-            let (id, params) = cast_req::<Rename>(req).expect("Failed to cast Rename request");
-            info!("Received `{}` request ({id}): {params:?}", Rename::METHOD);
-            return handle_rename(id, &params, connection);
-        }
-        GotoDefinition::METHOD => {
-            let (id, params) =
-                cast_req::<GotoDefinition>(req).expect("Failed to cast GotoDefinition request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                GotoDefinition::METHOD
-            );
-            handle_definition(id, &params, connection)?;
+            handle_completion(id, &params, connection)?;
         }
         DocumentDiagnosticRequest::METHOD => {
             let (id, params) = cast_req::<DocumentDiagnosticRequest>(req)
@@ -175,6 +152,42 @@ pub fn handle_request(
             );
             send_diagnostic_resp(&params.text_document.uri, connection)?;
         }
+        DocumentSymbolRequest::METHOD => {
+            let (id, params) = cast_req::<DocumentSymbolRequest>(req)
+                .expect("Failed to cast `Completion` request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                Completion::METHOD
+            );
+            handle_document_symbol(id, &params, connection)?;
+        }
+        Formatting::METHOD => {
+            let (id, params) =
+                cast_req::<Formatting>(req).expect("Failed to cast Formatting request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                Formatting::METHOD
+            );
+            return handle_formatting(id, &params, connection);
+        }
+        GotoDeclaration::METHOD => {
+            let (id, params) =
+                cast_req::<GotoDeclaration>(req).expect("Failed to cast `GotoDeclaration` request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                GotoDeclaration::METHOD
+            );
+            handle_declaration(id, &params, connection)?;
+        }
+        GotoDefinition::METHOD => {
+            let (id, params) =
+                cast_req::<GotoDefinition>(req).expect("Failed to cast GotoDefinition request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                GotoDefinition::METHOD
+            );
+            handle_definition(id, &params, connection)?;
+        }
         HoverRequest::METHOD => {
             let (id, params) =
                 cast_req::<HoverRequest>(req).expect("Failed to cast `HoverRequest` request");
@@ -184,23 +197,19 @@ pub fn handle_request(
             );
             handle_hover(id, &params, capabilities, connection)?;
         }
-        Completion::METHOD => {
+        References::METHOD => {
             let (id, params) =
-                cast_req::<Completion>(req).expect("Failed to cast `Completion` request");
+                cast_req::<References>(req).expect("Failed to cast References request");
             info!(
                 "Received `{}` request ({id}): {params:?}",
-                Completion::METHOD
+                References::METHOD
             );
-            handle_completion(id, &params, connection)?;
+            return handle_references(id, &params, connection);
         }
-        DocumentSymbolRequest::METHOD => {
-            let (id, params) = cast_req::<DocumentSymbolRequest>(req)
-                .expect("Failed to cast `Completion` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                Completion::METHOD
-            );
-            handle_document_symbol(id, &params, connection)?;
+        Rename::METHOD => {
+            let (id, params) = cast_req::<Rename>(req).expect("Failed to cast Rename request");
+            info!("Received `{}` request ({id}): {params:?}", Rename::METHOD);
+            return handle_rename(id, &params, connection);
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),
     }
@@ -234,6 +243,34 @@ fn handle_completion(
 
     info!("response_num: {response_num}");
     let resp = get_completion_response(response_num);
+    send_req_resp(id, resp, connection)
+}
+
+/// Sends response to a `textDocument/declaration` request.
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
+fn handle_declaration(
+    id: RequestId,
+    params: &GotoDeclarationParams,
+    connection: &Connection,
+) -> Result<()> {
+    let uri = &params.text_document_position_params.text_document.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
+    let resp = get_declaration_response(response_num);
     send_req_resp(id, resp, connection)
 }
 

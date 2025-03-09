@@ -40,6 +40,7 @@ pub fn get_init_dot_lua(
     // This is how we actually invoke the action to be tested
     match test_type {
         TestType::Completion
+        | TestType::Declaration
         | TestType::Definition
         | TestType::DocumentSymbol
         | TestType::Formatting
@@ -105,6 +106,7 @@ fn progress_threshold(start_type: &ServerStartType) -> String {
 fn get_attach_action(test_type: TestType) -> String {
     match test_type {
         TestType::Completion => include_str!("lua_templates/completion_action.lua"),
+        TestType::Declaration => include_str!("lua_templates/declaration_action.lua"),
         TestType::Definition => include_str!("lua_templates/definition_action.lua"),
         TestType::Diagnostic => "\n-- NOTE: No `check_progress_result` function for diagnostics, instead handled by `DiagnosticChanged` autocmd\n",
         TestType::DocumentSymbol => include_str!("lua_templates/document_symbol.lua"),
