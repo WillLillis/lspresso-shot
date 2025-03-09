@@ -45,6 +45,7 @@ pub fn get_init_dot_lua(
         | TestType::DocumentSymbol
         | TestType::Formatting
         | TestType::Hover
+        | TestType::Implementation
         | TestType::References
         | TestType::Rename
         | TestType::TypeDefinition => {
@@ -113,6 +114,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::DocumentSymbol => include_str!("lua_templates/document_symbol.lua"),
         TestType::Formatting => include_str!("lua_templates/formatting_action.lua"),
         TestType::Hover => include_str!("lua_templates/hover_action.lua"),
+        TestType::Implementation => include_str!("lua_templates/implementation_action.lua"),
         TestType::References => include_str!("lua_templates/references_action.lua"),
         TestType::Rename => include_str!("lua_templates/rename_action.lua"),
         TestType::TypeDefinition => include_str!("lua_templates/type_definition_action.lua"),

@@ -5,8 +5,9 @@ use lsp_types::{
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
         Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, Formatting, GotoDeclaration,
-        GotoDeclarationParams, GotoDefinition, GotoTypeDefinition, GotoTypeDefinitionParams,
-        HoverRequest, References, Rename, Request as _,
+        GotoDeclarationParams, GotoDefinition, GotoImplementation, GotoImplementationParams,
+        GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest, References, Rename,
+        Request as _,
     },
     CompletionParams, DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams,
     HoverOptions, HoverParams, HoverProviderCapability, ReferenceParams, RenameParams,
@@ -18,8 +19,8 @@ use crate::{
     responses::{
         get_completion_response, get_declaration_response, get_definition_response,
         get_diagnostics_response, get_document_symbol_response, get_formatting_response,
-        get_hover_response, get_references_response, get_rename_response,
-        get_type_definition_response,
+        get_hover_response, get_implementation_response, get_references_response,
+        get_rename_response, get_type_definition_response,
     },
 };
 
@@ -207,6 +208,15 @@ pub fn handle_request(
                 HoverRequest::METHOD
             );
             handle_hover(id, &params, capabilities, connection)?;
+        }
+        GotoImplementation::METHOD => {
+            let (id, params) =
+                cast_req::<GotoImplementation>(req).expect("Failed to cast `HoverRequest` request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                GotoImplementation::METHOD
+            );
+            handle_implementation(id, &params, connection)?;
         }
         References::METHOD => {
             let (id, params) =
@@ -415,6 +425,34 @@ fn handle_hover(
         // TODO: Send a progress done messages here
     }
     Ok(())
+}
+
+/// Sends response to a `textDocument/implementation` request.
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
+fn handle_implementation(
+    id: RequestId,
+    params: &GotoImplementationParams,
+    connection: &Connection,
+) -> Result<()> {
+    let uri = &params.text_document_position_params.text_document.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
+    let resp = get_implementation_response(response_num);
+    send_req_resp(id, resp, connection)
 }
 
 /// Sends a `textDocument/references` response to the client.

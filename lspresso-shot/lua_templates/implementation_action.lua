@@ -7,24 +7,24 @@ local function check_progress_result()
         report_log(tostring(progress_count) .. ' < ' .. tostring(PROGRESS_THRESHOLD) .. '\n') ---@diagnostic disable-line: undefined-global
         return
     end
-    report_log('Issuing hover request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
-    local hover_result = vim.lsp.buf_request_sync(0, 'textDocument/hover', {
+    report_log('Issuing implementation request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
+    local implementation_result = vim.lsp.buf_request_sync(0, 'textDocument/implementation', {
         textDocument = vim.lsp.util.make_text_document_params(0),
         ---@diagnostic disable-next-line: undefined-global
         SET_CURSOR_POSITION,
     }, 1000)
 
-    if not hover_result then
+    if not implementation_result then
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid hover result returned: ' .. vim.inspect(hover_result) .. '\n')
-    elseif hover_result and #hover_result >= 1 and hover_result[1].result then
+        report_log('No valid hover result returned: ' .. vim.inspect(implementation_result) .. '\n')
+    elseif implementation_result and #implementation_result >= 1 and implementation_result[1].result then
         local results_file = io.open('RESULTS_FILE', 'w')
         if not results_file then
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
             vim.cmd('qa!')
         end
         ---@diagnostic disable: need-check-nil
-        results_file:write(vim.json.encode(hover_result[1].result, { escape_slash = true }))
+        results_file:write(vim.json.encode(implementation_result[1].result, { escape_slash = true }))
         results_file:close()
         ---@diagnostic enable: need-check-nil
     else
