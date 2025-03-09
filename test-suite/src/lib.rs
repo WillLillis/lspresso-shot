@@ -9,3 +9,4 @@ mod formatting;
 mod hover;
 mod references;
 mod rename;
+mod type_definition;

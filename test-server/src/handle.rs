@@ -5,7 +5,8 @@ use lsp_types::{
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
         Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, Formatting, GotoDeclaration,
-        GotoDeclarationParams, GotoDefinition, HoverRequest, References, Rename, Request as _,
+        GotoDeclarationParams, GotoDefinition, GotoTypeDefinition, GotoTypeDefinitionParams,
+        HoverRequest, References, Rename, Request as _,
     },
     CompletionParams, DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams,
     HoverOptions, HoverParams, HoverProviderCapability, ReferenceParams, RenameParams,
@@ -18,6 +19,7 @@ use crate::{
         get_completion_response, get_declaration_response, get_definition_response,
         get_diagnostics_response, get_document_symbol_response, get_formatting_response,
         get_hover_response, get_references_response, get_rename_response,
+        get_type_definition_response,
     },
 };
 
@@ -187,6 +189,15 @@ pub fn handle_request(
                 GotoDefinition::METHOD
             );
             handle_definition(id, &params, connection)?;
+        }
+        GotoTypeDefinition::METHOD => {
+            let (id, params) =
+                cast_req::<GotoTypeDefinition>(req).expect("Failed to cast GotoDefinition request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                GotoTypeDefinition::METHOD
+            );
+            handle_type_definition(id, &params, connection)?;
         }
         HoverRequest::METHOD => {
             let (id, params) =
@@ -455,5 +466,33 @@ fn handle_rename(id: RequestId, params: &RenameParams, connection: &Connection) 
     let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
     let resp = get_rename_response(response_num);
+    send_req_resp(id, resp, connection)
+}
+
+/// Sends response to a `textDocument/typeDefinition` request.
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
+fn handle_type_definition(
+    id: RequestId,
+    params: &GotoTypeDefinitionParams,
+    connection: &Connection,
+) -> Result<()> {
+    let uri = &params.text_document_position_params.text_document.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
+    let resp = get_type_definition_response(response_num);
     send_req_resp(id, resp, connection)
 }
