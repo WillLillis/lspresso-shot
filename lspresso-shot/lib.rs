@@ -2,7 +2,7 @@ mod init_dot_lua;
 pub mod types;
 
 use lsp_types::{
-    request::{GotoDeclarationResponse, GotoTypeDefinitionResponse},
+    request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CompletionResponse, Diagnostic, DocumentChangeOperation, DocumentChanges,
     DocumentSymbolResponse, FormattingOptions, GotoDefinitionResponse, Hover, Location, ResourceOp,
     TextEdit, Uri, WorkspaceEdit,
@@ -20,8 +20,9 @@ use std::{
 use types::{
     CompletionMismatchError, CompletionResult, DeclarationMismatchError, DefinitionMismatchError,
     DiagnosticMismatchError, DocumentSymbolMismatchError, FormattingMismatchError,
-    FormattingResult, HoverMismatchError, ReferencesMismatchError, RenameMismatchError, TestCase,
-    TestError, TestResult, TestSetupError, TestType, TimeoutError, TypeDefinitionMismatchError,
+    FormattingResult, HoverMismatchError, ImplementationMismatchError, ReferencesMismatchError,
+    RenameMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
+    TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -686,6 +687,53 @@ pub fn test_hover(mut test_case: TestCase, expected: Option<&Hover>) -> TestResu
     collect_results(&test_case, None, expected, |expected, actual| {
         if expected != actual {
             Err(Box::new(HoverMismatchError {
+                test_id: test_case.test_id.clone(),
+                expected: expected.clone(),
+                actual: actual.clone(),
+            }))?;
+        }
+        Ok(())
+    })
+}
+
+/// Tests the server's response to a 'textDocument/implementation' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_implementation(
+    mut test_case: TestCase,
+    expected: Option<&GotoImplementationResponse>,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(
+            TestType::Implementation,
+        ))?;
+    }
+    test_case.test_type = Some(TestType::Implementation);
+    collect_results(&test_case, None, expected, |expected, actual| {
+        // HACK: Since `GotoImplementationResponse` is untagged, there is no way to
+        // differentiate between the `Array` and `Link` variants if we get an empty
+        // vector in response.
+        // Just treat this as a special case and say it's ok.
+        match (expected, actual) {
+            (
+                GotoImplementationResponse::Array(array_items),
+                GotoImplementationResponse::Link(link_items),
+            )
+            | (
+                GotoImplementationResponse::Link(link_items),
+                GotoImplementationResponse::Array(array_items),
+            ) => {
+                if array_items.is_empty() && link_items.is_empty() {
+                    return Ok(());
+                }
+            }
+            _ => {}
+        }
+        if expected != actual {
+            Err(Box::new(ImplementationMismatchError {
                 test_id: test_case.test_id.clone(),
                 expected: expected.clone(),
                 actual: actual.clone(),

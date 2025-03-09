@@ -1,7 +1,7 @@
 use std::{collections::HashMap, str::FromStr};
 
 use lsp_types::{
-    request::{GotoDeclarationResponse, GotoTypeDefinitionResponse},
+    request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     ChangeAnnotation, CodeDescription, CompletionItem, CompletionItemKind,
     CompletionItemLabelDetails, CompletionList, CompletionResponse, Diagnostic,
     DiagnosticRelatedInformation, DocumentChanges, DocumentSymbol, DocumentSymbolResponse,
@@ -223,6 +223,15 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
         }),
         _ => None,
     }
+}
+
+/// For use with `test_implementation`.
+///
+/// Since `textDocument/definition` and `textDocument/implementation` have the same
+/// response, this just wraps `get_definition_response`.
+#[must_use]
+pub fn get_implementation_response(response_num: u32) -> Option<GotoImplementationResponse> {
+    get_definition_response(response_num)
 }
 
 /// For use with `test_diagnostics`.

@@ -7,6 +7,7 @@ mod diagnostics;
 mod document_symbol;
 mod formatting;
 mod hover;
+mod implementation;
 mod references;
 mod rename;
 mod type_definition;

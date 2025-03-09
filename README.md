@@ -93,6 +93,8 @@ To start though, let's focus on the following TODOs:
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`
 - [x] `textDocument/rename`
+- [x] `textDocument/typeDefinition`
+- [x] `textDocument/implementation`
 - [ ] Figure out what methods we want to add next.
 
 ## Gotchas

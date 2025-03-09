@@ -10,7 +10,7 @@ use std::{
 use anstyle::{AnsiColor, Color, Style};
 // NOTE: Is re-exporting these types really necessary?
 pub use lsp_types::{
-    request::{GotoDeclarationResponse, GotoTypeDefinitionResponse},
+    request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CompletionItem, CompletionList, CompletionResponse, Diagnostic, DocumentSymbolResponse,
     GotoDefinitionResponse, Hover, Location, Position, TextEdit, WorkspaceEdit,
 };
@@ -37,6 +37,8 @@ pub enum TestType {
     Formatting,
     /// Test `textDocument/hover` requests
     Hover,
+    /// Test `textDocument/implementations` requests
+    Implementation,
     /// Test `textDocument/references` requests
     References,
     /// Test `textDocument/rename` requests
@@ -58,6 +60,7 @@ impl std::fmt::Display for TestType {
                 Self::DocumentSymbol => "documentSymbol",
                 Self::Formatting => "formatting",
                 Self::Hover => "hover",
+                Self::Implementation => "implementation",
                 Self::References => "references",
                 Self::Rename => "rename",
                 Self::TypeDefinition => "typeDefinition",
@@ -531,6 +534,8 @@ pub enum TestError {
     FormattingMismatch(#[from] FormattingMismatchError),
     #[error(transparent)]
     HoverMismatch(#[from] Box<HoverMismatchError>),
+    #[error(transparent)]
+    ImplementationMismatch(#[from] Box<ImplementationMismatchError>),
     #[error(transparent)]
     ReferencesMismatch(#[from] ReferencesMismatchError),
     #[error(transparent)]
@@ -1010,6 +1015,25 @@ impl std::fmt::Display for HoverMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Test {}: Incorrect Hover response:", self.test_id)?;
         write_fields_comparison(f, "Hover", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct ImplementationMismatchError {
+    pub test_id: String,
+    pub expected: GotoImplementationResponse,
+    pub actual: GotoImplementationResponse,
+}
+
+impl std::fmt::Display for ImplementationMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Implementation response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Implementation", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }
