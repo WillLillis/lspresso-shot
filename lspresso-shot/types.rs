@@ -223,7 +223,7 @@ impl TestCase {
     ///
     /// Returns `TestSetupError` if `nvim` isn't executable, the provided server
     /// isn't executable, or if an invalid test file path is found
-    pub fn validate(&self) -> Result<(), TestSetupError> {
+    pub fn validate(&self) -> TestSetupResult<()> {
         if !is_executable(&self.nvim_path) {
             Err(TestSetupError::InvalidNeovim(self.nvim_path.clone()))?;
         }
@@ -242,7 +242,7 @@ impl TestCase {
     }
 
     /// Validate the user-provided path a test case file
-    fn validate_path(&self, input_path: &Path) -> Result<(), TestSetupError> {
+    fn validate_path(&self, input_path: &Path) -> TestSetupResult<()> {
         let test_case_root = self.get_source_file_path("")?;
         let full_path = self.get_source_file_path(input_path)?;
         if full_path.to_string_lossy().is_empty()
