@@ -90,6 +90,7 @@ To start though, let's focus on the following TODOs:
 - [x] `textDocument/documentSymbol`
 - [x] `textDocument/formatting`
 - [x] `textDocument/hover`
+- [x] `textDocument/prepareCallHierarchy`
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`
 - [x] `textDocument/rename`

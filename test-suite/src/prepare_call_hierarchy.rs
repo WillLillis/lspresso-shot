@@ -1,0 +1,96 @@
+#[cfg(test)]
+mod test {
+    use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
+
+    use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
+    use lspresso_shot::{
+        lspresso_shot, test_prepare_call_hierarchy,
+        types::{ServerStartType, TestCase, TestFile},
+    };
+    use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
+
+    use lsp_types::{
+        CallHierarchyItem, CallHierarchyServerCapability, Position, Range, ServerCapabilities,
+        SymbolKind, Uri,
+    };
+    use rstest::rstest;
+
+    fn pch_capabilities_simple() -> ServerCapabilities {
+        ServerCapabilities {
+            call_hierarchy_provider: Some(CallHierarchyServerCapability::Simple(true)),
+            ..ServerCapabilities::default()
+        }
+    }
+
+    #[test]
+    fn test_server_prepare_call_hierarchy_simple_empty() {
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file)
+            .cursor_pos(Some(Position::default()));
+
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&pch_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_prepare_call_hierarchy(test_case, None));
+    }
+
+    #[rstest]
+    fn test_server_prepare_call_hierarchy_simple(#[values(0, 1, 2, 3)] response_num: u32) {
+        let resp =
+            test_server::responses::get_prepare_call_hierachy_response(response_num).unwrap();
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file)
+            .cursor_pos(Some(Position::default()));
+
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(response_num, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&pch_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_prepare_call_hierarchy(test_case, Some(&resp)));
+    }
+
+    #[test]
+    fn rust_analyzer_prepare_call_hierarchy() {
+        let source_file = TestFile::new(
+            "src/main.rs",
+            r#"pub fn main() {
+    println!("Hello, world!");
+}"#,
+        );
+        let test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                NonZeroU32::new(4).unwrap(),
+                "rustAnalyzer/Indexing".to_string(),
+            ))
+            .timeout(Duration::from_secs(20))
+            .cursor_pos(Some(Position::new(0, 8)))
+            .other_file(cargo_dot_toml());
+
+        lspresso_shot!(test_prepare_call_hierarchy(
+            test_case,
+            Some(&vec![CallHierarchyItem {
+                name: "main".to_string(),
+                kind: SymbolKind::FUNCTION,
+                tags: None,
+                detail: Some("pub fn main()".to_string()),
+                uri: Uri::from_str("src/main.rs").unwrap(),
+                range: Range {
+                    start: Position::new(0, 0),
+                    end: Position::new(2, 1),
+                },
+                selection_range: Range {
+                    start: Position::new(0, 7),
+                    end: Position::new(0, 11),
+                },
+                data: None,
+            }])
+        ));
+    }
+}

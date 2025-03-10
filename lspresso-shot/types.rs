@@ -11,8 +11,9 @@ use anstyle::{AnsiColor, Color, Style};
 // NOTE: Is re-exporting these types really necessary?
 pub use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CompletionItem, CompletionList, CompletionResponse, Diagnostic, DocumentSymbolResponse,
-    GotoDefinitionResponse, Hover, Location, Position, TextEdit, WorkspaceEdit,
+    CallHierarchyItem, CompletionItem, CompletionList, CompletionResponse, Diagnostic,
+    DocumentSymbolResponse, GotoDefinitionResponse, Hover, Location, Position, TextEdit,
+    WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -39,6 +40,8 @@ pub enum TestType {
     Hover,
     /// Test `textDocument/implementations` requests
     Implementation,
+    /// Test `textDocument/prepareCallHierarchy` requests
+    PrepareCallHierarchy,
     /// Test `textDocument/references` requests
     References,
     /// Test `textDocument/rename` requests
@@ -61,6 +64,7 @@ impl std::fmt::Display for TestType {
                 Self::Formatting => "formatting",
                 Self::Hover => "hover",
                 Self::Implementation => "implementation",
+                Self::PrepareCallHierarchy => "prepareCallHierarchy",
                 Self::References => "references",
                 Self::Rename => "rename",
                 Self::TypeDefinition => "typeDefinition",
@@ -536,6 +540,8 @@ pub enum TestError {
     HoverMismatch(#[from] Box<HoverMismatchError>),
     #[error(transparent)]
     ImplementationMismatch(#[from] Box<ImplementationMismatchError>),
+    #[error(transparent)]
+    PrepareCallHierarchyMismatch(#[from] PrepareCallHierachyMismatchError),
     #[error(transparent)]
     ReferencesMismatch(#[from] ReferencesMismatchError),
     #[error(transparent)]
@@ -1034,6 +1040,25 @@ impl std::fmt::Display for ImplementationMismatchError {
             self.test_id
         )?;
         write_fields_comparison(f, "Implementation", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error)]
+pub struct PrepareCallHierachyMismatchError {
+    pub test_id: String,
+    pub expected: Vec<CallHierarchyItem>,
+    pub actual: Vec<CallHierarchyItem>,
+}
+
+impl std::fmt::Display for PrepareCallHierachyMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Prepare Call Hierarchy response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Prepare Call Hierarchy", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }

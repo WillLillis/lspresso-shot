@@ -4,14 +4,14 @@ use lsp_server::{Connection, Message, Notification, Request, RequestId, Response
 use lsp_types::{
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
-        Completion, DocumentDiagnosticRequest, DocumentSymbolRequest, Formatting, GotoDeclaration,
-        GotoDeclarationParams, GotoDefinition, GotoImplementation, GotoImplementationParams,
-        GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest, References, Rename,
-        Request as _,
+        CallHierarchyPrepare, Completion, DocumentDiagnosticRequest, DocumentSymbolRequest,
+        Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition, GotoImplementation,
+        GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest,
+        References, Rename, Request as _,
     },
-    CompletionParams, DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams,
-    HoverOptions, HoverParams, HoverProviderCapability, ReferenceParams, RenameParams,
-    ServerCapabilities, Uri, WorkDoneProgressOptions,
+    CallHierarchyPrepareParams, CompletionParams, DocumentFormattingParams, DocumentSymbolParams,
+    GotoDefinitionParams, HoverOptions, HoverParams, HoverProviderCapability, ReferenceParams,
+    RenameParams, ServerCapabilities, Uri, WorkDoneProgressOptions,
 };
 
 use crate::{
@@ -19,8 +19,8 @@ use crate::{
     responses::{
         get_completion_response, get_declaration_response, get_definition_response,
         get_diagnostics_response, get_document_symbol_response, get_formatting_response,
-        get_hover_response, get_implementation_response, get_references_response,
-        get_rename_response, get_type_definition_response,
+        get_hover_response, get_implementation_response, get_prepare_call_hierachy_response,
+        get_references_response, get_rename_response, get_type_definition_response,
     },
 };
 
@@ -131,12 +131,22 @@ pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
 ///
 /// Panics if JSON encoding of a response fails or if a json request fails to cast
 /// into its equivalent in-memory struct.
+#[allow(clippy::too_many_lines)]
 pub fn handle_request(
     req: Request,
     capabilities: &ServerCapabilities,
     connection: &Connection,
 ) -> Result<()> {
     match req.method.as_str() {
+        CallHierarchyPrepare::METHOD => {
+            let (id, params) = cast_req::<CallHierarchyPrepare>(req)
+                .expect("Failed to cast `CallHierarchyPrepare` request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                Completion::METHOD
+            );
+            handle_prepare_call_hierarchy(id, &params, connection)?;
+        }
         Completion::METHOD => {
             let (id, params) =
                 cast_req::<Completion>(req).expect("Failed to cast `Completion` request");
@@ -452,6 +462,34 @@ fn handle_implementation(
     let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
     let resp = get_implementation_response(response_num);
+    send_req_resp(id, resp, connection)
+}
+
+/// Sends response to a `textDocument/prepareCallHierarchy` request.
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
+fn handle_prepare_call_hierarchy(
+    id: RequestId,
+    params: &CallHierarchyPrepareParams,
+    connection: &Connection,
+) -> Result<()> {
+    let uri = &params.text_document_position_params.text_document.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
+    let resp = get_prepare_call_hierachy_response(response_num);
     send_req_resp(id, resp, connection)
 }
 

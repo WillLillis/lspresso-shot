@@ -2,7 +2,7 @@ use std::{collections::HashMap, str::FromStr};
 
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    ChangeAnnotation, CodeDescription, CompletionItem, CompletionItemKind,
+    CallHierarchyItem, ChangeAnnotation, CodeDescription, CompletionItem, CompletionItemKind,
     CompletionItemLabelDetails, CompletionList, CompletionResponse, Diagnostic,
     DiagnosticRelatedInformation, DocumentChanges, DocumentSymbol, DocumentSymbolResponse,
     Documentation, GotoDefinitionResponse, Hover, HoverContents, LanguageString, Location,
@@ -232,6 +232,51 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
 #[must_use]
 pub fn get_implementation_response(response_num: u32) -> Option<GotoImplementationResponse> {
     get_definition_response(response_num)
+}
+
+/// For use with `test_prepare_call_hierarchy`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_prepare_call_hierachy_response(response_num: u32) -> Option<Vec<CallHierarchyItem>> {
+    let item1 = CallHierarchyItem {
+        name: "name1".to_string(),
+        kind: SymbolKind::FILE,
+        tags: None,
+        detail: Some("detail1".to_string()),
+        uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        selection_range: Range {
+            start: Position::new(5, 6),
+            end: Position::new(7, 8),
+        },
+        data: None,
+    };
+    let item2 = CallHierarchyItem {
+        name: "name2".to_string(),
+        kind: SymbolKind::FILE,
+        tags: None,
+        detail: Some("detail2\nmore details".to_string()),
+        uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
+        range: Range {
+            start: Position::new(9, 10),
+            end: Position::new(11, 12),
+        },
+        selection_range: Range {
+            start: Position::new(13, 14),
+            end: Position::new(15, 16),
+        },
+        data: None,
+    };
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![item1]),
+        2 => Some(vec![item2]),
+        3 => Some(vec![item1, item2]),
+        _ => None,
+    }
 }
 
 /// For use with `test_diagnostics`.
