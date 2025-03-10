@@ -59,7 +59,7 @@ That's it!
 ## Dependencies:
 
 Neovim must be available on your `$PATH`. See the project's [documentation][nvim-install-docs]
-for installation instructions. Versions at or later than 517ecb85f58ed6ac8b4d5443931612e75e7c7dc2
+for installation instructions. Versions at or later than [`517ecb8`][nvim-min-commit]
 are necessary.
 
 ## Examples:
@@ -121,9 +121,10 @@ project utilizes [neovim][nvim-repo]'s, meaning that unexpected behavior may occ
 is used with other editors' clients.
 
 - **Error Messages with Empty Container Types**: If the response to an LSP request contains an enum
-with inner types such as `Vec` or `HashMap`, and you expect this field to be empty, the error messages
-associated with a failure with said test case may display the wrong enum variant. This is because the
-LSP types are untagged, so there is no way to differentiate between empty container variants.
+with inner types such as `Vec` or `HashMap`, and you expect this to be empty, the error messages
+associated with a failure with said test case may display the wrong enum variant. This is because
+the Rust LSP types are untagged, so there is no way to differentiate between empty container variants
+during deserialization.
 
 ## Contributing
 
@@ -134,5 +135,6 @@ LSP types are untagged, so there is no way to differentiate between empty contai
 [progress-token]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#progress
 [nvim-repo]: https://github.com/neovim/neovim
 [nvim-install-docs]: https://github.com/neovim/neovim#install-from-source
+[nvim-min-commit]: https://github.com/neovim/neovim/commit/517ecb85f58ed6ac8b4d5443931612e75e7c7dc2
 [rust-analyzer]: https://github.com/rust-lang/rust-analyzer
 [repo-tests]: https://github.com/WillLillis/lspresso-shot/blob/master/src/test.rs
