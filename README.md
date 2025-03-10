@@ -70,6 +70,8 @@ for examples of how to use the library.
 
 ## TODOs/Ideas:
 
+- [ ] Most of the Lua files share the same structure. We can probably pull the common
+      logic out and do some string interpolation instead of duplicating it a ton.
 - [ ] Clean up Lua logic (I'm unfamiliar with the neovim API)
     - Add Lua unit tests? (Do we roll our own/ is there an easy framework?)
 - [x] Add CI and whatnot (Improvements to current lua workflow?)
@@ -81,7 +83,7 @@ for examples of how to use the library.
     are more flushed out.
 
 As an eventual end goal, we'd obviously like to provide test coverage for *all* LSP methods.
-To start though, let's focus on the following TODOs:
+So far, we have:
 
 - [x] Sync up test server test coverage with current rust-analyzer coverage
 - [x] `textDocument/completion`
@@ -96,9 +98,8 @@ To start though, let's focus on the following TODOs:
 - [x] `textDocument/rename`
 - [x] `textDocument/typeDefinition`
 - [x] `textDocument/implementation`
-- [ ] Figure out what methods we want to add next.
 
-## Gotchas
+## Gotchas/Known Issues
 
 - If your server undergoes some sort of indexing process at startup before it's ready
 to service a given request, you need to account for this by specifying `ServerStartType::Progress(NonZeroU32, String)`
@@ -118,6 +119,11 @@ expected results may need to be adjusted to reflect this.
 leaving plenty of room for client implementations to behave differently from one another. This
 project utilizes [neovim][nvim-repo]'s, meaning that unexpected behavior may occur when your server
 is used with other editors' clients.
+
+- **Error Messages with Empty Container Types**: If the response to an LSP request contains an enum
+with inner types such as `Vec` or `HashMap`, and you expect this field to be empty, the error messages
+associated with a failure with said test case may display the wrong enum variant. This is because the
+LSP types are untagged, so there is no way to differentiate between empty container variants.
 
 ## Contributing
 
