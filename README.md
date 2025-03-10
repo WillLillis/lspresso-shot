@@ -64,7 +64,7 @@ are necessary.
 
 ## Examples:
 
-- The library's test corpus uses [rust-analyzer][rust-analyzer]. See [`src/test.rs`][repo-tests]
+- The library's test corpus uses [rust-analyzer][rust-analyzer]. See [`test-suite/src/*`][repo-tests]
 for examples of how to use the library.
 - TODO: Add asm-lsp/other LSPs here once it's being used.
 
@@ -137,4 +137,4 @@ during deserialization.
 [nvim-install-docs]: https://github.com/neovim/neovim#install-from-source
 [nvim-min-commit]: https://github.com/neovim/neovim/commit/517ecb85f58ed6ac8b4d5443931612e75e7c7dc2
 [rust-analyzer]: https://github.com/rust-lang/rust-analyzer
-[repo-tests]: https://github.com/WillLillis/lspresso-shot/blob/master/src/test.rs
+[repo-tests]: https://github.com/WillLillis/lspresso-shot/tree/master/test-suite/src
