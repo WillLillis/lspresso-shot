@@ -120,7 +120,7 @@ impl Empty for WorkspaceEdit {}
 fn clean_uri(uri: &Uri, test_case: &TestCase) -> TestResult<Uri> {
     let test_case_root = test_case
         .get_source_file_path("") // "/tmp/lspresso-shot/<test-id>/src/"
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e))?
+        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?
         .to_str()
         .unwrap()
         .to_string();
@@ -270,11 +270,11 @@ where
 {
     let get_results = |path: &Path| -> TestResult<R2> {
         let raw_results = String::from_utf8(
-            fs::read(path).map_err(|e| TestError::IO(test_case.test_id.clone(), e))?,
+            fs::read(path).map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
         )
-        .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e))?;
+        .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e.to_string()))?;
         let raw_resp: R2 = serde_json::from_str(&raw_results)
-            .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e))?;
+            .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e.to_string()))?;
         let cleaned = raw_resp.clean_response(test_case)?;
         Ok(cleaned)
     };
@@ -288,10 +288,10 @@ where
 
     let empty_result_path = test_case
         .get_empty_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e))?;
+        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
     let results_file_path = test_case
         .get_results_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e))?;
+        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
 
     match (
         R1::is_empty(),
@@ -333,7 +333,7 @@ where
 fn run_test(test_case: &TestCase, source_path: &Path) -> TestResult<()> {
     let init_dot_lua_path = test_case
         .get_init_lua_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e))?;
+        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
 
     // Restrict the number of tests invoking neovim at a given time to prevent timeout issues
     let (lock, cvar) = &*get_runner_count();
@@ -365,10 +365,10 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestResult<()> {
     // than the timeout
     let error_path = test_case
         .get_error_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e))?;
+        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
     if error_path.exists() {
         let error = fs::read_to_string(&error_path)
-            .map_err(|e| TestError::IO(test_case.test_id.clone(), e))?;
+            .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
         Err(TestError::Neovim(test_case.test_id.clone(), error))?;
     }
 
@@ -851,15 +851,14 @@ pub fn test_rename(
                 // HACK: Comparing against the stringified error is rather hacky,
                 // but the error object's `code` field isn't accessible. In this case,
                 // we return the expected object
-                let e_str = e.to_string();
-                if e_str.eq("invalid type: sequence, expected a map at line 1 column 11") {
+                if e.eq("invalid type: sequence, expected a map at line 1 column 11") {
                     // NOTE: The JSON is as follows: `{"changes":[]}`
                     WorkspaceEdit {
                         changes: Some(HashMap::new()),
                         document_changes: None,
                         change_annotations: None,
                     }
-                } else if e_str.eq("invalid type: sequence, expected a map at line 1 column 21") {
+                } else if e.eq("invalid type: sequence, expected a map at line 1 column 21") {
                     // NOTE: The JSON is as follows: `{"changeAnnotations":[]}`
                     WorkspaceEdit {
                         changes: None,

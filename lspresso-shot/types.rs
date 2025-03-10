@@ -491,7 +491,7 @@ pub enum ServerStartType {
 
 pub type TestSetupResult<T> = Result<T, TestSetupError>;
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum TestSetupError {
     #[error("Source file \"{0}\" must have an extension")]
     MissingFileExtension(String),
@@ -506,19 +506,19 @@ pub enum TestSetupError {
     #[error("Cursor position must be specified for {0} tests")]
     InvalidCursorPosition(TestType),
     #[error("{0}")]
-    IO(std::io::Error),
+    IO(String),
 }
 
 impl From<std::io::Error> for TestSetupError {
     fn from(value: std::io::Error) -> Self {
-        Self::IO(value)
+        Self::IO(value.to_string())
     }
 }
 
 pub type TestResult<T> = Result<T, TestError>;
 
 // NOTE: Certain variants' inner types are `Box`ed because they are large
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub enum TestError {
     #[error("Test {0}: Expected `None`, got:\n{1}")]
     ExpectedNone(String, String),
@@ -555,16 +555,16 @@ pub enum TestError {
     #[error("Test {0}: Neovim Error\n{1}")]
     Neovim(String, String),
     #[error("Test {0}: IO Error\n{1}")]
-    IO(String, std::io::Error),
+    IO(String, String),
     #[error("Test {0}: UTF8 Error\n{1}")]
-    Utf8(String, std::string::FromUtf8Error),
+    Utf8(String, String),
     #[error("Test {0}: Serialization Error\n{1}")]
-    Serialization(String, serde_json::Error),
+    Serialization(String, String),
     #[error(transparent)]
     TimeoutExceeded(TimeoutError),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct TimeoutError {
     pub test_id: String,
     pub timeout: Duration,
@@ -731,7 +731,7 @@ fn write_fields_comparison<T: Serialize>(
 // pain for library consumers. I'd like to experiment with the different ways we
 // can handle this, but for now we'll just allow for exact matching, and a simple
 // "contains" check.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum CompletionResult {
     /// Expect this exact set of completion items in the provided order
     Exact(CompletionResponse),
@@ -791,7 +791,7 @@ impl CompletionResult {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub struct CompletionMismatchError {
     pub test_id: String,
     pub expected: CompletionResult,
@@ -901,7 +901,7 @@ impl std::fmt::Display for CompletionMismatchError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub struct DeclarationMismatchError {
     pub test_id: String,
     pub expected: GotoDeclarationResponse,
@@ -920,7 +920,7 @@ impl std::fmt::Display for DeclarationMismatchError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub struct DefinitionMismatchError {
     pub test_id: String,
     pub expected: GotoDefinitionResponse,
@@ -939,7 +939,7 @@ impl std::fmt::Display for DefinitionMismatchError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct DiagnosticMismatchError {
     pub test_id: String,
     pub expected: Vec<Diagnostic>,
@@ -954,7 +954,7 @@ impl std::fmt::Display for DiagnosticMismatchError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub struct DocumentSymbolMismatchError {
     pub test_id: String,
     pub expected: DocumentSymbolResponse,
@@ -981,7 +981,7 @@ pub enum FormattingResult {
     Response(Vec<TextEdit>),
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct FormattingMismatchError {
     pub test_id: String,
     pub expected: FormattingResult,
@@ -1010,7 +1010,7 @@ impl std::fmt::Display for FormattingMismatchError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct HoverMismatchError {
     pub test_id: String,
     pub expected: Hover,
@@ -1025,7 +1025,7 @@ impl std::fmt::Display for HoverMismatchError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub struct ImplementationMismatchError {
     pub test_id: String,
     pub expected: GotoImplementationResponse,
@@ -1044,7 +1044,7 @@ impl std::fmt::Display for ImplementationMismatchError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub struct PrepareCallHierachyMismatchError {
     pub test_id: String,
     pub expected: Vec<CallHierarchyItem>,
@@ -1063,7 +1063,7 @@ impl std::fmt::Display for PrepareCallHierachyMismatchError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct ReferencesMismatchError {
     pub test_id: String,
     pub expected: Vec<Location>,
@@ -1078,7 +1078,7 @@ impl std::fmt::Display for ReferencesMismatchError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct RenameMismatchError {
     pub test_id: String,
     pub expected: WorkspaceEdit,
@@ -1093,7 +1093,7 @@ impl std::fmt::Display for RenameMismatchError {
     }
 }
 
-#[derive(Debug, Error)]
+#[derive(Debug, Error, PartialEq)]
 pub struct TypeDefinitionMismatchError {
     pub test_id: String,
     pub expected: GotoTypeDefinitionResponse,

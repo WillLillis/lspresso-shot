@@ -5,7 +5,7 @@ mod test {
     use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
         lspresso_shot, test_implementation,
-        types::{ServerStartType, TestCase, TestFile},
+        types::{ServerStartType, TestCase, TestError, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
@@ -23,7 +23,7 @@ mod test {
     }
 
     #[test]
-    fn test_server_implementation_empty_simple() {
+    fn test_server_implementation_empty_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
             .cursor_pos(Some(Position::default()));
@@ -38,7 +38,40 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_implementation_simple(#[values(0, 1, 2, 3, 4, 5, 6)] response_num: u32) {
+    fn test_server_implementation_simple_expect_none_got_some(
+        #[values(0, 1, 2, 3, 4, 5, 6)] response_num: u32,
+    ) {
+        let resp = test_server::responses::get_implementation_response(response_num).unwrap();
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file)
+            .cursor_pos(Some(Position::default()));
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(response_num, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&implementation_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        let test_result = test_implementation(test_case.clone(), None);
+        let mut expected_err =
+            TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
+        if response_num == 3 {
+            // HACK: Because of the deserialization issues with empty vector results,
+            // this error rendered incorrectly as `Link` rather than `Array`
+            assert_eq!(
+                expected_err,
+                TestError::ExpectedNone(test_case.test_id.clone(), "Link(\n    [],\n)".to_string())
+            );
+            expected_err =
+                TestError::ExpectedNone(test_case.test_id, "Array(\n    [],\n)".to_string());
+        }
+        assert_eq!(Err(expected_err), test_result);
+    }
+
+    #[rstest]
+    fn test_server_implementation_simple_expect_some_got_some(
+        #[values(0, 1, 2, 3, 4, 5, 6)] response_num: u32,
+    ) {
         let resp = test_server::responses::get_implementation_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
