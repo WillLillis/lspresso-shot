@@ -101,7 +101,7 @@ pub fn get_init_dot_lua(
 
 fn progress_threshold(start_type: &ServerStartType) -> String {
     match start_type {
-        ServerStartType::Simple => "0".to_string(),
+        ServerStartType::Simple => "1".to_string(),
         ServerStartType::Progress(threshold, _) => threshold.to_string(),
     }
 }
