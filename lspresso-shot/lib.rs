@@ -3,7 +3,7 @@ pub mod types;
 
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CompletionResponse, Diagnostic, DocumentChangeOperation, DocumentChanges,
+    CallHierarchyItem, CompletionResponse, Diagnostic, DocumentChangeOperation, DocumentChanges,
     DocumentSymbolResponse, FormattingOptions, GotoDefinitionResponse, Hover, Location, ResourceOp,
     TextEdit, Uri, WorkspaceEdit,
 };
@@ -20,9 +20,9 @@ use std::{
 use types::{
     CompletionMismatchError, CompletionResult, DeclarationMismatchError, DefinitionMismatchError,
     DiagnosticMismatchError, DocumentSymbolMismatchError, FormattingMismatchError,
-    FormattingResult, HoverMismatchError, ImplementationMismatchError, ReferencesMismatchError,
-    RenameMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
-    TypeDefinitionMismatchError,
+    FormattingResult, HoverMismatchError, ImplementationMismatchError,
+    PrepareCallHierachyMismatchError, ReferencesMismatchError, RenameMismatchError, TestCase,
+    TestError, TestResult, TestSetupError, TestType, TimeoutError, TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -106,6 +106,7 @@ impl Empty for FormattingResult {}
 impl Empty for GotoDefinitionResponse {}
 impl Empty for Hover {}
 impl Empty for String {}
+impl Empty for Vec<CallHierarchyItem> {}
 impl Empty for Vec<Diagnostic> {}
 impl Empty for Vec<Location> {}
 impl Empty for Vec<TextEdit> {}
@@ -139,6 +140,14 @@ where
     }
 }
 
+impl CleanResponse for Vec<CallHierarchyItem> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        for item in &mut self {
+            item.uri = clean_uri(&item.uri, test_case)?;
+        }
+        Ok(self)
+    }
+}
 impl CleanResponse for EmptyResult {}
 impl CleanResponse for CompletionResponse {}
 impl CleanResponse for DocumentSymbolResponse {
@@ -244,22 +253,27 @@ impl CleanResponse for WorkspaceEdit {
 /// This handles the validating the test case, running the test, and gathering/deserializing
 /// results.
 ///
-/// If `R` is `Empty`, we expect empty results and this will only return `Err`
-/// or `Ok(None)`. Otherwise, we expect some results, and this function will return
-/// `Ok(Some(_))` or `Err`.
-fn test_inner<R>(
+/// `R2` is *always* the expected response type for the given test case. If the test case is
+/// expecting `Some(_)` results, then `R1 == R2`. If `None` is expected, `R1` is `EmptyResult`.
+///
+/// If `R1` is `Empty`, we expect empty results and this will only return `Err`
+/// or `Ok(None)`.
+///
+/// Otherwise, we expect some results, and this function will return `Ok(Some(_))` or `Err`.
+fn test_inner<R1, R2>(
     test_case: &TestCase,
     replacements: Option<&Vec<(&str, String)>>,
-) -> TestResult<Option<R>>
+) -> TestResult<Option<R2>>
 where
-    R: serde::de::DeserializeOwned + std::fmt::Debug + Empty + CleanResponse,
+    R1: serde::de::DeserializeOwned + std::fmt::Debug + Empty + CleanResponse,
+    R2: serde::de::DeserializeOwned + std::fmt::Debug + Empty + CleanResponse,
 {
-    let get_results = |path: &Path| -> TestResult<R> {
+    let get_results = |path: &Path| -> TestResult<R2> {
         let raw_results = String::from_utf8(
             fs::read(path).map_err(|e| TestError::IO(test_case.test_id.clone(), e))?,
         )
         .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e))?;
-        let raw_resp: R = serde_json::from_str(&raw_results)
+        let raw_resp: R2 = serde_json::from_str(&raw_results)
             .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e))?;
         let cleaned = raw_resp.clean_response(test_case)?;
         Ok(cleaned)
@@ -280,7 +294,7 @@ where
         .map_err(|e| TestError::IO(test_case.test_id.clone(), e))?;
 
     match (
-        R::is_empty(),
+        R1::is_empty(),
         empty_result_path.exists(),
         results_file_path.exists(),
     ) {
@@ -290,7 +304,7 @@ where
         (true, false, true) => {
             // Don't propagate errors up here, as it's better for the user to see
             // that they expected empty results but got some instead
-            let results: TestResult<R> = get_results(&results_file_path);
+            let results: TestResult<R2> = get_results(&results_file_path);
             let actual_str = match results {
                 Ok(res) => format!("{res:#?}"),
                 Err(e) => format!("Invalid results: {e}"),
@@ -308,7 +322,7 @@ where
         (false, true, false) => Err(TestError::ExpectedSome(test_case.test_id.clone()))?,
         // Expected and got some results
         (false, false, true) => {
-            let actual: R = get_results(&results_file_path)?;
+            let actual: R2 = get_results(&results_file_path)?;
             Ok(Some(actual))
         }
     }
@@ -375,10 +389,10 @@ where
     R2: serde::de::DeserializeOwned + std::fmt::Debug + Empty + CleanResponse,
 {
     if let Some(expected) = expected {
-        let actual: R2 = test_inner(test_case, replacements)?.unwrap();
+        let actual = test_inner::<R2, R2>(test_case, replacements)?.unwrap();
         Ok(cmp(expected, &actual)?)
     } else {
-        let empty = test_inner::<EmptyResult>(test_case, replacements)?;
+        let empty = test_inner::<EmptyResult, R2>(test_case, replacements)?;
         assert!(empty.is_none());
         Ok(())
     }
@@ -743,6 +757,39 @@ pub fn test_implementation(
     })
 }
 
+/// Tests the server's response to a 'textDocument/prepareCallHierarchy' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_prepare_call_hierarchy(
+    mut test_case: TestCase,
+    expected: Option<&Vec<CallHierarchyItem>>,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(
+            TestType::PrepareCallHierarchy,
+        ))?;
+    }
+    test_case.test_type = Some(TestType::PrepareCallHierarchy);
+    collect_results(
+        &test_case,
+        None,
+        expected,
+        |expected, actual: &Vec<CallHierarchyItem>| {
+            if expected != actual {
+                Err(PrepareCallHierachyMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
 /// Tests the server's response to a 'textDocument/references' request
 ///
 /// # Errors
@@ -795,7 +842,7 @@ pub fn test_rename(
     // NOTE: It would be nice to use `collect_results` here, but complications introduced
     // by the serialization issues make that more trouble than it's worth
     if let Some(expected) = expected {
-        let actual = match test_inner::<WorkspaceEdit>(
+        let actual = match test_inner::<WorkspaceEdit, WorkspaceEdit>(
             &test_case,
             Some(&vec![("NEW_NAME", format!("newName = '{new_name}'"))]),
         ) {
@@ -836,7 +883,7 @@ pub fn test_rename(
 
         Ok(())
     } else {
-        let empty = test_inner::<EmptyResult>(
+        let empty = test_inner::<EmptyResult, WorkspaceEdit>(
             &test_case,
             Some(&vec![("NEW_NAME", format!("newName = '{new_name}'"))]),
         )?;
