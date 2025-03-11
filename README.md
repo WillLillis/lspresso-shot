@@ -85,7 +85,6 @@ for examples of how to use the library.
 As an eventual end goal, we'd obviously like to provide test coverage for *all* LSP methods.
 So far, we have:
 
-- [x] Sync up test server test coverage with current rust-analyzer coverage
 - [x] `textDocument/completion`
 - [x] `textDocument/declaration`
 - [x] `textDocument/definition`
@@ -98,6 +97,7 @@ So far, we have:
 - [x] `textDocument/rename`
 - [x] `textDocument/typeDefinition`
 - [x] `textDocument/implementation`
+- [x] `callHierarchy/incomingCalls`
 
 ## Gotchas/Known Issues
 

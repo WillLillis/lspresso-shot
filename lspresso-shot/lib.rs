@@ -3,9 +3,9 @@ pub mod types;
 
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CallHierarchyItem, CompletionResponse, Diagnostic, DocumentChangeOperation, DocumentChanges,
-    DocumentSymbolResponse, FormattingOptions, GotoDefinitionResponse, Hover, Location, ResourceOp,
-    TextEdit, Uri, WorkspaceEdit,
+    CallHierarchyIncomingCall, CallHierarchyItem, CompletionResponse, Diagnostic,
+    DocumentChangeOperation, DocumentChanges, DocumentSymbolResponse, FormattingOptions,
+    GotoDefinitionResponse, Hover, Location, ResourceOp, TextEdit, Uri, WorkspaceEdit,
 };
 
 use std::{
@@ -20,7 +20,7 @@ use std::{
 use types::{
     CompletionMismatchError, CompletionResult, DeclarationMismatchError, DefinitionMismatchError,
     DiagnosticMismatchError, DocumentSymbolMismatchError, FormattingMismatchError,
-    FormattingResult, HoverMismatchError, ImplementationMismatchError,
+    FormattingResult, HoverMismatchError, ImplementationMismatchError, IncomingCallsMismatchError,
     PrepareCallHierachyMismatchError, ReferencesMismatchError, RenameMismatchError, TestCase,
     TestError, TestResult, TestSetupError, TestType, TimeoutError, TypeDefinitionMismatchError,
 };
@@ -108,6 +108,7 @@ impl Empty for Hover {}
 impl Empty for String {}
 impl Empty for Vec<CallHierarchyItem> {}
 impl Empty for Vec<Diagnostic> {}
+impl Empty for Vec<CallHierarchyIncomingCall> {}
 impl Empty for Vec<Location> {}
 impl Empty for Vec<TextEdit> {}
 impl Empty for WorkspaceEdit {}
@@ -194,6 +195,14 @@ impl CleanResponse for Vec<Diagnostic> {
                     related.location.uri = clean_uri(&related.location.uri, test_case)?;
                 }
             }
+        }
+        Ok(self)
+    }
+}
+impl CleanResponse for Vec<CallHierarchyIncomingCall> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        for call in &mut self {
+            call.from.uri = clean_uri(&call.from.uri, test_case)?;
         }
         Ok(self)
     }
@@ -755,6 +764,39 @@ pub fn test_implementation(
         }
         Ok(())
     })
+}
+
+/// Tests the server's response to a 'callHierarchy/incomingCalls' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_incoming_calls(
+    mut test_case: TestCase,
+    call_item: &CallHierarchyItem,
+    expected: Option<&Vec<CallHierarchyIncomingCall>>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::IncomingCalls);
+    collect_results(
+        &test_case,
+        Some(&vec![(
+            "CALL_ITEM",
+            serde_json::to_string_pretty(call_item)
+                .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e.to_string()))?,
+        )]),
+        expected,
+        |expected, actual: &Vec<CallHierarchyIncomingCall>| {
+            if expected != actual {
+                Err(IncomingCallsMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'textDocument/prepareCallHierarchy' request

@@ -9,11 +9,10 @@ local function check_progress_result()
     end
 
     -- Receive  json-encoded `FormattingOptions` from the rust side in `json_opts`
-    ---@diagnostic disable-next-line: undefined-global, lowercase-global
-    json_opts = [[
+    local json_opts = [[
 JSON_OPTIONS
     ]]
-    format_opts = vim.json.decode(json_opts) ---@diagnostic disable-line: undefined-global, lowercase-global
+    local format_opts = vim.json.decode(json_opts)
 
     report_log('Format opts: ' .. tostring(vim.inspect(format_opts)) .. '\n') ---@diagnostic disable-line: undefined-global
     report_log('Issuing formatting request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
