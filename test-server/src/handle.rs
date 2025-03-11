@@ -4,14 +4,15 @@ use lsp_server::{Connection, Message, Notification, Request, RequestId, Response
 use lsp_types::{
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
-        CallHierarchyPrepare, Completion, DocumentDiagnosticRequest, DocumentSymbolRequest,
-        Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition, GotoImplementation,
-        GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest,
-        References, Rename, Request as _,
+        CallHierarchyIncomingCalls, CallHierarchyPrepare, Completion, DocumentDiagnosticRequest,
+        DocumentSymbolRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
+        GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
+        HoverRequest, References, Rename, Request as _,
     },
-    CallHierarchyPrepareParams, CompletionParams, DocumentFormattingParams, DocumentSymbolParams,
-    GotoDefinitionParams, HoverOptions, HoverParams, HoverProviderCapability, ReferenceParams,
-    RenameParams, ServerCapabilities, Uri, WorkDoneProgressOptions,
+    CallHierarchyIncomingCallsParams, CallHierarchyPrepareParams, CompletionParams,
+    DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams, HoverOptions,
+    HoverParams, HoverProviderCapability, ReferenceParams, RenameParams, ServerCapabilities, Uri,
+    WorkDoneProgressOptions,
 };
 
 use crate::{
@@ -19,8 +20,9 @@ use crate::{
     responses::{
         get_completion_response, get_declaration_response, get_definition_response,
         get_diagnostics_response, get_document_symbol_response, get_formatting_response,
-        get_hover_response, get_implementation_response, get_prepare_call_hierachy_response,
-        get_references_response, get_rename_response, get_type_definition_response,
+        get_hover_response, get_implementation_response, get_incoming_calls_response,
+        get_prepare_call_hierachy_response, get_references_response, get_rename_response,
+        get_type_definition_response,
     },
 };
 
@@ -138,6 +140,15 @@ pub fn handle_request(
     connection: &Connection,
 ) -> Result<()> {
     match req.method.as_str() {
+        CallHierarchyIncomingCalls::METHOD => {
+            let (id, params) = cast_req::<CallHierarchyIncomingCalls>(req)
+                .expect("Failed to cast `CallHierarchyIncomingCalls` request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                CallHierarchyIncomingCalls::METHOD
+            );
+            handle_incoming_calls(id, &params, connection)?;
+        }
         CallHierarchyPrepare::METHOD => {
             let (id, params) = cast_req::<CallHierarchyPrepare>(req)
                 .expect("Failed to cast `CallHierarchyPrepare` request");
@@ -158,7 +169,7 @@ pub fn handle_request(
         }
         DocumentDiagnosticRequest::METHOD => {
             let (id, params) = cast_req::<DocumentDiagnosticRequest>(req)
-                .expect("Failed to cast DocumentDiagnosticRequest request");
+                .expect("Failed to cast `DocumentDiagnosticRequest` request");
             info!(
                 "Received `{}` request ({id}): {params:?}",
                 DocumentDiagnosticRequest::METHOD
@@ -167,7 +178,7 @@ pub fn handle_request(
         }
         DocumentSymbolRequest::METHOD => {
             let (id, params) = cast_req::<DocumentSymbolRequest>(req)
-                .expect("Failed to cast `Completion` request");
+                .expect("Failed to cast `DocumentSymbolRequest` request");
             info!(
                 "Received `{}` request ({id}): {params:?}",
                 Completion::METHOD
@@ -176,7 +187,7 @@ pub fn handle_request(
         }
         Formatting::METHOD => {
             let (id, params) =
-                cast_req::<Formatting>(req).expect("Failed to cast Formatting request");
+                cast_req::<Formatting>(req).expect("Failed to cast `Formatting` request");
             info!(
                 "Received `{}` request ({id}): {params:?}",
                 Formatting::METHOD
@@ -194,16 +205,25 @@ pub fn handle_request(
         }
         GotoDefinition::METHOD => {
             let (id, params) =
-                cast_req::<GotoDefinition>(req).expect("Failed to cast GotoDefinition request");
+                cast_req::<GotoDefinition>(req).expect("Failed to cast `GotoDefinition` request");
             info!(
                 "Received `{}` request ({id}): {params:?}",
                 GotoDefinition::METHOD
             );
             handle_definition(id, &params, connection)?;
         }
+        GotoImplementation::METHOD => {
+            let (id, params) = cast_req::<GotoImplementation>(req)
+                .expect("Failed to cast `GotoImplementation` request");
+            info!(
+                "Received `{}` request ({id}): {params:?}",
+                GotoImplementation::METHOD
+            );
+            handle_implementation(id, &params, connection)?;
+        }
         GotoTypeDefinition::METHOD => {
-            let (id, params) =
-                cast_req::<GotoTypeDefinition>(req).expect("Failed to cast GotoDefinition request");
+            let (id, params) = cast_req::<GotoTypeDefinition>(req)
+                .expect("Failed to cast `GotoTypeDefinition` request");
             info!(
                 "Received `{}` request ({id}): {params:?}",
                 GotoTypeDefinition::METHOD
@@ -219,18 +239,9 @@ pub fn handle_request(
             );
             handle_hover(id, &params, capabilities, connection)?;
         }
-        GotoImplementation::METHOD => {
-            let (id, params) =
-                cast_req::<GotoImplementation>(req).expect("Failed to cast `HoverRequest` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                GotoImplementation::METHOD
-            );
-            handle_implementation(id, &params, connection)?;
-        }
         References::METHOD => {
             let (id, params) =
-                cast_req::<References>(req).expect("Failed to cast References request");
+                cast_req::<References>(req).expect("Failed to cast `References` request");
             info!(
                 "Received `{}` request ({id}): {params:?}",
                 References::METHOD
@@ -238,7 +249,7 @@ pub fn handle_request(
             return handle_references(id, &params, connection);
         }
         Rename::METHOD => {
-            let (id, params) = cast_req::<Rename>(req).expect("Failed to cast Rename request");
+            let (id, params) = cast_req::<Rename>(req).expect("Failed to cast `Rename` request");
             info!("Received `{}` request ({id}): {params:?}", Rename::METHOD);
             return handle_rename(id, &params, connection);
         }
@@ -462,6 +473,34 @@ fn handle_implementation(
     let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
     let resp = get_implementation_response(response_num);
+    send_req_resp(id, resp, connection)
+}
+
+/// Sends response to a `callHierarchy/incomingCalls` request.
+///
+/// # Errors
+///
+/// Returns `Err` if sending the response fails.
+///
+/// # Panics
+///
+/// Panics if serialization of `params` fails.
+fn handle_incoming_calls(
+    id: RequestId,
+    params: &CallHierarchyIncomingCallsParams,
+    connection: &Connection,
+) -> Result<()> {
+    let uri = &params.item.uri;
+    let Some(root_path) = get_root_test_path(uri) else {
+        error!(
+            "Failed to retrieve root path from provided uri: {}",
+            uri.as_str()
+        );
+        return Ok(());
+    };
+    let response_num = receive_response_num(&root_path)?;
+    info!("response_num: {response_num}");
+    let resp = get_incoming_calls_response(response_num);
     send_req_resp(id, resp, connection)
 }
 

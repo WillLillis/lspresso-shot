@@ -11,9 +11,9 @@ use anstyle::{AnsiColor, Color, Style};
 // NOTE: Is re-exporting these types really necessary?
 pub use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CallHierarchyItem, CompletionItem, CompletionList, CompletionResponse, Diagnostic,
-    DocumentSymbolResponse, GotoDefinitionResponse, Hover, Location, Position, TextEdit,
-    WorkspaceEdit,
+    CallHierarchyIncomingCall, CallHierarchyItem, CompletionItem, CompletionList,
+    CompletionResponse, Diagnostic, DocumentSymbolResponse, GotoDefinitionResponse, Hover,
+    Location, Position, TextEdit, WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -40,6 +40,8 @@ pub enum TestType {
     Hover,
     /// Test `textDocument/implementations` requests
     Implementation,
+    /// Test `textDocument/incomingCalls` requests
+    IncomingCalls,
     /// Test `textDocument/prepareCallHierarchy` requests
     PrepareCallHierarchy,
     /// Test `textDocument/references` requests
@@ -54,20 +56,21 @@ impl std::fmt::Display for TestType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "textDocument/{}",
+            "{}",
             match self {
-                Self::Completion => "completion",
-                Self::Declaration => "declaration",
-                Self::Definition => "definition",
-                Self::Diagnostic => "publishDiagnostics",
-                Self::DocumentSymbol => "documentSymbol",
-                Self::Formatting => "formatting",
-                Self::Hover => "hover",
-                Self::Implementation => "implementation",
-                Self::PrepareCallHierarchy => "prepareCallHierarchy",
-                Self::References => "references",
-                Self::Rename => "rename",
-                Self::TypeDefinition => "typeDefinition",
+                Self::Completion => "textDocument/completion",
+                Self::Declaration => "textDocument/declaration",
+                Self::Definition => "textDocument/definition",
+                Self::Diagnostic => "textDocument/publishDiagnostics",
+                Self::DocumentSymbol => "textDocument/documentSymbol",
+                Self::Formatting => "textDocument/formatting",
+                Self::Hover => "textDocument/hover",
+                Self::Implementation => "textDocument/implementation",
+                Self::IncomingCalls => "callHierarchy/incomingCalls",
+                Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
+                Self::References => "textDocument/references",
+                Self::Rename => "textDocument/rename",
+                Self::TypeDefinition => "textDocument/typeDefinition",
             }
         )?;
         Ok(())
@@ -540,6 +543,8 @@ pub enum TestError {
     HoverMismatch(#[from] Box<HoverMismatchError>),
     #[error(transparent)]
     ImplementationMismatch(#[from] Box<ImplementationMismatchError>),
+    #[error(transparent)]
+    IncomingCallsMismatch(#[from] IncomingCallsMismatchError),
     #[error(transparent)]
     PrepareCallHierarchyMismatch(#[from] PrepareCallHierachyMismatchError),
     #[error(transparent)]
@@ -1033,6 +1038,25 @@ pub struct ImplementationMismatchError {
 }
 
 impl std::fmt::Display for ImplementationMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Implementation response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Implementation", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error, PartialEq)]
+pub struct IncomingCallsMismatchError {
+    pub test_id: String,
+    pub expected: Vec<CallHierarchyIncomingCall>,
+    pub actual: Vec<CallHierarchyIncomingCall>,
+}
+
+impl std::fmt::Display for IncomingCallsMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
