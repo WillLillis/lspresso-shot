@@ -204,15 +204,16 @@ pub fn handle_request(
     Ok(())
 }
 
+// TODO: Pull out common handler logic into a macro
+// This will get a little more complicated once we start checking capabilities
+// at runtime, but I think that should be doable with a closure parameter
+
 /// Sends response to a `textDocument/completion` request.
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn handle_completion(
     id: RequestId,
     params: &CompletionParams,
@@ -237,11 +238,8 @@ fn handle_completion(
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn declaration(
     id: RequestId,
     params: &GotoDeclarationParams,
@@ -265,11 +263,8 @@ fn declaration(
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn definition(id: RequestId, params: &GotoDefinitionParams, connection: &Connection) -> Result<()> {
     let uri = &params.text_document_position_params.text_document.uri;
     let Some(root_path) = get_root_test_path(uri) else {
@@ -289,11 +284,8 @@ fn definition(id: RequestId, params: &GotoDefinitionParams, connection: &Connect
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn document_symbol(
     id: RequestId,
     params: &DocumentSymbolParams,
@@ -317,11 +309,8 @@ fn document_symbol(
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn formatting(
     id: RequestId,
     params: &DocumentFormattingParams,
@@ -346,11 +335,8 @@ fn formatting(
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn hover(
     id: RequestId,
     params: &HoverParams,
@@ -393,11 +379,8 @@ fn hover(
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn implementation(
     id: RequestId,
     params: &GotoImplementationParams,
@@ -421,11 +404,8 @@ fn implementation(
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn incoming_calls(
     id: RequestId,
     params: &CallHierarchyIncomingCallsParams,
@@ -449,11 +429,8 @@ fn incoming_calls(
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn prepare_call_hierarchy(
     id: RequestId,
     params: &CallHierarchyPrepareParams,
@@ -477,11 +454,8 @@ fn prepare_call_hierarchy(
 ///
 /// # Errors
 ///
-/// Retruns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `Vec<Location>` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn references(id: RequestId, params: &ReferenceParams, connection: &Connection) -> Result<()> {
     let uri = &params.text_document_position.text_document.uri;
     let Some(root_path) = get_root_test_path(uri) else {
@@ -501,11 +475,8 @@ fn references(id: RequestId, params: &ReferenceParams, connection: &Connection) 
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn rename(id: RequestId, params: &RenameParams, connection: &Connection) -> Result<()> {
     let uri = &params.text_document_position.text_document.uri;
     let Some(root_path) = get_root_test_path(uri) else {
@@ -525,11 +496,8 @@ fn rename(id: RequestId, params: &RenameParams, connection: &Connection) -> Resu
 ///
 /// # Errors
 ///
-/// Returns `Err` if sending the response fails.
-///
-/// # Panics
-///
-/// Panics if serialization of `params` fails.
+/// Returns `Err` if receiving the response nummber from the test case or sending
+/// the response to  the server fails.
 fn type_definition(
     id: RequestId,
     params: &GotoTypeDefinitionParams,
