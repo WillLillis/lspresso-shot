@@ -10,9 +10,8 @@ use lsp_types::{
         HoverRequest, References, Rename, Request as _,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyPrepareParams, CompletionParams,
-    DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams, HoverOptions,
-    HoverParams, HoverProviderCapability, ReferenceParams, RenameParams, ServerCapabilities, Uri,
-    WorkDoneProgressOptions,
+    DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams, HoverParams,
+    ReferenceParams, RenameParams, ServerCapabilities, Uri,
 };
 
 use crate::{
@@ -122,6 +121,21 @@ pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
     Ok(connection.sender.send(Message::Notification(notif))?)
 }
 
+macro_rules! handle_request {
+    ($request_type:ty, $handler:expr, $req:expr, $connection:expr) => {
+        let (id, params) = cast_req::<$request_type>($req).expect(concat!(
+            "Failed to cast `",
+            stringify!($request_type),
+            "` request"
+        ));
+        info!(
+            "Received `{}` request ({id}): {params:?}",
+            <$request_type>::METHOD
+        );
+        $handler(id, &params, $connection)?;
+    };
+}
+
 /// Handles `Request`s from the lsp client.
 ///
 /// # Errors
@@ -133,39 +147,20 @@ pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
 ///
 /// Panics if JSON encoding of a response fails or if a json request fails to cast
 /// into its equivalent in-memory struct.
-#[allow(clippy::too_many_lines)]
 pub fn handle_request(
     req: Request,
-    capabilities: &ServerCapabilities,
-    connection: &Connection,
+    _capabilities: &ServerCapabilities, // TODO: Use once we have more capabilities tested
+    conn: &Connection,
 ) -> Result<()> {
     match req.method.as_str() {
         CallHierarchyIncomingCalls::METHOD => {
-            let (id, params) = cast_req::<CallHierarchyIncomingCalls>(req)
-                .expect("Failed to cast `CallHierarchyIncomingCalls` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                CallHierarchyIncomingCalls::METHOD
-            );
-            handle_incoming_calls(id, &params, connection)?;
+            handle_request!(CallHierarchyIncomingCalls, incoming_calls, req, conn);
         }
         CallHierarchyPrepare::METHOD => {
-            let (id, params) = cast_req::<CallHierarchyPrepare>(req)
-                .expect("Failed to cast `CallHierarchyPrepare` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                Completion::METHOD
-            );
-            handle_prepare_call_hierarchy(id, &params, connection)?;
+            handle_request!(CallHierarchyPrepare, prepare_call_hierarchy, req, conn);
         }
         Completion::METHOD => {
-            let (id, params) =
-                cast_req::<Completion>(req).expect("Failed to cast `Completion` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                Completion::METHOD
-            );
-            handle_completion(id, &params, connection)?;
+            handle_request!(Completion, handle_completion, req, conn);
         }
         DocumentDiagnosticRequest::METHOD => {
             let (id, params) = cast_req::<DocumentDiagnosticRequest>(req)
@@ -174,84 +169,34 @@ pub fn handle_request(
                 "Received `{}` request ({id}): {params:?}",
                 DocumentDiagnosticRequest::METHOD
             );
-            send_diagnostic_resp(&params.text_document.uri, connection)?;
+            send_diagnostic_resp(&params.text_document.uri, conn)?;
         }
         DocumentSymbolRequest::METHOD => {
-            let (id, params) = cast_req::<DocumentSymbolRequest>(req)
-                .expect("Failed to cast `DocumentSymbolRequest` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                Completion::METHOD
-            );
-            handle_document_symbol(id, &params, connection)?;
+            handle_request!(DocumentSymbolRequest, document_symbol, req, conn);
         }
         Formatting::METHOD => {
-            let (id, params) =
-                cast_req::<Formatting>(req).expect("Failed to cast `Formatting` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                Formatting::METHOD
-            );
-            return handle_formatting(id, &params, connection);
+            handle_request!(Formatting, formatting, req, conn);
         }
         GotoDeclaration::METHOD => {
-            let (id, params) =
-                cast_req::<GotoDeclaration>(req).expect("Failed to cast `GotoDeclaration` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                GotoDeclaration::METHOD
-            );
-            handle_declaration(id, &params, connection)?;
+            handle_request!(GotoDeclaration, declaration, req, conn);
         }
         GotoDefinition::METHOD => {
-            let (id, params) =
-                cast_req::<GotoDefinition>(req).expect("Failed to cast `GotoDefinition` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                GotoDefinition::METHOD
-            );
-            handle_definition(id, &params, connection)?;
+            handle_request!(GotoDefinition, definition, req, conn);
         }
         GotoImplementation::METHOD => {
-            let (id, params) = cast_req::<GotoImplementation>(req)
-                .expect("Failed to cast `GotoImplementation` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                GotoImplementation::METHOD
-            );
-            handle_implementation(id, &params, connection)?;
+            handle_request!(GotoImplementation, implementation, req, conn);
         }
         GotoTypeDefinition::METHOD => {
-            let (id, params) = cast_req::<GotoTypeDefinition>(req)
-                .expect("Failed to cast `GotoTypeDefinition` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                GotoTypeDefinition::METHOD
-            );
-            handle_type_definition(id, &params, connection)?;
+            handle_request!(GotoTypeDefinition, type_definition, req, conn);
         }
         HoverRequest::METHOD => {
-            let (id, params) =
-                cast_req::<HoverRequest>(req).expect("Failed to cast `HoverRequest` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                HoverRequest::METHOD
-            );
-            handle_hover(id, &params, capabilities, connection)?;
+            handle_request!(HoverRequest, hover, req, conn);
         }
         References::METHOD => {
-            let (id, params) =
-                cast_req::<References>(req).expect("Failed to cast `References` request");
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                References::METHOD
-            );
-            return handle_references(id, &params, connection);
+            handle_request!(References, references, req, conn);
         }
         Rename::METHOD => {
-            let (id, params) = cast_req::<Rename>(req).expect("Failed to cast `Rename` request");
-            info!("Received `{}` request ({id}): {params:?}", Rename::METHOD);
-            return handle_rename(id, &params, connection);
+            handle_request!(Rename, rename, req, conn);
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),
     }
@@ -297,7 +242,7 @@ fn handle_completion(
 /// # Panics
 ///
 /// Panics if serialization of `params` fails.
-fn handle_declaration(
+fn declaration(
     id: RequestId,
     params: &GotoDeclarationParams,
     connection: &Connection,
@@ -325,11 +270,7 @@ fn handle_declaration(
 /// # Panics
 ///
 /// Panics if serialization of `params` fails.
-fn handle_definition(
-    id: RequestId,
-    params: &GotoDefinitionParams,
-    connection: &Connection,
-) -> Result<()> {
+fn definition(id: RequestId, params: &GotoDefinitionParams, connection: &Connection) -> Result<()> {
     let uri = &params.text_document_position_params.text_document.uri;
     let Some(root_path) = get_root_test_path(uri) else {
         error!(
@@ -353,7 +294,7 @@ fn handle_definition(
 /// # Panics
 ///
 /// Panics if serialization of `params` fails.
-fn handle_document_symbol(
+fn document_symbol(
     id: RequestId,
     params: &DocumentSymbolParams,
     connection: &Connection,
@@ -381,7 +322,7 @@ fn handle_document_symbol(
 /// # Panics
 ///
 /// Panics if serialization of `params` fails.
-fn handle_formatting(
+fn formatting(
     id: RequestId,
     params: &DocumentFormattingParams,
     connection: &Connection,
@@ -410,10 +351,10 @@ fn handle_formatting(
 /// # Panics
 ///
 /// Panics if serialization of `params` fails.
-fn handle_hover(
+fn hover(
     id: RequestId,
     params: &HoverParams,
-    capabilities: &ServerCapabilities,
+    // capabilities: &ServerCapabilities, // TODO: Once we add more capabilities coverage
     connection: &Connection,
 ) -> Result<()> {
     let uri = &params.text_document_position_params.text_document.uri;
@@ -426,25 +367,25 @@ fn handle_hover(
     };
     let response_num = receive_response_num(&root_path)?;
 
-    let is_progress = matches!(
-        capabilities.hover_provider,
-        Some(HoverProviderCapability::Options(HoverOptions {
-            work_done_progress_options: WorkDoneProgressOptions {
-                work_done_progress: Some(true),
-            },
-        }))
-    );
-    if is_progress {
-        // TODO: Send a few mock progress responses before sending the data
-    }
+    // let is_progress = matches!(
+    //     capabilities.hover_provider,
+    //     Some(HoverProviderCapability::Options(HoverOptions {
+    //         work_done_progress_options: WorkDoneProgressOptions {
+    //             work_done_progress: Some(true),
+    //         },
+    //     }))
+    // );
+    // if is_progress {
+    //     // TODO: Send a few mock progress responses before sending the data
+    // }
 
     info!("response_num: {response_num}");
     let resp = get_hover_response(response_num);
     send_req_resp(id, resp, connection)?;
 
-    if is_progress {
-        // TODO: Send a progress done messages here
-    }
+    // if is_progress {
+    //     // TODO: Send a progress done messages here
+    // }
     Ok(())
 }
 
@@ -457,7 +398,7 @@ fn handle_hover(
 /// # Panics
 ///
 /// Panics if serialization of `params` fails.
-fn handle_implementation(
+fn implementation(
     id: RequestId,
     params: &GotoImplementationParams,
     connection: &Connection,
@@ -485,7 +426,7 @@ fn handle_implementation(
 /// # Panics
 ///
 /// Panics if serialization of `params` fails.
-fn handle_incoming_calls(
+fn incoming_calls(
     id: RequestId,
     params: &CallHierarchyIncomingCallsParams,
     connection: &Connection,
@@ -513,7 +454,7 @@ fn handle_incoming_calls(
 /// # Panics
 ///
 /// Panics if serialization of `params` fails.
-fn handle_prepare_call_hierarchy(
+fn prepare_call_hierarchy(
     id: RequestId,
     params: &CallHierarchyPrepareParams,
     connection: &Connection,
@@ -541,11 +482,7 @@ fn handle_prepare_call_hierarchy(
 /// # Panics
 ///
 /// Panics if serialization of `Vec<Location>` fails.
-fn handle_references(
-    id: RequestId,
-    params: &ReferenceParams,
-    connection: &Connection,
-) -> Result<()> {
+fn references(id: RequestId, params: &ReferenceParams, connection: &Connection) -> Result<()> {
     let uri = &params.text_document_position.text_document.uri;
     let Some(root_path) = get_root_test_path(uri) else {
         error!(
@@ -569,7 +506,7 @@ fn handle_references(
 /// # Panics
 ///
 /// Panics if serialization of `params` fails.
-fn handle_rename(id: RequestId, params: &RenameParams, connection: &Connection) -> Result<()> {
+fn rename(id: RequestId, params: &RenameParams, connection: &Connection) -> Result<()> {
     let uri = &params.text_document_position.text_document.uri;
     let Some(root_path) = get_root_test_path(uri) else {
         error!(
@@ -593,7 +530,7 @@ fn handle_rename(id: RequestId, params: &RenameParams, connection: &Connection) 
 /// # Panics
 ///
 /// Panics if serialization of `params` fails.
-fn handle_type_definition(
+fn type_definition(
     id: RequestId,
     params: &GotoTypeDefinitionParams,
     connection: &Connection,
