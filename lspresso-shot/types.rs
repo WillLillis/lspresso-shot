@@ -40,7 +40,7 @@ pub enum TestType {
     Hover,
     /// Test `textDocument/implementations` requests
     Implementation,
-    /// Test `textDocument/incomingCalls` requests
+    /// Test `callHierarchy/incomingCalls` requests
     IncomingCalls,
     /// Test `textDocument/prepareCallHierarchy` requests
     PrepareCallHierarchy,

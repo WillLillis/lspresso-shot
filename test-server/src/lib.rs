@@ -1,6 +1,10 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+use log::error;
 use lsp_types::{ServerCapabilities, Uri};
 
 pub mod handle;
@@ -60,7 +64,7 @@ pub fn send_response_num(response_num: u32, path: &Path) -> std::io::Result<()> 
     let mut path = path.to_path_buf();
     path.push("RESPONSE_NUM.txt");
 
-    std::fs::write(path, response_num.to_string())
+    fs::write(path, response_num.to_string())
 }
 
 /// Serialized `capabilities` to JSON and writes them to `path/capabilities.json`
@@ -78,7 +82,7 @@ pub fn send_capabiltiies(capabilities: &ServerCapabilities, path: &Path) -> std:
     let capabilities_json =
         serde_json::to_string_pretty(capabilities).expect("Failed to serialize capabilities");
 
-    std::fs::write(path, capabilities_json)
+    fs::write(path, capabilities_json)
 }
 
 /// Reads a response number from `path/RESPONSE_NUM.txt`
@@ -89,10 +93,17 @@ pub fn send_capabiltiies(capabilities: &ServerCapabilities, path: &Path) -> std:
 pub fn receive_response_num(path: &Path) -> Result<u32> {
     let mut path = path.to_path_buf();
     path.push("RESPONSE_NUM.txt");
-    let response_str = std::fs::read_to_string(path)?;
-
-    match response_str.parse::<u32>() {
-        Ok(num) => Ok(num),
-        Err(e) => Err(anyhow!("Failed to parse response num contents -- {e}")),
+    match fs::read_to_string(path) {
+        Ok(response_str) => match response_str.parse::<u32>() {
+            Ok(num) => Ok(num),
+            Err(e) => {
+                error!("Failed to parse response num contents -- {e}");
+                Err(e)?
+            }
+        },
+        Err(e) => {
+            error!("Failed to read response num file -- {e}");
+            Err(e)?
+        }
     }
 }
