@@ -122,7 +122,7 @@ pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
 }
 
 macro_rules! handle_request {
-    ($request_type:ty, $handler:expr, $req:expr, $connection:expr) => {
+    ($request_type:ty, $handler:expr, $resp_getter:expr, $req:expr, $connection:expr, $extract_uri:expr) => {{
         let (id, params) = cast_req::<$request_type>($req).expect(concat!(
             "Failed to cast `",
             stringify!($request_type),
@@ -132,8 +132,20 @@ macro_rules! handle_request {
             "Received `{}` request ({id}): {params:?}",
             <$request_type>::METHOD
         );
-        $handler(id, &params, $connection)?;
-    };
+        let uri = $extract_uri(params);
+        let Some(root_path) = get_root_test_path(&uri) else {
+            error!(
+                "Failed to retrieve root path from provided uri: {}",
+                uri.as_str()
+            );
+            return Ok(());
+        };
+        let response_num = receive_response_num(&root_path)?;
+        info!("response_num: {response_num}");
+
+        let resp = $resp_getter(response_num);
+        send_req_resp(id, resp, $connection)
+    }};
 }
 
 /// Handles `Request`s from the lsp client.
@@ -147,20 +159,48 @@ macro_rules! handle_request {
 ///
 /// Panics if JSON encoding of a response fails or if a json request fails to cast
 /// into its equivalent in-memory struct.
+#[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
 pub fn handle_request(
     req: Request,
     _capabilities: &ServerCapabilities, // TODO: Use once we have more capabilities tested
     conn: &Connection,
 ) -> Result<()> {
+    // TODO: Probably check capabilities here and do some progress reporting before
+    // and after handling the request, maybe implement other behaviors
     match req.method.as_str() {
         CallHierarchyIncomingCalls::METHOD => {
-            handle_request!(CallHierarchyIncomingCalls, incoming_calls, req, conn);
+            handle_request!(
+                CallHierarchyIncomingCalls,
+                incoming_calls,
+                get_incoming_calls_response,
+                req,
+                conn,
+                |params: CallHierarchyIncomingCallsParams| -> Uri { params.item.uri }
+            )?;
         }
         CallHierarchyPrepare::METHOD => {
-            handle_request!(CallHierarchyPrepare, prepare_call_hierarchy, req, conn);
+            handle_request!(
+                CallHierarchyPrepare,
+                prepare_call_hierarchy,
+                get_prepare_call_hierachy_response,
+                req,
+                conn,
+                |params: CallHierarchyPrepareParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
+            )?;
         }
         Completion::METHOD => {
-            handle_request!(Completion, handle_completion, req, conn);
+            handle_request!(
+                Completion,
+                handle_completion,
+                get_completion_response,
+                req,
+                conn,
+                |params: CompletionParams| -> Uri {
+                    params.text_document_position.text_document.uri
+                }
+            )?;
         }
         DocumentDiagnosticRequest::METHOD => {
             let (id, params) = cast_req::<DocumentDiagnosticRequest>(req)
@@ -172,347 +212,109 @@ pub fn handle_request(
             send_diagnostic_resp(&params.text_document.uri, conn)?;
         }
         DocumentSymbolRequest::METHOD => {
-            handle_request!(DocumentSymbolRequest, document_symbol, req, conn);
+            handle_request!(
+                DocumentSymbolRequest,
+                document_symbol,
+                get_document_symbol_response,
+                req,
+                conn,
+                |params: DocumentSymbolParams| -> Uri { params.text_document.uri }
+            )?;
         }
         Formatting::METHOD => {
-            handle_request!(Formatting, formatting, req, conn);
+            handle_request!(
+                Formatting,
+                formatting,
+                get_formatting_response,
+                req,
+                conn,
+                |params: DocumentFormattingParams| -> Uri { params.text_document.uri }
+            )?;
         }
         GotoDeclaration::METHOD => {
-            handle_request!(GotoDeclaration, declaration, req, conn);
+            handle_request!(
+                GotoDeclaration,
+                declaration,
+                get_declaration_response,
+                req,
+                conn,
+                |params: GotoDeclarationParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
+            )?;
         }
         GotoDefinition::METHOD => {
-            handle_request!(GotoDefinition, definition, req, conn);
+            handle_request!(
+                GotoDefinition,
+                definition,
+                get_definition_response,
+                req,
+                conn,
+                |params: GotoDefinitionParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
+            )?;
         }
         GotoImplementation::METHOD => {
-            handle_request!(GotoImplementation, implementation, req, conn);
+            handle_request!(
+                GotoImplementation,
+                implementation,
+                get_implementation_response,
+                req,
+                conn,
+                |params: GotoImplementationParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
+            )?;
         }
         GotoTypeDefinition::METHOD => {
-            handle_request!(GotoTypeDefinition, type_definition, req, conn);
+            handle_request!(
+                GotoTypeDefinition,
+                type_definition,
+                get_type_definition_response,
+                req,
+                conn,
+                |params: GotoTypeDefinitionParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
+            )?;
         }
         HoverRequest::METHOD => {
-            handle_request!(HoverRequest, hover, req, conn);
+            handle_request!(
+                HoverRequest,
+                hover,
+                get_hover_response,
+                req,
+                conn,
+                |params: HoverParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
+            )?;
         }
         References::METHOD => {
-            handle_request!(References, references, req, conn);
+            handle_request!(
+                References,
+                references,
+                get_references_response,
+                req,
+                conn,
+                |params: ReferenceParams| -> Uri {
+                    params.text_document_position.text_document.uri
+                }
+            )?;
         }
         Rename::METHOD => {
-            handle_request!(Rename, rename, req, conn);
+            handle_request!(
+                Rename,
+                rename,
+                get_rename_response,
+                req,
+                conn,
+                |params: RenameParams| -> Uri { params.text_document_position.text_document.uri }
+            )?;
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),
     }
 
     Ok(())
-}
-
-// TODO: Pull out common handler logic into a macro
-// This will get a little more complicated once we start checking capabilities
-// at runtime, but I think that should be doable with a closure parameter
-
-/// Sends response to a `textDocument/completion` request.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn handle_completion(
-    id: RequestId,
-    params: &CompletionParams,
-    connection: &Connection,
-) -> Result<()> {
-    let uri = &params.text_document_position.text_document.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-
-    info!("response_num: {response_num}");
-    let resp = get_completion_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `textDocument/declaration` request.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn declaration(
-    id: RequestId,
-    params: &GotoDeclarationParams,
-    connection: &Connection,
-) -> Result<()> {
-    let uri = &params.text_document_position_params.text_document.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_declaration_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `textDocument/definition` request.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn definition(id: RequestId, params: &GotoDefinitionParams, connection: &Connection) -> Result<()> {
-    let uri = &params.text_document_position_params.text_document.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_definition_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `textDocument/documentSymbol` request.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn document_symbol(
-    id: RequestId,
-    params: &DocumentSymbolParams,
-    connection: &Connection,
-) -> Result<()> {
-    let uri = &params.text_document.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_document_symbol_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `textDocument/formatting` request.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn formatting(
-    id: RequestId,
-    params: &DocumentFormattingParams,
-    connection: &Connection,
-) -> Result<()> {
-    let uri = &params.text_document.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-
-    info!("response_num: {response_num}");
-    let resp = get_formatting_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `textDocument/hover` request.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn hover(
-    id: RequestId,
-    params: &HoverParams,
-    // capabilities: &ServerCapabilities, // TODO: Once we add more capabilities coverage
-    connection: &Connection,
-) -> Result<()> {
-    let uri = &params.text_document_position_params.text_document.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-
-    // let is_progress = matches!(
-    //     capabilities.hover_provider,
-    //     Some(HoverProviderCapability::Options(HoverOptions {
-    //         work_done_progress_options: WorkDoneProgressOptions {
-    //             work_done_progress: Some(true),
-    //         },
-    //     }))
-    // );
-    // if is_progress {
-    //     // TODO: Send a few mock progress responses before sending the data
-    // }
-
-    info!("response_num: {response_num}");
-    let resp = get_hover_response(response_num);
-    send_req_resp(id, resp, connection)?;
-
-    // if is_progress {
-    //     // TODO: Send a progress done messages here
-    // }
-    Ok(())
-}
-
-/// Sends response to a `textDocument/implementation` request.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn implementation(
-    id: RequestId,
-    params: &GotoImplementationParams,
-    connection: &Connection,
-) -> Result<()> {
-    let uri = &params.text_document_position_params.text_document.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_implementation_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `callHierarchy/incomingCalls` request.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn incoming_calls(
-    id: RequestId,
-    params: &CallHierarchyIncomingCallsParams,
-    connection: &Connection,
-) -> Result<()> {
-    let uri = &params.item.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_incoming_calls_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `textDocument/prepareCallHierarchy` request.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn prepare_call_hierarchy(
-    id: RequestId,
-    params: &CallHierarchyPrepareParams,
-    connection: &Connection,
-) -> Result<()> {
-    let uri = &params.text_document_position_params.text_document.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_prepare_call_hierachy_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends a `textDocument/references` response to the client.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn references(id: RequestId, params: &ReferenceParams, connection: &Connection) -> Result<()> {
-    let uri = &params.text_document_position.text_document.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_references_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `textDocument/rename` request.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn rename(id: RequestId, params: &RenameParams, connection: &Connection) -> Result<()> {
-    let uri = &params.text_document_position.text_document.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_rename_response(response_num);
-    send_req_resp(id, resp, connection)
-}
-
-/// Sends response to a `textDocument/typeDefinition` request.
-///
-/// # Errors
-///
-/// Returns `Err` if receiving the response nummber from the test case or sending
-/// the response to  the server fails.
-fn type_definition(
-    id: RequestId,
-    params: &GotoTypeDefinitionParams,
-    connection: &Connection,
-) -> Result<()> {
-    let uri = &params.text_document_position_params.text_document.uri;
-    let Some(root_path) = get_root_test_path(uri) else {
-        error!(
-            "Failed to retrieve root path from provided uri: {}",
-            uri.as_str()
-        );
-        return Ok(());
-    };
-    let response_num = receive_response_num(&root_path)?;
-    info!("response_num: {response_num}");
-    let resp = get_type_definition_response(response_num);
-    send_req_resp(id, resp, connection)
 }
