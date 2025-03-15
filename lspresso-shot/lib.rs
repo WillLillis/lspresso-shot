@@ -783,6 +783,10 @@ pub fn test_implementation(
 ///
 /// Returns `TestError` if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `call_item` fails
 pub fn test_incoming_calls(
     mut test_case: TestCase,
     call_item: &CallHierarchyItem,
@@ -794,7 +798,7 @@ pub fn test_incoming_calls(
         Some(&vec![(
             "CALL_ITEM",
             serde_json::to_string_pretty(call_item)
-                .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e.to_string()))?,
+                .expect("JSON deserialzation of call item failed"),
         )]),
         expected,
         |expected, actual: &Vec<CallHierarchyIncomingCall>| {

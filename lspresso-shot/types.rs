@@ -1065,7 +1065,7 @@ impl std::fmt::Display for IncomingCallsMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "Test {}: Incorrect Implementation response:",
+            "Test {}: Incorrect IncomingCalls response:",
             self.test_id
         )?;
         write_fields_comparison(f, "Implementation", &self.expected, &self.actual, 0)?;
