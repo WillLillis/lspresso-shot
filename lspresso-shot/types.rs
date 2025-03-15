@@ -8,6 +8,7 @@ use std::{
 };
 
 use anstyle::{AnsiColor, Color, Style};
+use lsp_types::TypeHierarchyItem;
 // NOTE: Is re-exporting these types really necessary?
 pub use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
@@ -46,6 +47,8 @@ pub enum TestType {
     OutgoingCalls,
     /// Test `textDocument/prepareCallHierarchy` requests
     PrepareCallHierarchy,
+    /// Test `textDocument/prepareTypeHierarchy` requests
+    PrepareTypeHierarchy,
     /// Test `textDocument/references` requests
     References,
     /// Test `textDocument/rename` requests
@@ -71,6 +74,7 @@ impl std::fmt::Display for TestType {
                 Self::IncomingCalls => "callHierarchy/incomingCalls",
                 Self::OutgoingCalls => "callHierarchy/outgoingCalls",
                 Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
+                Self::PrepareTypeHierarchy => "textDocument/prepareTypeHierarchy",
                 Self::References => "textDocument/references",
                 Self::Rename => "textDocument/rename",
                 Self::TypeDefinition => "textDocument/typeDefinition",
@@ -552,6 +556,8 @@ pub enum TestError {
     OutgoingCallsMismatch(#[from] OutgoingCallsMismatchError),
     #[error(transparent)]
     PrepareCallHierarchyMismatch(#[from] PrepareCallHierachyMismatchError),
+    #[error(transparent)]
+    PrepareTypeHierarchyMismatch(#[from] PrepareTypeHierachyMismatchError),
     #[error(transparent)]
     ReferencesMismatch(#[from] ReferencesMismatchError),
     #[error(transparent)]
@@ -1107,6 +1113,25 @@ impl std::fmt::Display for PrepareCallHierachyMismatchError {
             self.test_id
         )?;
         write_fields_comparison(f, "Prepare Call Hierarchy", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct PrepareTypeHierachyMismatchError {
+    pub test_id: String,
+    pub expected: Vec<TypeHierarchyItem>,
+    pub actual: Vec<TypeHierarchyItem>,
+}
+
+impl std::fmt::Display for PrepareTypeHierachyMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Prepare Type Hierarchy response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Prepare Type Hierarchy", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }
