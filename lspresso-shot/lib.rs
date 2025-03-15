@@ -933,56 +933,21 @@ pub fn test_rename(
         Err(TestSetupError::InvalidCursorPosition(TestType::Rename))?;
     }
     test_case.test_type = Some(TestType::Rename);
-    // NOTE: It would be nice to use `collect_results` here, but complications introduced
-    // by the serialization issues make that more trouble than it's worth
-    if let Some(expected) = expected {
-        let actual = match test_inner::<WorkspaceEdit, WorkspaceEdit>(
-            &test_case,
-            Some(&vec![("NEW_NAME", format!("newName = '{new_name}'"))]),
-        ) {
-            Ok(edits) => edits.unwrap(),
-            Err(TestError::Serialization(test_id, e)) => {
-                // HACK: Comparing against the stringified error is rather hacky,
-                // but the error object's `code` field isn't accessible. In this case,
-                // we return the expected object
-                if e.eq("invalid type: sequence, expected a map at line 1 column 11") {
-                    // NOTE: The JSON is as follows: `{"changes":[]}`
-                    WorkspaceEdit {
-                        changes: Some(HashMap::new()),
-                        document_changes: None,
-                        change_annotations: None,
-                    }
-                } else if e.eq("invalid type: sequence, expected a map at line 1 column 21") {
-                    // NOTE: The JSON is as follows: `{"changeAnnotations":[]}`
-                    WorkspaceEdit {
-                        changes: None,
-                        document_changes: None,
-                        change_annotations: Some(HashMap::new()),
-                    }
-                } else {
-                    Err(TestError::Serialization(test_id, e))?
-                }
+    collect_results(
+        &test_case,
+        Some(&vec![("NEW_NAME", format!("newName = '{new_name}'"))]),
+        expected,
+        |expected, actual| {
+            if expected != actual {
+                Err(Box::new(RenameMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                }))?;
             }
-            Err(e) => Err(e)?,
-        };
-
-        if *expected != actual {
-            Err(Box::new(RenameMismatchError {
-                test_id: test_case.test_id,
-                expected: expected.clone(),
-                actual,
-            }))?;
-        }
-
-        Ok(())
-    } else {
-        let empty = test_inner::<EmptyResult, WorkspaceEdit>(
-            &test_case,
-            Some(&vec![("NEW_NAME", format!("newName = '{new_name}'"))]),
-        )?;
-        assert!(empty.is_none());
-        Ok(())
-    }
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'textDocument/typeDefinition' request
