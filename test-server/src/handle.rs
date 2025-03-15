@@ -123,7 +123,7 @@ pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
 }
 
 macro_rules! handle_request {
-    ($request_type:ty, $handler:expr, $resp_getter:expr, $req:expr, $connection:expr, $extract_uri:expr) => {{
+    ($request_type:ty, $resp_getter:expr, $req:expr, $connection:expr, $extract_uri:expr) => {{
         let (id, params) = cast_req::<$request_type>($req).expect(concat!(
             "Failed to cast `",
             stringify!($request_type),
@@ -172,7 +172,6 @@ pub fn handle_request(
         CallHierarchyIncomingCalls::METHOD => {
             handle_request!(
                 CallHierarchyIncomingCalls,
-                incoming_calls,
                 get_incoming_calls_response,
                 req,
                 conn,
@@ -191,7 +190,6 @@ pub fn handle_request(
         CallHierarchyPrepare::METHOD => {
             handle_request!(
                 CallHierarchyPrepare,
-                prepare_call_hierarchy,
                 get_prepare_call_hierachy_response,
                 req,
                 conn,
@@ -203,7 +201,6 @@ pub fn handle_request(
         Completion::METHOD => {
             handle_request!(
                 Completion,
-                handle_completion,
                 get_completion_response,
                 req,
                 conn,
@@ -224,7 +221,6 @@ pub fn handle_request(
         DocumentSymbolRequest::METHOD => {
             handle_request!(
                 DocumentSymbolRequest,
-                document_symbol,
                 get_document_symbol_response,
                 req,
                 conn,
@@ -234,7 +230,6 @@ pub fn handle_request(
         Formatting::METHOD => {
             handle_request!(
                 Formatting,
-                formatting,
                 get_formatting_response,
                 req,
                 conn,
@@ -244,7 +239,6 @@ pub fn handle_request(
         GotoDeclaration::METHOD => {
             handle_request!(
                 GotoDeclaration,
-                declaration,
                 get_declaration_response,
                 req,
                 conn,
@@ -256,7 +250,6 @@ pub fn handle_request(
         GotoDefinition::METHOD => {
             handle_request!(
                 GotoDefinition,
-                definition,
                 get_definition_response,
                 req,
                 conn,
@@ -268,7 +261,6 @@ pub fn handle_request(
         GotoImplementation::METHOD => {
             handle_request!(
                 GotoImplementation,
-                implementation,
                 get_implementation_response,
                 req,
                 conn,
@@ -280,7 +272,6 @@ pub fn handle_request(
         GotoTypeDefinition::METHOD => {
             handle_request!(
                 GotoTypeDefinition,
-                type_definition,
                 get_type_definition_response,
                 req,
                 conn,
@@ -292,7 +283,6 @@ pub fn handle_request(
         HoverRequest::METHOD => {
             handle_request!(
                 HoverRequest,
-                hover,
                 get_hover_response,
                 req,
                 conn,
@@ -304,7 +294,6 @@ pub fn handle_request(
         References::METHOD => {
             handle_request!(
                 References,
-                references,
                 get_references_response,
                 req,
                 conn,
@@ -316,7 +305,6 @@ pub fn handle_request(
         Rename::METHOD => {
             handle_request!(
                 Rename,
-                rename,
                 get_rename_response,
                 req,
                 conn,
