@@ -2,13 +2,13 @@ use std::{collections::HashMap, str::FromStr};
 
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CallHierarchyIncomingCall, CallHierarchyItem, ChangeAnnotation, CodeDescription,
-    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
-    CompletionResponse, Diagnostic, DiagnosticRelatedInformation, DocumentChanges, DocumentSymbol,
-    DocumentSymbolResponse, Documentation, GotoDefinitionResponse, Hover, HoverContents,
-    LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind, Position,
-    PublishDiagnosticsParams, Range, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit,
-    TextEdit, Uri, WorkspaceEdit,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, ChangeAnnotation,
+    CodeDescription, CompletionItem, CompletionItemKind, CompletionItemLabelDetails,
+    CompletionList, CompletionResponse, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
+    DocumentSymbol, DocumentSymbolResponse, Documentation, GotoDefinitionResponse, Hover,
+    HoverContents, LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind,
+    Position, PublishDiagnosticsParams, Range, SymbolInformation, SymbolKind, SymbolTag,
+    TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
 };
 
 use crate::get_dummy_source_path;
@@ -262,6 +262,63 @@ pub fn get_incoming_calls_response(response_num: u32) -> Option<Vec<CallHierarch
     };
     let item2 = CallHierarchyIncomingCall {
         from: CallHierarchyItem {
+            name: "name2".to_string(),
+            kind: SymbolKind::FILE,
+            tags: None,
+            detail: Some("detail2".to_string()),
+            uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
+            range: Range {
+                start: Position::new(1, 2),
+                end: Position::new(3, 4),
+            },
+            selection_range: Range {
+                start: Position::new(5, 6),
+                end: Position::new(7, 8),
+            },
+            data: None,
+        },
+        from_ranges: vec![Range {
+            start: Position::new(9, 10),
+            end: Position::new(11, 12),
+        }],
+    };
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![item1]),
+        2 => Some(vec![item2]),
+        3 => Some(vec![item1, item2]),
+        _ => None,
+    }
+}
+
+/// For use with `test_outgoing_calls`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_outgoing_calls_response(response_num: u32) -> Option<Vec<CallHierarchyOutgoingCall>> {
+    let item1 = CallHierarchyOutgoingCall {
+        to: CallHierarchyItem {
+            name: "name1".to_string(),
+            kind: SymbolKind::FILE,
+            tags: None,
+            detail: Some("detail1".to_string()),
+            uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
+            range: Range {
+                start: Position::new(1, 2),
+                end: Position::new(3, 4),
+            },
+            selection_range: Range {
+                start: Position::new(5, 6),
+                end: Position::new(7, 8),
+            },
+            data: None,
+        },
+        from_ranges: vec![Range {
+            start: Position::new(9, 10),
+            end: Position::new(11, 12),
+        }],
+    };
+    let item2 = CallHierarchyOutgoingCall {
+        to: CallHierarchyItem {
             name: "name2".to_string(),
             kind: SymbolKind::FILE,
             tags: None,

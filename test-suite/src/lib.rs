@@ -9,6 +9,7 @@ mod formatting;
 mod hover;
 mod implementation;
 mod incoming_calls;
+mod outgoing_calls;
 mod prepare_call_hierarchy;
 mod references;
 mod rename;
