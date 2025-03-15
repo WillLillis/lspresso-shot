@@ -11,9 +11,9 @@ use anstyle::{AnsiColor, Color, Style};
 // NOTE: Is re-exporting these types really necessary?
 pub use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CallHierarchyIncomingCall, CallHierarchyItem, CompletionItem, CompletionList,
-    CompletionResponse, Diagnostic, DocumentSymbolResponse, GotoDefinitionResponse, Hover,
-    Location, Position, TextEdit, WorkspaceEdit,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CompletionItem,
+    CompletionList, CompletionResponse, Diagnostic, DocumentSymbolResponse, GotoDefinitionResponse,
+    Hover, Location, Position, TextEdit, WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -42,6 +42,8 @@ pub enum TestType {
     Implementation,
     /// Test `callHierarchy/incomingCalls` requests
     IncomingCalls,
+    /// Test `callHierarchy/outgoingCalls` requests
+    OutgoingCalls,
     /// Test `textDocument/prepareCallHierarchy` requests
     PrepareCallHierarchy,
     /// Test `textDocument/references` requests
@@ -67,6 +69,7 @@ impl std::fmt::Display for TestType {
                 Self::Hover => "textDocument/hover",
                 Self::Implementation => "textDocument/implementation",
                 Self::IncomingCalls => "callHierarchy/incomingCalls",
+                Self::OutgoingCalls => "callHierarchy/outgoingCalls",
                 Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
                 Self::References => "textDocument/references",
                 Self::Rename => "textDocument/rename",
@@ -545,6 +548,8 @@ pub enum TestError {
     ImplementationMismatch(#[from] Box<ImplementationMismatchError>),
     #[error(transparent)]
     IncomingCallsMismatch(#[from] IncomingCallsMismatchError),
+    #[error(transparent)]
+    OutgoingCallsMismatch(#[from] OutgoingCallsMismatchError),
     #[error(transparent)]
     PrepareCallHierarchyMismatch(#[from] PrepareCallHierachyMismatchError),
     #[error(transparent)]
@@ -1061,6 +1066,25 @@ impl std::fmt::Display for IncomingCallsMismatchError {
         writeln!(
             f,
             "Test {}: Incorrect Implementation response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Implementation", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error, PartialEq)]
+pub struct OutgoingCallsMismatchError {
+    pub test_id: String,
+    pub expected: Vec<CallHierarchyOutgoingCall>,
+    pub actual: Vec<CallHierarchyOutgoingCall>,
+}
+
+impl std::fmt::Display for OutgoingCallsMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect OutgoingCalls response:",
             self.test_id
         )?;
         write_fields_comparison(f, "Implementation", &self.expected, &self.actual, 0)?;

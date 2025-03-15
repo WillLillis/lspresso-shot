@@ -4,14 +4,15 @@ use lsp_server::{Connection, Message, Notification, Request, RequestId, Response
 use lsp_types::{
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
-        CallHierarchyIncomingCalls, CallHierarchyPrepare, Completion, DocumentDiagnosticRequest,
-        DocumentSymbolRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
-        GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
-        HoverRequest, References, Rename, Request as _,
+        CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare, Completion,
+        DocumentDiagnosticRequest, DocumentSymbolRequest, Formatting, GotoDeclaration,
+        GotoDeclarationParams, GotoDefinition, GotoImplementation, GotoImplementationParams,
+        GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest, References, Rename,
+        Request as _,
     },
-    CallHierarchyIncomingCallsParams, CallHierarchyPrepareParams, CompletionParams,
-    DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams, HoverParams,
-    ReferenceParams, RenameParams, ServerCapabilities, Uri,
+    CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
+    CompletionParams, DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams,
+    HoverParams, ReferenceParams, RenameParams, ServerCapabilities, Uri,
 };
 
 use crate::{
@@ -20,8 +21,8 @@ use crate::{
         get_completion_response, get_declaration_response, get_definition_response,
         get_diagnostics_response, get_document_symbol_response, get_formatting_response,
         get_hover_response, get_implementation_response, get_incoming_calls_response,
-        get_prepare_call_hierachy_response, get_references_response, get_rename_response,
-        get_type_definition_response,
+        get_outgoing_calls_response, get_prepare_call_hierachy_response, get_references_response,
+        get_rename_response, get_type_definition_response,
     },
 };
 
@@ -176,6 +177,15 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: CallHierarchyIncomingCallsParams| -> Uri { params.item.uri }
+            )?;
+        }
+        CallHierarchyOutgoingCalls::METHOD => {
+            handle_request!(
+                CallHierarchyOutgoingCalls,
+                get_outgoing_calls_response,
+                req,
+                conn,
+                |params: CallHierarchyOutgoingCallsParams| -> Uri { params.item.uri }
             )?;
         }
         CallHierarchyPrepare::METHOD => {

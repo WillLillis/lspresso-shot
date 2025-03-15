@@ -3,9 +3,10 @@ pub mod types;
 
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CallHierarchyIncomingCall, CallHierarchyItem, CompletionResponse, Diagnostic,
-    DocumentChangeOperation, DocumentChanges, DocumentSymbolResponse, FormattingOptions,
-    GotoDefinitionResponse, Hover, Location, ResourceOp, TextEdit, Uri, WorkspaceEdit,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CompletionResponse,
+    Diagnostic, DocumentChangeOperation, DocumentChanges, DocumentSymbolResponse,
+    FormattingOptions, GotoDefinitionResponse, Hover, Location, ResourceOp, TextEdit, Uri,
+    WorkspaceEdit,
 };
 
 use std::{
@@ -21,8 +22,9 @@ use types::{
     CompletionMismatchError, CompletionResult, DeclarationMismatchError, DefinitionMismatchError,
     DiagnosticMismatchError, DocumentSymbolMismatchError, FormattingMismatchError,
     FormattingResult, HoverMismatchError, ImplementationMismatchError, IncomingCallsMismatchError,
-    PrepareCallHierachyMismatchError, ReferencesMismatchError, RenameMismatchError, TestCase,
-    TestError, TestResult, TestSetupError, TestType, TimeoutError, TypeDefinitionMismatchError,
+    OutgoingCallsMismatchError, PrepareCallHierachyMismatchError, ReferencesMismatchError,
+    RenameMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
+    TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -109,6 +111,7 @@ impl Empty for String {}
 impl Empty for Vec<CallHierarchyItem> {}
 impl Empty for Vec<Diagnostic> {}
 impl Empty for Vec<CallHierarchyIncomingCall> {}
+impl Empty for Vec<CallHierarchyOutgoingCall> {}
 impl Empty for Vec<Location> {}
 impl Empty for Vec<TextEdit> {}
 impl Empty for WorkspaceEdit {}
@@ -203,6 +206,14 @@ impl CleanResponse for Vec<CallHierarchyIncomingCall> {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
         for call in &mut self {
             call.from.uri = clean_uri(&call.from.uri, test_case)?;
+        }
+        Ok(self)
+    }
+}
+impl CleanResponse for Vec<CallHierarchyOutgoingCall> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        for call in &mut self {
+            call.to.uri = clean_uri(&call.to.uri, test_case)?;
         }
         Ok(self)
     }
@@ -789,6 +800,43 @@ pub fn test_incoming_calls(
         |expected, actual: &Vec<CallHierarchyIncomingCall>| {
             if expected != actual {
                 Err(IncomingCallsMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Tests the server's response to a 'textDocument/prepareCallHierarchy' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `call_item` fails
+pub fn test_outgoing_calls(
+    mut test_case: TestCase,
+    call_item: &CallHierarchyItem,
+    expected: Option<&Vec<CallHierarchyOutgoingCall>>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::OutgoingCalls);
+    collect_results(
+        &test_case,
+        Some(&vec![(
+            "CALL_ITEM",
+            serde_json::to_string_pretty(call_item)
+                .expect("JSON deserialzation of call item failed"),
+        )]),
+        expected,
+        |expected, actual: &Vec<CallHierarchyOutgoingCall>| {
+            if expected != actual {
+                Err(OutgoingCallsMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),
