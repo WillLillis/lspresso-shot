@@ -5,8 +5,8 @@ use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CompletionResponse,
     Diagnostic, DocumentChangeOperation, DocumentChanges, DocumentSymbolResponse,
-    FormattingOptions, GotoDefinitionResponse, Hover, Location, ResourceOp, TextEdit, Uri,
-    WorkspaceEdit,
+    FormattingOptions, GotoDefinitionResponse, Hover, Location, ResourceOp, TextEdit,
+    TypeHierarchyItem, Uri, WorkspaceEdit,
 };
 
 use std::{
@@ -22,9 +22,9 @@ use types::{
     CompletionMismatchError, CompletionResult, DeclarationMismatchError, DefinitionMismatchError,
     DiagnosticMismatchError, DocumentSymbolMismatchError, FormattingMismatchError,
     FormattingResult, HoverMismatchError, ImplementationMismatchError, IncomingCallsMismatchError,
-    OutgoingCallsMismatchError, PrepareCallHierachyMismatchError, ReferencesMismatchError,
-    RenameMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
-    TypeDefinitionMismatchError,
+    OutgoingCallsMismatchError, PrepareCallHierachyMismatchError, PrepareTypeHierachyMismatchError,
+    ReferencesMismatchError, RenameMismatchError, TestCase, TestError, TestResult, TestSetupError,
+    TestType, TimeoutError, TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -114,6 +114,7 @@ impl Empty for Vec<CallHierarchyIncomingCall> {}
 impl Empty for Vec<CallHierarchyOutgoingCall> {}
 impl Empty for Vec<Location> {}
 impl Empty for Vec<TextEdit> {}
+impl Empty for Vec<TypeHierarchyItem> {}
 impl Empty for WorkspaceEdit {}
 
 /// Cleans a given `Uri` object of any information internal to the case
@@ -227,6 +228,14 @@ impl CleanResponse for Vec<Location> {
     }
 }
 impl CleanResponse for Vec<TextEdit> {}
+impl CleanResponse for Vec<TypeHierarchyItem> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        for item in &mut self {
+            item.uri = clean_uri(&item.uri, test_case)?;
+        }
+        Ok(self)
+    }
+}
 impl CleanResponse for WorkspaceEdit {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
         if let Some(ref mut changes) = self.changes {
@@ -874,6 +883,39 @@ pub fn test_prepare_call_hierarchy(
         |expected, actual: &Vec<CallHierarchyItem>| {
             if expected != actual {
                 Err(PrepareCallHierachyMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Tests the server's response to a 'textDocument/prepareTypeHierarchy' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_prepare_type_hierarchy(
+    mut test_case: TestCase,
+    expected: Option<&Vec<TypeHierarchyItem>>,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(
+            TestType::PrepareTypeHierarchy,
+        ))?;
+    }
+    test_case.test_type = Some(TestType::PrepareTypeHierarchy);
+    collect_results(
+        &test_case,
+        None,
+        expected,
+        |expected, actual: &Vec<TypeHierarchyItem>| {
+            if expected != actual {
+                Err(PrepareTypeHierachyMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),

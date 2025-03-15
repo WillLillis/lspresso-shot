@@ -8,7 +8,7 @@ use lsp_types::{
     DocumentSymbol, DocumentSymbolResponse, Documentation, GotoDefinitionResponse, Hover,
     HoverContents, LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind,
     Position, PublishDiagnosticsParams, Range, SymbolInformation, SymbolKind, SymbolTag,
-    TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
+    TextDocumentEdit, TextEdit, TypeHierarchyItem, Uri, WorkspaceEdit,
 };
 
 use crate::get_dummy_source_path;
@@ -369,6 +369,51 @@ pub fn get_prepare_call_hierachy_response(response_num: u32) -> Option<Vec<CallH
         data: None,
     };
     let item2 = CallHierarchyItem {
+        name: "name2".to_string(),
+        kind: SymbolKind::FILE,
+        tags: None,
+        detail: Some("detail2\nmore details".to_string()),
+        uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
+        range: Range {
+            start: Position::new(9, 10),
+            end: Position::new(11, 12),
+        },
+        selection_range: Range {
+            start: Position::new(13, 14),
+            end: Position::new(15, 16),
+        },
+        data: None,
+    };
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![item1]),
+        2 => Some(vec![item2]),
+        3 => Some(vec![item1, item2]),
+        _ => None,
+    }
+}
+
+/// For use with `test_prepare_call_hierarchy`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_prepare_type_hierachy_response(response_num: u32) -> Option<Vec<TypeHierarchyItem>> {
+    let item1 = TypeHierarchyItem {
+        name: "name1".to_string(),
+        kind: SymbolKind::FILE,
+        tags: None,
+        detail: Some("detail1".to_string()),
+        uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        selection_range: Range {
+            start: Position::new(5, 6),
+            end: Position::new(7, 8),
+        },
+        data: None,
+    };
+    let item2 = TypeHierarchyItem {
         name: "name2".to_string(),
         kind: SymbolKind::FILE,
         tags: None,
