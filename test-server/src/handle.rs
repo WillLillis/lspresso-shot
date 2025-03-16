@@ -8,11 +8,12 @@ use lsp_types::{
         DocumentDiagnosticRequest, DocumentSymbolRequest, Formatting, GotoDeclaration,
         GotoDeclarationParams, GotoDefinition, GotoImplementation, GotoImplementationParams,
         GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest, References, Rename,
-        Request as _,
+        Request as _, TypeHierarchyPrepare,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CompletionParams, DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams,
-    HoverParams, ReferenceParams, RenameParams, ServerCapabilities, Uri,
+    HoverParams, ReferenceParams, RenameParams, ServerCapabilities, TypeHierarchyPrepareParams,
+    Uri,
 };
 
 use crate::{
@@ -21,8 +22,9 @@ use crate::{
         get_completion_response, get_declaration_response, get_definition_response,
         get_diagnostics_response, get_document_symbol_response, get_formatting_response,
         get_hover_response, get_implementation_response, get_incoming_calls_response,
-        get_outgoing_calls_response, get_prepare_call_hierachy_response, get_references_response,
-        get_rename_response, get_type_definition_response,
+        get_outgoing_calls_response, get_prepare_call_hierachy_response,
+        get_prepare_type_hierachy_response, get_references_response, get_rename_response,
+        get_type_definition_response,
     },
 };
 
@@ -309,6 +311,17 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: RenameParams| -> Uri { params.text_document_position.text_document.uri }
+            )?;
+        }
+        TypeHierarchyPrepare::METHOD => {
+            handle_request!(
+                TypeHierarchyPrepare,
+                get_prepare_type_hierachy_response,
+                req,
+                conn,
+                |params: TypeHierarchyPrepareParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
             )?;
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),

@@ -98,6 +98,9 @@ So far, we have:
 - [x] `textDocument/typeDefinition`
 - [x] `textDocument/implementation`
 - [x] `callHierarchy/incomingCalls`
+- [x] `callHierarchy/outgoingCalls`
+- [x] `textDocument/prepareTypeHierarchy`
+
 
 ## Gotchas/Known Issues
 
