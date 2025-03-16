@@ -4,6 +4,7 @@ mod completion;
 mod declaration;
 mod definition;
 mod diagnostics;
+mod document_highlight;
 mod document_symbol;
 mod formatting;
 mod hover;
