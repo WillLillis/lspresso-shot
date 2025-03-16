@@ -44,6 +44,7 @@ pub fn get_init_dot_lua(
         | TestType::Definition
         | TestType::DocumentHighlight
         | TestType::DocumentLink
+        | TestType::DocumentLinkResolve
         | TestType::DocumentSymbol
         | TestType::Formatting
         | TestType::Hover
@@ -118,6 +119,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::Diagnostic => "\n-- NOTE: No `check_progress_result` function for diagnostics, instead handled by `DiagnosticChanged` autocmd\n",
         TestType::DocumentHighlight => include_str!("lua_templates/document_highlight_action.lua"),
         TestType::DocumentLink => include_str!("lua_templates/document_link_action.lua"),
+        TestType::DocumentLinkResolve => include_str!("lua_templates/document_link_resolve_action.lua"),
         TestType::DocumentSymbol => include_str!("lua_templates/document_symbol_action.lua"),
         TestType::Formatting => include_str!("lua_templates/formatting_action.lua"),
         TestType::Hover => include_str!("lua_templates/hover_action.lua"),

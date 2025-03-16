@@ -41,7 +41,7 @@ pub fn get_document_highlight_response(response_num: u32) -> Option<Vec<Document
     }
 }
 
-/// For use with `test_document_highlight`.
+/// For use with `test_document_link`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_document_link_response(response_num: u32) -> Option<Vec<DocumentLink>> {
@@ -78,6 +78,45 @@ pub fn get_document_link_response(response_num: u32) -> Option<Vec<DocumentLink>
         2 => Some(vec![item2]),
         3 => Some(vec![item3]),
         4 => Some(vec![item1, item2, item3]),
+        _ => None,
+    }
+}
+
+/// For use with `test_document_link_resolve`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_document_link_resolve_response(response_num: u32) -> Option<DocumentLink> {
+    let item1 = DocumentLink {
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        target: None,
+        tooltip: None,
+        data: None,
+    };
+    let item2 = DocumentLink {
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        target: Some(Uri::from_str(&get_dummy_source_path()).unwrap()),
+        tooltip: None,
+        data: None,
+    };
+    let item3 = DocumentLink {
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        target: Some(Uri::from_str(&get_dummy_source_path()).unwrap()),
+        tooltip: Some("tooltip".to_string()),
+        data: None,
+    };
+    match response_num {
+        0 => Some(item1),
+        1 => Some(item2),
+        2 => Some(item3),
         _ => None,
     }
 }

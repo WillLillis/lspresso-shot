@@ -37,6 +37,8 @@ pub enum TestType {
     DocumentHighlight,
     /// Test `textDocument/documentLink` requests
     DocumentLink,
+    /// Test `documentLink/resolve` requests
+    DocumentLinkResolve,
     /// Test `textDocument/documentSymbol` requests
     DocumentSymbol,
     /// Test `textDocument/formatting` requests
@@ -71,6 +73,7 @@ impl std::fmt::Display for TestType {
                 Self::Diagnostic => "textDocument/publishDiagnostics",
                 Self::DocumentHighlight => "textDocument/documentHighlight",
                 Self::DocumentLink => "textDocument/documentLink",
+                Self::DocumentLinkResolve => "documentLink/resolve",
                 Self::DocumentSymbol => "textDocument/documentSymbol",
                 Self::Formatting => "textDocument/formatting",
                 Self::Hover => "textDocument/hover",
@@ -550,6 +553,8 @@ pub enum TestError {
     #[error(transparent)]
     DocumentLinkMismatch(#[from] DocumentLinkMismatchError),
     #[error(transparent)]
+    DocumentLinkResolveMismatch(#[from] DocumentLinkResolveMismatchError),
+    #[error(transparent)]
     DocumentSymbolMismatch(#[from] DocumentSymbolMismatchError),
     #[error(transparent)]
     FormattingMismatch(#[from] FormattingMismatchError),
@@ -1013,6 +1018,25 @@ impl std::fmt::Display for DocumentLinkMismatchError {
     }
 }
 
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct DocumentLinkResolveMismatchError {
+    pub test_id: String,
+    pub expected: DocumentLink,
+    pub actual: DocumentLink,
+}
+
+impl std::fmt::Display for DocumentLinkResolveMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Document Link Resolve response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Document Link", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub struct DocumentSymbolMismatchError {
     pub test_id: String,
@@ -1225,6 +1249,7 @@ impl Empty for EmptyResult {
 }
 
 impl Empty for CompletionResponse {}
+impl Empty for DocumentLink {}
 impl Empty for DocumentSymbolResponse {}
 impl Empty for FormattingResult {}
 impl Empty for GotoDefinitionResponse {}
@@ -1278,6 +1303,14 @@ impl CleanResponse for Vec<CallHierarchyItem> {
 }
 impl CleanResponse for EmptyResult {}
 impl CleanResponse for CompletionResponse {}
+impl CleanResponse for DocumentLink {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        if let Some(ref mut uri) = self.target {
+            *uri = clean_uri(uri, test_case)?;
+        }
+        Ok(self)
+    }
+}
 impl CleanResponse for DocumentSymbolResponse {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
         match &mut self {
