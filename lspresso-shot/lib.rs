@@ -19,11 +19,11 @@ use std::{
 use types::{
     CleanResponse, CompletionMismatchError, CompletionResult, DeclarationMismatchError,
     DefinitionMismatchError, DiagnosticMismatchError, DocumentHighlightMismatchError,
-    DocumentLinkMismatchError, DocumentSymbolMismatchError, Empty, EmptyResult,
-    FormattingMismatchError, FormattingResult, HoverMismatchError, ImplementationMismatchError,
-    IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
-    ReferencesMismatchError, RenameMismatchError, TestCase, TestError, TestResult, TestSetupError,
-    TestType, TimeoutError, TypeDefinitionMismatchError,
+    DocumentLinkMismatchError, DocumentLinkResolveMismatchError, DocumentSymbolMismatchError,
+    Empty, EmptyResult, FormattingMismatchError, FormattingResult, HoverMismatchError,
+    ImplementationMismatchError, IncomingCallsMismatchError, OutgoingCallsMismatchError,
+    PrepareCallHierachyMismatchError, ReferencesMismatchError, RenameMismatchError, TestCase,
+    TestError, TestResult, TestSetupError, TestType, TimeoutError, TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -437,6 +437,41 @@ pub fn test_document_link(
         |expected, actual: &Vec<DocumentLink>| {
             if expected != actual {
                 Err(DocumentLinkMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Tests the server's response to a 'documentLink/resolve' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `link` fails
+pub fn test_document_link_resolve(
+    mut test_case: TestCase,
+    link: &DocumentLink,
+    expected: Option<&DocumentLink>,
+) -> TestResult<()> {
+    let json_link =
+        serde_json::to_string_pretty(link).expect("JSON deserialzation of document link failed");
+    test_case.test_type = Some(TestType::DocumentLinkResolve);
+    collect_results(
+        &test_case,
+        Some(&vec![("DOC_LINK", json_link)]),
+        expected,
+        |expected, actual: &DocumentLink| {
+            if expected != actual {
+                Err(DocumentLinkResolveMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),

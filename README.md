@@ -74,6 +74,10 @@ for examples of how to use the library.
       logic out and do some string interpolation instead of duplicating it a ton.
 - [ ] Clean up Lua logic (I'm unfamiliar with the neovim API)
     - Add Lua unit tests? (Do we roll our own/ is there an easy framework?)
+- [ ] It may make sense to require a cursor position argument explicitly in the the
+      `test_*` functions, rather than accepting it implicitly in the `TestCase` struct and
+      returning an error if its missing when required. Functionally this would operate the
+      same either way, but it would make things clearer to library consumers.
 - [x] Add CI and whatnot (Improvements to current lua workflow?)
 - [ ] It may be possible to extend this library's functionality as a CLI tool.
     - Users could specify test cases through JSON, which we can then deserialize
@@ -100,6 +104,7 @@ So far, we have:
 - [x] `textDocument/typeDefinition`
 - [x] `textDocument/implementation`
 - [x] `callHierarchy/incomingCalls`
+- [x] `documentLink/resolve`
 
 ## Gotchas/Known Issues
 

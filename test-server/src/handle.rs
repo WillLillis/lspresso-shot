@@ -6,21 +6,23 @@ use lsp_types::{
     request::{
         CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare, Completion,
         DocumentDiagnosticRequest, DocumentHighlightRequest, DocumentLinkRequest,
-        DocumentSymbolRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
-        GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
-        HoverRequest, References, Rename, Request as _,
+        DocumentLinkResolve, DocumentSymbolRequest, Formatting, GotoDeclaration,
+        GotoDeclarationParams, GotoDefinition, GotoImplementation, GotoImplementationParams,
+        GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest, References, Rename,
+        Request as _,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    CompletionParams, DocumentFormattingParams, DocumentHighlightParams, DocumentLinkParams,
-    DocumentSymbolParams, GotoDefinitionParams, HoverParams, ReferenceParams, RenameParams,
-    ServerCapabilities, Uri,
+    CompletionParams, DocumentFormattingParams, DocumentHighlightParams, DocumentLink,
+    DocumentLinkParams, DocumentSymbolParams, GotoDefinitionParams, HoverParams, ReferenceParams,
+    RenameParams, ServerCapabilities, Uri,
 };
 
 use crate::{
     get_root_test_path, receive_response_num,
     responses::{
         get_completion_response, get_declaration_response, get_definition_response,
-        get_diagnostics_response, get_document_highlight_response, get_document_link_response,
+        get_diagnostics_response, get_document_highlight_response,
+        get_document_link_resolve_response, get_document_link_response,
         get_document_symbol_response, get_formatting_response, get_hover_response,
         get_implementation_response, get_incoming_calls_response, get_outgoing_calls_response,
         get_prepare_call_hierachy_response, get_references_response, get_rename_response,
@@ -238,6 +240,15 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: DocumentLinkParams| -> Uri { params.text_document.uri }
+            )?;
+        }
+        DocumentLinkResolve::METHOD => {
+            handle_request!(
+                DocumentLinkResolve,
+                get_document_link_resolve_response,
+                req,
+                conn,
+                |params: DocumentLink| -> Uri { params.target.unwrap() }
             )?;
         }
         DocumentSymbolRequest::METHOD => {
