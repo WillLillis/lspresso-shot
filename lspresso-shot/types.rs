@@ -1,19 +1,20 @@
 use std::{
-    collections::HashSet,
+    collections::{HashMap, HashSet},
     env::temp_dir,
     fs,
     num::NonZeroU32,
     path::{Path, PathBuf},
+    str::FromStr as _,
     time::Duration,
 };
 
 use anstyle::{AnsiColor, Color, Style};
-// NOTE: Is re-exporting these types really necessary?
-pub use lsp_types::{
+use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CompletionItem,
-    CompletionList, CompletionResponse, Diagnostic, DocumentSymbolResponse, GotoDefinitionResponse,
-    Hover, Location, Position, TextEdit, WorkspaceEdit,
+    CompletionList, CompletionResponse, Diagnostic, DocumentChangeOperation, DocumentChanges,
+    DocumentHighlight, DocumentSymbolResponse, GotoDefinitionResponse, Hover, Location, Position,
+    ResourceOp, TextEdit, Uri, WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -1181,5 +1182,190 @@ impl std::fmt::Display for TypeDefinitionMismatchError {
         )?;
         write_fields_comparison(f, "GotoTypeDefinition", &self.expected, &self.actual, 0)?;
         Ok(())
+    }
+}
+
+pub(crate) trait Empty {
+    fn is_empty() -> bool {
+        false
+    }
+}
+
+#[derive(Debug, serde::Deserialize)]
+pub(crate) struct EmptyResult {}
+
+impl Empty for EmptyResult {
+    fn is_empty() -> bool {
+        true
+    }
+}
+
+impl Empty for CompletionResponse {}
+impl Empty for DocumentSymbolResponse {}
+impl Empty for FormattingResult {}
+impl Empty for GotoDefinitionResponse {}
+impl Empty for Hover {}
+impl Empty for String {}
+impl Empty for Vec<CallHierarchyItem> {}
+impl Empty for Vec<Diagnostic> {}
+impl Empty for Vec<DocumentHighlight> {}
+impl Empty for Vec<CallHierarchyIncomingCall> {}
+impl Empty for Vec<CallHierarchyOutgoingCall> {}
+impl Empty for Vec<Location> {}
+impl Empty for Vec<TextEdit> {}
+impl Empty for WorkspaceEdit {}
+
+/// Cleans a given `Uri` object of any information internal to the case
+///
+/// # Examples
+///
+/// `file:///tmp/lspresso-shot/<test-id>/src/foo.rs` -> `foo.rs`
+fn clean_uri(uri: &Uri, test_case: &TestCase) -> TestResult<Uri> {
+    let test_case_root = test_case
+        .get_source_file_path("") // "/tmp/lspresso-shot/<test-id>/src/"
+        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?
+        .to_str()
+        .unwrap()
+        .to_string();
+    let path = uri.path().to_string();
+    let cleaned = path.strip_prefix(&test_case_root).unwrap_or(&path);
+    Ok(Uri::from_str(cleaned).unwrap())
+}
+
+pub(crate) trait CleanResponse
+where
+    Self: Sized,
+{
+    /// Cleans a given resonse object of any Uri information related to the test case
+    #[allow(unused_variables, unused_mut)]
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        Ok(self)
+    }
+}
+
+impl CleanResponse for Vec<CallHierarchyItem> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        for item in &mut self {
+            item.uri = clean_uri(&item.uri, test_case)?;
+        }
+        Ok(self)
+    }
+}
+impl CleanResponse for EmptyResult {}
+impl CleanResponse for CompletionResponse {}
+impl CleanResponse for DocumentSymbolResponse {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        match &mut self {
+            Self::Flat(syms) => {
+                for sym in syms {
+                    sym.location.uri = clean_uri(&sym.location.uri, test_case)?;
+                }
+            }
+            Self::Nested(_) => {}
+        }
+        Ok(self)
+    }
+}
+impl CleanResponse for FormattingResult {}
+impl CleanResponse for GotoDefinitionResponse {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        match &mut self {
+            Self::Scalar(location) => {
+                location.uri = clean_uri(&location.uri, test_case)?;
+            }
+            Self::Array(locs) => {
+                for loc in locs {
+                    loc.uri = clean_uri(&loc.uri, test_case)?;
+                }
+            }
+            Self::Link(links) => {
+                for link in links {
+                    link.target_uri = clean_uri(&link.target_uri, test_case)?;
+                }
+            }
+        }
+        Ok(self)
+    }
+}
+impl CleanResponse for Hover {}
+impl CleanResponse for String {}
+impl CleanResponse for Vec<Diagnostic> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        for diagnostic in &mut self {
+            if let Some(info) = diagnostic.related_information.as_mut() {
+                for related in info {
+                    related.location.uri = clean_uri(&related.location.uri, test_case)?;
+                }
+            }
+        }
+        Ok(self)
+    }
+}
+impl CleanResponse for Vec<CallHierarchyIncomingCall> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        for call in &mut self {
+            call.from.uri = clean_uri(&call.from.uri, test_case)?;
+        }
+        Ok(self)
+    }
+}
+impl CleanResponse for Vec<CallHierarchyOutgoingCall> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        for call in &mut self {
+            call.to.uri = clean_uri(&call.to.uri, test_case)?;
+        }
+        Ok(self)
+    }
+}
+impl CleanResponse for Vec<DocumentHighlight> {}
+impl CleanResponse for Vec<Location> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        for loc in &mut self {
+            loc.uri = clean_uri(&loc.uri, test_case)?;
+        }
+        Ok(self)
+    }
+}
+impl CleanResponse for Vec<TextEdit> {}
+impl CleanResponse for WorkspaceEdit {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        if let Some(ref mut changes) = self.changes {
+            let mut new_changes = HashMap::new();
+            for (uri, edits) in changes.drain() {
+                let cleaned_uri = clean_uri(&uri, test_case)?;
+                new_changes.insert(cleaned_uri, edits);
+            }
+            *changes = new_changes;
+        }
+        match self.document_changes {
+            Some(DocumentChanges::Edits(ref mut edits)) => {
+                for edit in edits {
+                    edit.text_document.uri = clean_uri(&edit.text_document.uri, test_case)?;
+                }
+            }
+            Some(DocumentChanges::Operations(ref mut ops)) => {
+                for op in ops {
+                    match op {
+                        DocumentChangeOperation::Op(ref mut op) => match op {
+                            ResourceOp::Create(ref mut create) => {
+                                create.uri = clean_uri(&create.uri, test_case)?;
+                            }
+                            ResourceOp::Rename(ref mut rename) => {
+                                rename.old_uri = clean_uri(&rename.old_uri, test_case)?;
+                                rename.new_uri = clean_uri(&rename.new_uri, test_case)?;
+                            }
+                            ResourceOp::Delete(ref mut delete) => {
+                                delete.uri = clean_uri(&delete.uri, test_case)?;
+                            }
+                        },
+                        DocumentChangeOperation::Edit(edit) => {
+                            edit.text_document.uri = clean_uri(&edit.text_document.uri, test_case)?;
+                        }
+                    }
+                }
+            }
+            None => {}
+        }
+        Ok(self)
     }
 }
