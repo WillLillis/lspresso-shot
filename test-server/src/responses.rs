@@ -5,13 +5,41 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, ChangeAnnotation,
     CodeDescription, CompletionItem, CompletionItemKind, CompletionItemLabelDetails,
     CompletionList, CompletionResponse, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
-    DocumentSymbol, DocumentSymbolResponse, Documentation, GotoDefinitionResponse, Hover,
-    HoverContents, LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind,
-    Position, PublishDiagnosticsParams, Range, SymbolInformation, SymbolKind, SymbolTag,
-    TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
+    DocumentHighlight, DocumentHighlightKind, DocumentSymbol, DocumentSymbolResponse,
+    Documentation, GotoDefinitionResponse, Hover, HoverContents, LanguageString, Location,
+    LocationLink, MarkedString, MarkupContent, MarkupKind, Position, PublishDiagnosticsParams,
+    Range, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit, Uri,
+    WorkspaceEdit,
 };
 
 use crate::get_dummy_source_path;
+
+/// For use with `test_document_highlight`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_document_highlight_response(response_num: u32) -> Option<Vec<DocumentHighlight>> {
+    let item1 = DocumentHighlight {
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        kind: None,
+    };
+    let item2 = DocumentHighlight {
+        range: Range {
+            start: Position::new(5, 6),
+            end: Position::new(7, 8),
+        },
+        kind: Some(DocumentHighlightKind::TEXT),
+    };
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![item1]),
+        2 => Some(vec![item2]),
+        3 => Some(vec![item1, item2]),
+        _ => None,
+    }
+}
 
 /// For use with `test_document_symbol`.
 #[must_use]

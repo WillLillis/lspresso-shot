@@ -14,14 +14,14 @@ use std::{
     fs,
     path::Path,
     process::{Command, Stdio},
-    str::FromStr as _,
     sync::{Arc, Condvar, Mutex, OnceLock},
 };
 
 use types::{
-    CompletionMismatchError, CompletionResult, DeclarationMismatchError, DefinitionMismatchError,
-    DiagnosticMismatchError, DocumentSymbolMismatchError, FormattingMismatchError,
-    FormattingResult, HoverMismatchError, ImplementationMismatchError, IncomingCallsMismatchError,
+    CleanResponse, CompletionMismatchError, CompletionResult, DeclarationMismatchError,
+    DefinitionMismatchError, DiagnosticMismatchError, DocumentHighlightMismatchError,
+    DocumentSymbolMismatchError, Empty, EmptyResult, FormattingMismatchError, FormattingResult,
+    HoverMismatchError, ImplementationMismatchError, IncomingCallsMismatchError,
     OutgoingCallsMismatchError, PrepareCallHierachyMismatchError, ReferencesMismatchError,
     RenameMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
     TypeDefinitionMismatchError,
@@ -560,6 +560,39 @@ pub fn test_diagnostics(mut test_case: TestCase, expected: &Vec<Diagnostic>) -> 
         |expected: &Vec<Diagnostic>, actual: &Vec<Diagnostic>| {
             if expected != actual {
                 Err(DiagnosticMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Tests the server's response to a 'textDocument/documentHighlight' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_document_highlight(
+    mut test_case: TestCase,
+    expected: Option<&Vec<DocumentHighlight>>,
+) -> TestResult<()> {
+    if test_case.cursor_pos.is_none() {
+        Err(TestSetupError::InvalidCursorPosition(
+            TestType::DocumentHighlight,
+        ))?;
+    }
+    test_case.test_type = Some(TestType::DocumentHighlight);
+    collect_results(
+        &test_case,
+        None,
+        expected,
+        |expected, actual: &Vec<DocumentHighlight>| {
+            if expected != actual {
+                Err(DocumentHighlightMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),

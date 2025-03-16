@@ -32,6 +32,8 @@ pub enum TestType {
     Definition,
     /// Test `textDocument/publishDiagnostics` requests
     Diagnostic,
+    /// Test `textDocument/documentHighlight` requests
+    DocumentHighlight,
     /// Test `textDocument/documentSymbol` requests
     DocumentSymbol,
     /// Test `textDocument/formatting` requests
@@ -64,6 +66,7 @@ impl std::fmt::Display for TestType {
                 Self::Declaration => "textDocument/declaration",
                 Self::Definition => "textDocument/definition",
                 Self::Diagnostic => "textDocument/publishDiagnostics",
+                Self::DocumentHighlight => "textDocument/documentHighlight",
                 Self::DocumentSymbol => "textDocument/documentSymbol",
                 Self::Formatting => "textDocument/formatting",
                 Self::Hover => "textDocument/hover",
@@ -539,6 +542,8 @@ pub enum TestError {
     #[error(transparent)]
     DiagnosticMismatch(#[from] DiagnosticMismatchError),
     #[error(transparent)]
+    DocumentHighlightMismatch(#[from] DocumentHighlightMismatchError),
+    #[error(transparent)]
     DocumentSymbolMismatch(#[from] DocumentSymbolMismatchError),
     #[error(transparent)]
     FormattingMismatch(#[from] FormattingMismatchError),
@@ -979,6 +984,25 @@ impl std::fmt::Display for DocumentSymbolMismatchError {
             self.test_id
         )?;
         write_fields_comparison(f, "Document Symbols", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct DocumentHighlightMismatchError {
+    pub test_id: String,
+    pub expected: Vec<DocumentHighlight>,
+    pub actual: Vec<DocumentHighlight>,
+}
+
+impl std::fmt::Display for DocumentHighlightMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Document Highlight response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Document Highlight", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }

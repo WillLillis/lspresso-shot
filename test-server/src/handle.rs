@@ -5,24 +5,25 @@ use lsp_types::{
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
         CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare, Completion,
-        DocumentDiagnosticRequest, DocumentSymbolRequest, Formatting, GotoDeclaration,
-        GotoDeclarationParams, GotoDefinition, GotoImplementation, GotoImplementationParams,
-        GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest, References, Rename,
-        Request as _,
+        DocumentDiagnosticRequest, DocumentHighlightRequest, DocumentSymbolRequest, Formatting,
+        GotoDeclaration, GotoDeclarationParams, GotoDefinition, GotoImplementation,
+        GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest,
+        References, Rename, Request as _,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    CompletionParams, DocumentFormattingParams, DocumentSymbolParams, GotoDefinitionParams,
-    HoverParams, ReferenceParams, RenameParams, ServerCapabilities, Uri,
+    CompletionParams, DocumentFormattingParams, DocumentHighlightParams, DocumentSymbolParams,
+    GotoDefinitionParams, HoverParams, ReferenceParams, RenameParams, ServerCapabilities, Uri,
 };
 
 use crate::{
     get_root_test_path, receive_response_num,
     responses::{
         get_completion_response, get_declaration_response, get_definition_response,
-        get_diagnostics_response, get_document_symbol_response, get_formatting_response,
-        get_hover_response, get_implementation_response, get_incoming_calls_response,
-        get_outgoing_calls_response, get_prepare_call_hierachy_response, get_references_response,
-        get_rename_response, get_type_definition_response,
+        get_diagnostics_response, get_document_highlight_response, get_document_symbol_response,
+        get_formatting_response, get_hover_response, get_implementation_response,
+        get_incoming_calls_response, get_outgoing_calls_response,
+        get_prepare_call_hierachy_response, get_references_response, get_rename_response,
+        get_type_definition_response,
     },
 };
 
@@ -217,6 +218,17 @@ pub fn handle_request(
                 DocumentDiagnosticRequest::METHOD
             );
             send_diagnostic_resp(&params.text_document.uri, conn)?;
+        }
+        DocumentHighlightRequest::METHOD => {
+            handle_request!(
+                DocumentHighlightRequest,
+                get_document_highlight_response,
+                req,
+                conn,
+                |params: DocumentHighlightParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
+            )?;
         }
         DocumentSymbolRequest::METHOD => {
             handle_request!(
