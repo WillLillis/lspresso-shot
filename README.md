@@ -88,6 +88,8 @@ So far, we have:
 - [x] `textDocument/completion`
 - [x] `textDocument/declaration`
 - [x] `textDocument/definition`
+- [x] `textDocument/documentHighlight`
+- [x] `textDocument/documentLink`
 - [x] `textDocument/documentSymbol`
 - [x] `textDocument/formatting`
 - [x] `textDocument/hover`

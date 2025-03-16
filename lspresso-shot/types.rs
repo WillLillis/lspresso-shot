@@ -13,8 +13,8 @@ use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CompletionItem,
     CompletionList, CompletionResponse, Diagnostic, DocumentChangeOperation, DocumentChanges,
-    DocumentHighlight, DocumentSymbolResponse, GotoDefinitionResponse, Hover, Location, Position,
-    ResourceOp, TextEdit, Uri, WorkspaceEdit,
+    DocumentHighlight, DocumentLink, DocumentSymbolResponse, GotoDefinitionResponse, Hover,
+    Location, Position, ResourceOp, TextEdit, Uri, WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -35,6 +35,8 @@ pub enum TestType {
     Diagnostic,
     /// Test `textDocument/documentHighlight` requests
     DocumentHighlight,
+    /// Test `textDocument/documentLink` requests
+    DocumentLink,
     /// Test `textDocument/documentSymbol` requests
     DocumentSymbol,
     /// Test `textDocument/formatting` requests
@@ -68,6 +70,7 @@ impl std::fmt::Display for TestType {
                 Self::Definition => "textDocument/definition",
                 Self::Diagnostic => "textDocument/publishDiagnostics",
                 Self::DocumentHighlight => "textDocument/documentHighlight",
+                Self::DocumentLink => "textDocument/documentLink",
                 Self::DocumentSymbol => "textDocument/documentSymbol",
                 Self::Formatting => "textDocument/formatting",
                 Self::Hover => "textDocument/hover",
@@ -545,6 +548,8 @@ pub enum TestError {
     #[error(transparent)]
     DocumentHighlightMismatch(#[from] DocumentHighlightMismatchError),
     #[error(transparent)]
+    DocumentLinkMismatch(#[from] DocumentLinkMismatchError),
+    #[error(transparent)]
     DocumentSymbolMismatch(#[from] DocumentSymbolMismatchError),
     #[error(transparent)]
     FormattingMismatch(#[from] FormattingMismatchError),
@@ -970,25 +975,6 @@ impl std::fmt::Display for DiagnosticMismatchError {
     }
 }
 
-#[derive(Debug, Error, PartialEq)]
-pub struct DocumentSymbolMismatchError {
-    pub test_id: String,
-    pub expected: DocumentSymbolResponse,
-    pub actual: DocumentSymbolResponse,
-}
-
-impl std::fmt::Display for DocumentSymbolMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Document Symbol response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Document Symbols", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
 #[derive(Debug, Error, PartialEq, Eq)]
 pub struct DocumentHighlightMismatchError {
     pub test_id: String,
@@ -1004,6 +990,44 @@ impl std::fmt::Display for DocumentHighlightMismatchError {
             self.test_id
         )?;
         write_fields_comparison(f, "Document Highlight", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct DocumentLinkMismatchError {
+    pub test_id: String,
+    pub expected: Vec<DocumentLink>,
+    pub actual: Vec<DocumentLink>,
+}
+
+impl std::fmt::Display for DocumentLinkMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Document Link response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Document Link", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error, PartialEq)]
+pub struct DocumentSymbolMismatchError {
+    pub test_id: String,
+    pub expected: DocumentSymbolResponse,
+    pub actual: DocumentSymbolResponse,
+}
+
+impl std::fmt::Display for DocumentSymbolMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Document Symbol response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Document Symbols", &self.expected, &self.actual, 0)?;
         Ok(())
     }
 }
@@ -1209,6 +1233,7 @@ impl Empty for String {}
 impl Empty for Vec<CallHierarchyItem> {}
 impl Empty for Vec<Diagnostic> {}
 impl Empty for Vec<DocumentHighlight> {}
+impl Empty for Vec<DocumentLink> {}
 impl Empty for Vec<CallHierarchyIncomingCall> {}
 impl Empty for Vec<CallHierarchyOutgoingCall> {}
 impl Empty for Vec<Location> {}
@@ -1318,6 +1343,16 @@ impl CleanResponse for Vec<CallHierarchyOutgoingCall> {
     }
 }
 impl CleanResponse for Vec<DocumentHighlight> {}
+impl CleanResponse for Vec<DocumentLink> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        for link in &mut self {
+            if let Some(ref mut uri) = link.target {
+                *uri = clean_uri(uri, test_case)?;
+            }
+        }
+        Ok(self)
+    }
+}
 impl CleanResponse for Vec<Location> {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
         for loc in &mut self {
