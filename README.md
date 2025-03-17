@@ -78,6 +78,10 @@ for examples of how to use the library.
       `test_*` functions, rather than accepting it implicitly in the `TestCase` struct and
       returning an error if its missing when required. Functionally this would operate the
       same either way, but it would make things clearer to library consumers.
+- [ ] Utilize `vim.uv.hr_time()` to provide a benchmarking utility
+    - This could provide two (more?) means of measurement. One would simply test the time
+    between issuing the request and receiving a response. The other would measure the time
+    between the server attaching and the receiving a reponse to the request of interest.
 - [x] Add CI and whatnot (Improvements to current lua workflow?)
 - [ ] It may be possible to extend this library's functionality as a CLI tool.
     - Users could specify test cases through JSON, which we can then deserialize
@@ -89,6 +93,9 @@ for examples of how to use the library.
 As an eventual end goal, we'd obviously like to provide test coverage for *all* LSP methods.
 So far, we have:
 
+- [x] `callHierarchy/incomingCalls`
+- [x] `documentLink/resolve`
+- [x] `textDocument/codeLens`
 - [x] `textDocument/completion`
 - [x] `textDocument/declaration`
 - [x] `textDocument/definition`
@@ -96,15 +103,13 @@ So far, we have:
 - [x] `textDocument/documentLink`
 - [x] `textDocument/documentSymbol`
 - [x] `textDocument/formatting`
+- [x] `textDocument/implementation`
 - [x] `textDocument/hover`
 - [x] `textDocument/prepareCallHierarchy`
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`
 - [x] `textDocument/rename`
 - [x] `textDocument/typeDefinition`
-- [x] `textDocument/implementation`
-- [x] `callHierarchy/incomingCalls`
-- [x] `documentLink/resolve`
 
 ## Gotchas/Known Issues
 
