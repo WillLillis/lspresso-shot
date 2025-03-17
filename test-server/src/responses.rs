@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, ChangeAnnotation,
-    CodeDescription, CompletionItem, CompletionItemKind, CompletionItemLabelDetails,
+    CodeDescription, CodeLens, CompletionItem, CompletionItemKind, CompletionItemLabelDetails,
     CompletionList, CompletionResponse, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
     DocumentHighlight, DocumentHighlightKind, DocumentLink, DocumentSymbol, DocumentSymbolResponse,
     Documentation, GotoDefinitionResponse, Hover, HoverContents, LanguageString, Location,
@@ -159,6 +159,38 @@ pub fn get_document_symbol_response(response_num: u32) -> Option<DocumentSymbolR
             },
             children: Some(vec![]),
         }])),
+        _ => None,
+    }
+}
+
+/// For use with `test_code_lens`.
+#[must_use]
+pub fn get_code_lens_response(response_num: u32) -> Option<Vec<CodeLens>> {
+    let item1 = CodeLens {
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        command: None,
+        data: None,
+    };
+    let item2 = CodeLens {
+        range: Range {
+            start: Position::new(5, 6),
+            end: Position::new(7, 8),
+        },
+        command: Some(lsp_types::Command {
+            title: "title".to_string(),
+            command: "command".to_string(),
+            arguments: None,
+        }),
+        data: None,
+    };
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![item1]),
+        2 => Some(vec![item2]),
+        3 => Some(vec![item1, item2]),
         _ => None,
     }
 }

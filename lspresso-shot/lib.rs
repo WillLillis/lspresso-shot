@@ -3,7 +3,7 @@ pub mod types;
 
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, Diagnostic,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens, Diagnostic,
     DocumentHighlight, DocumentLink, DocumentSymbolResponse, FormattingOptions,
     GotoDefinitionResponse, Hover, Location, TextEdit, WorkspaceEdit,
 };
@@ -17,13 +17,14 @@ use std::{
 };
 
 use types::{
-    CleanResponse, CompletionMismatchError, CompletionResult, DeclarationMismatchError,
-    DefinitionMismatchError, DiagnosticMismatchError, DocumentHighlightMismatchError,
-    DocumentLinkMismatchError, DocumentLinkResolveMismatchError, DocumentSymbolMismatchError,
-    Empty, EmptyResult, FormattingMismatchError, FormattingResult, HoverMismatchError,
-    ImplementationMismatchError, IncomingCallsMismatchError, OutgoingCallsMismatchError,
-    PrepareCallHierachyMismatchError, ReferencesMismatchError, RenameMismatchError, TestCase,
-    TestError, TestResult, TestSetupError, TestType, TimeoutError, TypeDefinitionMismatchError,
+    CleanResponse, CodeLensMismatchError, CompletionMismatchError, CompletionResult,
+    DeclarationMismatchError, DefinitionMismatchError, DiagnosticMismatchError,
+    DocumentHighlightMismatchError, DocumentLinkMismatchError, DocumentLinkResolveMismatchError,
+    DocumentSymbolMismatchError, Empty, EmptyResult, FormattingMismatchError, FormattingResult,
+    HoverMismatchError, ImplementationMismatchError, IncomingCallsMismatchError,
+    OutgoingCallsMismatchError, PrepareCallHierachyMismatchError, ReferencesMismatchError,
+    RenameMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
+    TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -232,6 +233,55 @@ where
         assert!(empty.is_none());
         Ok(())
     }
+}
+
+pub type CodeLensComparator = fn(&Vec<CodeLens>, &Vec<CodeLens>, &TestCase) -> bool;
+
+/// Tests the server's response to a 'textDocument/codeLens' request
+///
+/// - `commands` is a list of LSP command names the client should advertise support for in its
+///   capabilities (e.g. "rust-analyzer.runSingle"). This enables command-based `CodeLens`
+///   responses from the server, such as "Run" or "Debug" actions.
+///
+/// - `cmp` is an optional custom comparator function that can be used to compare the expected
+///   and actual results. Becaue the `CodeLens` struct can contain arbitrary JSON, it's not feasible
+///   to clean results from test-case specific information (e.g. the root path).
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_code_lens(
+    mut test_case: TestCase,
+    commands: Option<&Vec<String>>,
+    cmp: Option<CodeLensComparator>,
+    expected: Option<&Vec<CodeLens>>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::CodeLens);
+    let command_str = commands.map_or_else(String::new, |cmds| {
+        cmds.iter()
+            .fold(String::new(), |accum, cmd| accum + &format!("\"{cmd}\",\n"))
+    });
+
+    collect_results(
+        &test_case,
+        Some(&vec![("COMMANDS", command_str)]),
+        expected,
+        |expected, actual: &Vec<CodeLens>| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(CodeLensMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: (*expected).clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'textDocument/complection' request

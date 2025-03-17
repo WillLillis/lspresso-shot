@@ -1,5 +1,6 @@
 pub mod test_helpers;
 
+mod code_lens;
 mod completion;
 mod declaration;
 mod definition;

@@ -11,10 +11,10 @@ use std::{
 use anstyle::{AnsiColor, Color, Style};
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CompletionItem,
-    CompletionList, CompletionResponse, Diagnostic, DocumentChangeOperation, DocumentChanges,
-    DocumentHighlight, DocumentLink, DocumentSymbolResponse, GotoDefinitionResponse, Hover,
-    Location, Position, ResourceOp, TextEdit, Uri, WorkspaceEdit,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens,
+    CompletionItem, CompletionList, CompletionResponse, Diagnostic, DocumentChangeOperation,
+    DocumentChanges, DocumentHighlight, DocumentLink, DocumentSymbolResponse,
+    GotoDefinitionResponse, Hover, Location, Position, ResourceOp, TextEdit, Uri, WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -25,6 +25,8 @@ use crate::init_dot_lua::get_init_dot_lua;
 /// Specifies the type of test to run
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TestType {
+    /// Test `textDocument/codeLens` requests
+    CodeLens,
     /// Test `textDocument/completion` requests
     Completion,
     /// Test `textDocument/declaration` requests
@@ -67,6 +69,7 @@ impl std::fmt::Display for TestType {
             f,
             "{}",
             match self {
+                Self::CodeLens => "textDocument/codeLens",
                 Self::Completion => "textDocument/completion",
                 Self::Declaration => "textDocument/declaration",
                 Self::Definition => "textDocument/definition",
@@ -541,6 +544,8 @@ pub enum TestError {
     #[error("Test {0}: Expected valid results, got `None`")]
     ExpectedSome(String),
     #[error(transparent)]
+    CodeLensMismatch(#[from] CodeLensMismatchError),
+    #[error(transparent)]
     CompletionMismatch(#[from] CompletionMismatchError),
     #[error(transparent)]
     DeclarationMismatch(#[from] Box<DeclarationMismatchError>),
@@ -748,6 +753,21 @@ fn write_fields_comparison<T: Serialize>(
     }
 
     Ok(())
+}
+
+#[derive(Debug, Error, PartialEq)]
+pub struct CodeLensMismatchError {
+    pub test_id: String,
+    pub expected: Vec<CodeLens>,
+    pub actual: Vec<CodeLens>,
+}
+
+impl std::fmt::Display for CodeLensMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Incorrect CodeLens response:", self.test_id)?;
+        write_fields_comparison(f, "CodeLens", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
 }
 
 // `textDocument/completion` is a bit different from other requests. Servers commonly
@@ -1259,6 +1279,7 @@ impl Empty for Vec<CallHierarchyItem> {}
 impl Empty for Vec<Diagnostic> {}
 impl Empty for Vec<DocumentHighlight> {}
 impl Empty for Vec<DocumentLink> {}
+impl Empty for Vec<CodeLens> {}
 impl Empty for Vec<CallHierarchyIncomingCall> {}
 impl Empty for Vec<CallHierarchyOutgoingCall> {}
 impl Empty for Vec<Location> {}
@@ -1270,16 +1291,23 @@ impl Empty for WorkspaceEdit {}
 /// # Examples
 ///
 /// `file:///tmp/lspresso-shot/<test-id>/src/foo.rs` -> `foo.rs`
-fn clean_uri(uri: &Uri, test_case: &TestCase) -> TestResult<Uri> {
-    let test_case_root = test_case
+///
+/// # Errors
+///
+/// Returns `TestError::IO` on failure to get the root source file path from
+/// `test_case`, or `TestSetupError::InvalidFilePath` if the root source file path
+/// cannot be converted betwen a `Uri` and a `String`
+pub fn clean_uri(uri: &Uri, test_case: &TestCase) -> TestResult<Uri> {
+    let root = test_case
         .get_source_file_path("") // "/tmp/lspresso-shot/<test-id>/src/"
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?
+        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+    let test_case_root = root
         .to_str()
-        .unwrap()
+        .ok_or_else(|| TestSetupError::InvalidFilePath(format!("{}", root.display())))?
         .to_string();
     let path = uri.path().to_string();
     let cleaned = path.strip_prefix(&test_case_root).unwrap_or(&path);
-    Ok(Uri::from_str(cleaned).unwrap())
+    Ok(Uri::from_str(cleaned).map_err(|_| TestSetupError::InvalidFilePath(path))?)
 }
 
 pub(crate) trait CleanResponse
@@ -1293,6 +1321,7 @@ where
     }
 }
 
+impl CleanResponse for Vec<CodeLens> {}
 impl CleanResponse for Vec<CallHierarchyItem> {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
         for item in &mut self {
