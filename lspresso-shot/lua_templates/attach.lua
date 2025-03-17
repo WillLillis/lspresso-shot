@@ -16,6 +16,7 @@ vim.api.nvim_create_autocmd('FileType', {
             cmd = { 'EXECUTABLE_PATH' },
             root_dir = 'ROOT_PATH/src',
             settings = {},
+            capabilities = capabilities, ---@diagnostic disable-line: undefined-global
             on_attach = function(client, _) ---@diagnostic disable-line: unused-local
                 ---@diagnostic disable-next-line: undefined-global, exp-in-action
                 LSP_ACTION

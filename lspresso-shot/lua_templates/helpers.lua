@@ -31,3 +31,13 @@ local function mark_empty_file()
     empty_file:close()
     ---@diagnostic enable: need-check-nil
 end
+
+local capabilities = vim.lsp.protocol.make_client_capabilities()
+capabilities.experimental = {
+    commands = {
+        commands = {
+            ---@diagnostic disable-next-line: undefined-global
+            COMMANDS
+        },
+    },
+}

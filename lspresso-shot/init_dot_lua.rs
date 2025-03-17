@@ -39,7 +39,8 @@ pub fn get_init_dot_lua(
     );
     // This is how we actually invoke the action to be tested
     match test_type {
-        TestType::Completion
+        TestType::CodeLens
+        | TestType::Completion
         | TestType::Declaration
         | TestType::Definition
         | TestType::DocumentHighlight
@@ -88,6 +89,7 @@ pub fn get_init_dot_lua(
         .replace("EMPTY_PATH", empty_path.to_str().unwrap())
         .replace("FILE_EXTENSION", source_extension)
         .replace("SET_CURSOR_POSITION", &set_cursor_position)
+        .replace("COMMANDS", "") // clear out commands placeholder if they weren't set by `custom_replacements`
         .replace(
             "PROGRESS_THRESHOLD",
             &progress_threshold(&test_case.start_type),
@@ -113,6 +115,7 @@ fn progress_threshold(start_type: &ServerStartType) -> String {
 
 fn get_attach_action(test_type: TestType) -> String {
     match test_type {
+        TestType::CodeLens => include_str!("lua_templates/code_lens_action.lua"),
         TestType::Completion => include_str!("lua_templates/completion_action.lua"),
         TestType::Declaration => include_str!("lua_templates/declaration_action.lua"),
         TestType::Definition => include_str!("lua_templates/definition_action.lua"),
