@@ -13,7 +13,7 @@ use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens,
     CompletionItem, CompletionList, CompletionResponse, Diagnostic, DocumentChangeOperation,
-    DocumentChanges, DocumentHighlight, DocumentLink, DocumentSymbolResponse,
+    DocumentChanges, DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange,
     GotoDefinitionResponse, Hover, Location, Position, ResourceOp, TextEdit, Uri, WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
@@ -45,6 +45,8 @@ pub enum TestType {
     DocumentLinkResolve,
     /// Test `textDocument/documentSymbol` requests
     DocumentSymbol,
+    /// Test `textDocument/foldingRange` requests
+    FoldingRange,
     /// Test `textDocument/formatting` requests
     Formatting,
     /// Test `textDocument/hover` requests
@@ -81,6 +83,7 @@ impl std::fmt::Display for TestType {
                 Self::DocumentLink => "textDocument/documentLink",
                 Self::DocumentLinkResolve => "documentLink/resolve",
                 Self::DocumentSymbol => "textDocument/documentSymbol",
+                Self::FoldingRange => "textDocument/foldingRange",
                 Self::Formatting => "textDocument/formatting",
                 Self::Hover => "textDocument/hover",
                 Self::Implementation => "textDocument/implementation",
@@ -566,6 +569,8 @@ pub enum TestError {
     DocumentLinkResolveMismatch(#[from] DocumentLinkResolveMismatchError),
     #[error(transparent)]
     DocumentSymbolMismatch(#[from] DocumentSymbolMismatchError),
+    #[error(transparent)]
+    FoldingRangeMismatch(#[from] FoldingRangeMismatchError),
     #[error(transparent)]
     FormattingMismatch(#[from] FormattingMismatchError),
     #[error(transparent)]
@@ -1100,6 +1105,21 @@ impl std::fmt::Display for DocumentSymbolMismatchError {
     }
 }
 
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct FoldingRangeMismatchError {
+    pub test_id: String,
+    pub expected: Vec<FoldingRange>,
+    pub actual: Vec<FoldingRange>,
+}
+
+impl std::fmt::Display for FoldingRangeMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Test {}: Folding Range response:", self.test_id)?;
+        write_fields_comparison(f, "FoldingRange", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, Clone)]
 pub enum FormattingResult {
     /// Check if the file's formatted state matches the expected contents
@@ -1307,6 +1327,7 @@ impl Empty for Vec<DocumentLink> {}
 impl Empty for Vec<CodeLens> {}
 impl Empty for Vec<CallHierarchyIncomingCall> {}
 impl Empty for Vec<CallHierarchyOutgoingCall> {}
+impl Empty for Vec<FoldingRange> {}
 impl Empty for Vec<Location> {}
 impl Empty for Vec<TextEdit> {}
 impl Empty for WorkspaceEdit {}
@@ -1441,6 +1462,7 @@ impl CleanResponse for Vec<DocumentLink> {
         Ok(self)
     }
 }
+impl CleanResponse for Vec<FoldingRange> {}
 impl CleanResponse for Vec<Location> {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
         for loc in &mut self {

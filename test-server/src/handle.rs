@@ -9,14 +9,14 @@ use lsp_types::{
         CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare,
         CodeLensRequest, CodeLensResolve, Completion, DocumentDiagnosticRequest,
         DocumentHighlightRequest, DocumentLinkRequest, DocumentLinkResolve, DocumentSymbolRequest,
-        Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition, GotoImplementation,
-        GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest,
-        References, Rename, Request as _,
+        FoldingRangeRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
+        GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
+        HoverRequest, References, Rename, Request as _,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeLens, CodeLensParams, CompletionParams, DocumentFormattingParams, DocumentHighlightParams,
-    DocumentLink, DocumentLinkParams, DocumentSymbolParams, GotoDefinitionParams, HoverParams,
-    ReferenceParams, RenameParams, ServerCapabilities, Uri,
+    DocumentLink, DocumentLinkParams, DocumentSymbolParams, FoldingRangeParams,
+    GotoDefinitionParams, HoverParams, ReferenceParams, RenameParams, ServerCapabilities, Uri,
 };
 
 use crate::{
@@ -25,10 +25,11 @@ use crate::{
         get_code_lens_resolve_response, get_code_lens_response, get_completion_response,
         get_declaration_response, get_definition_response, get_diagnostics_response,
         get_document_highlight_response, get_document_link_resolve_response,
-        get_document_link_response, get_document_symbol_response, get_formatting_response,
-        get_hover_response, get_implementation_response, get_incoming_calls_response,
-        get_outgoing_calls_response, get_prepare_call_hierachy_response, get_references_response,
-        get_rename_response, get_type_definition_response,
+        get_document_link_response, get_document_symbol_response, get_folding_range_response,
+        get_formatting_response, get_hover_response, get_implementation_response,
+        get_incoming_calls_response, get_outgoing_calls_response,
+        get_prepare_call_hierachy_response, get_references_response, get_rename_response,
+        get_type_definition_response,
     },
 };
 
@@ -282,6 +283,15 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: DocumentSymbolParams| -> Uri { params.text_document.uri }
+            )?;
+        }
+        FoldingRangeRequest::METHOD => {
+            handle_request!(
+                FoldingRangeRequest,
+                get_folding_range_response,
+                req,
+                conn,
+                |params: FoldingRangeParams| -> Uri { params.text_document.uri }
             )?;
         }
         Formatting::METHOD => {

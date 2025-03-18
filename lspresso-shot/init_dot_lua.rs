@@ -48,6 +48,7 @@ pub fn get_init_dot_lua(
         | TestType::DocumentLink
         | TestType::DocumentLinkResolve
         | TestType::DocumentSymbol
+        | TestType::FoldingRange
         | TestType::Formatting
         | TestType::Hover
         | TestType::Implementation
@@ -126,6 +127,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::DocumentLink => include_str!("lua_templates/document_link_action.lua"),
         TestType::DocumentLinkResolve => include_str!("lua_templates/document_link_resolve_action.lua"),
         TestType::DocumentSymbol => include_str!("lua_templates/document_symbol_action.lua"),
+        TestType::FoldingRange => include_str!("lua_templates/folding_range_action.lua"),
         TestType::Formatting => include_str!("lua_templates/formatting_action.lua"),
         TestType::Hover => include_str!("lua_templates/hover_action.lua"),
         TestType::Implementation => include_str!("lua_templates/implementation_action.lua"),
