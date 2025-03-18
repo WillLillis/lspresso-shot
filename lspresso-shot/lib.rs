@@ -17,8 +17,8 @@ use std::{
 };
 
 use types::{
-    CleanResponse, CodeLensMismatchError, CompletionMismatchError, CompletionResult,
-    DeclarationMismatchError, DefinitionMismatchError, DiagnosticMismatchError,
+    CleanResponse, CodeLensMismatchError, CodeLensResolveMismatchError, CompletionMismatchError,
+    CompletionResult, DeclarationMismatchError, DefinitionMismatchError, DiagnosticMismatchError,
     DocumentHighlightMismatchError, DocumentLinkMismatchError, DocumentLinkResolveMismatchError,
     DocumentSymbolMismatchError, Empty, EmptyResult, FormattingMismatchError, FormattingResult,
     HoverMismatchError, ImplementationMismatchError, IncomingCallsMismatchError,
@@ -274,6 +274,65 @@ pub fn test_code_lens(
             );
             if !eql {
                 Err(CodeLensMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: (*expected).clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type CodeLensResolveComparator = fn(&CodeLens, &CodeLens, &TestCase) -> bool;
+
+/// Tests the server's response to a 'codeLens/resolve' request
+///
+/// - `commands` is a list of LSP command names the client should advertise support for in its
+///   capabilities (e.g. "rust-analyzer.runSingle"). This enables command-based `CodeLens`
+///   responses from the server, such as "Run" or "Debug" actions.
+///
+/// - `cmp` is an optional custom comparator function that can be used to compare the expected
+///   and actual results. Becaue the `CodeLens` struct can contain arbitrary JSON, it's not feasible
+///   to clean results from test-case specific information (e.g. the root path).
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `code_lens` fails
+pub fn test_code_lens_resolve(
+    mut test_case: TestCase,
+    commands: Option<&Vec<String>>,
+    code_lens: &CodeLens,
+    cmp: Option<CodeLensResolveComparator>,
+    expected: Option<&CodeLens>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::CodeLensResolve);
+    let command_str = commands.map_or_else(String::new, |cmds| {
+        cmds.iter()
+            .fold(String::new(), |accum, cmd| accum + &format!("\"{cmd}\",\n"))
+    });
+    let code_lens_json =
+        serde_json::to_string_pretty(code_lens).expect("JSON deserialzation of code lens failed");
+
+    collect_results(
+        &test_case,
+        Some(&vec![
+            ("COMMANDS", command_str),
+            ("CODE_LENS", code_lens_json),
+        ]),
+        expected,
+        |expected, actual: &CodeLens| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(CodeLensResolveMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: (*expected).clone(),
                     actual: actual.clone(),
