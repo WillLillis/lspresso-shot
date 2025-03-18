@@ -27,6 +27,8 @@ use crate::init_dot_lua::get_init_dot_lua;
 pub enum TestType {
     /// Test `textDocument/codeLens` requests
     CodeLens,
+    /// Test `codeLens/resolve` requests
+    CodeLensResolve,
     /// Test `textDocument/completion` requests
     Completion,
     /// Test `textDocument/declaration` requests
@@ -70,6 +72,7 @@ impl std::fmt::Display for TestType {
             "{}",
             match self {
                 Self::CodeLens => "textDocument/codeLens",
+                Self::CodeLensResolve => "codeLens/resolve",
                 Self::Completion => "textDocument/completion",
                 Self::Declaration => "textDocument/declaration",
                 Self::Definition => "textDocument/definition",
@@ -546,6 +549,8 @@ pub enum TestError {
     #[error(transparent)]
     CodeLensMismatch(#[from] CodeLensMismatchError),
     #[error(transparent)]
+    CodeLensResolveMismatch(#[from] CodeLensResolveMismatchError),
+    #[error(transparent)]
     CompletionMismatch(#[from] CompletionMismatchError),
     #[error(transparent)]
     DeclarationMismatch(#[from] Box<DeclarationMismatchError>),
@@ -765,6 +770,25 @@ pub struct CodeLensMismatchError {
 impl std::fmt::Display for CodeLensMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Test {}: Incorrect CodeLens response:", self.test_id)?;
+        write_fields_comparison(f, "CodeLens", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Error, PartialEq)]
+pub struct CodeLensResolveMismatchError {
+    pub test_id: String,
+    pub expected: CodeLens,
+    pub actual: CodeLens,
+}
+
+impl std::fmt::Display for CodeLensResolveMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect CodeLens Resolve response:",
+            self.test_id
+        )?;
         write_fields_comparison(f, "CodeLens", &self.expected, &self.actual, 0)?;
         Ok(())
     }
@@ -1268,6 +1292,7 @@ impl Empty for EmptyResult {
     }
 }
 
+impl Empty for CodeLens {}
 impl Empty for CompletionResponse {}
 impl Empty for DocumentLink {}
 impl Empty for DocumentSymbolResponse {}
@@ -1321,6 +1346,7 @@ where
     }
 }
 
+impl CleanResponse for CodeLens {}
 impl CleanResponse for Vec<CodeLens> {}
 impl CleanResponse for Vec<CallHierarchyItem> {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {

@@ -94,6 +94,7 @@ As an eventual end goal, we'd obviously like to provide test coverage for *all* 
 So far, we have:
 
 - [x] `callHierarchy/incomingCalls`
+- [x] `codeLens/resolve`
 - [x] `documentLink/resolve`
 - [x] `textDocument/codeLens`
 - [x] `textDocument/completion`

@@ -22,7 +22,7 @@ mod test {
     }
 
     #[test]
-    fn test_server_definition_simple_expect_none_got_none() {
+    fn test_server_code_lens_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file)
             .cursor_pos(Some(Position::default()));

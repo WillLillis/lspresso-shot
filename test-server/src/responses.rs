@@ -195,6 +195,36 @@ pub fn get_code_lens_response(response_num: u32) -> Option<Vec<CodeLens>> {
     }
 }
 
+/// For use with `test_code_lens_resolve`.
+#[must_use]
+pub fn get_code_lens_resolve_response(response_num: u32) -> Option<CodeLens> {
+    let item1 = CodeLens {
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        command: None,
+        data: None,
+    };
+    let item2 = CodeLens {
+        range: Range {
+            start: Position::new(5, 6),
+            end: Position::new(7, 8),
+        },
+        command: Some(lsp_types::Command {
+            title: "title".to_string(),
+            command: "command".to_string(),
+            arguments: None,
+        }),
+        data: None,
+    };
+    match response_num {
+        0 => Some(item1),
+        1 => Some(item2),
+        _ => None,
+    }
+}
+
 /// For use with `test_completion`.
 #[must_use]
 pub fn get_completion_response(response_num: u32) -> Option<CompletionResponse> {
