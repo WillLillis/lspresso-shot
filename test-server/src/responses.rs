@@ -6,10 +6,10 @@ use lsp_types::{
     CodeDescription, CodeLens, CompletionItem, CompletionItemKind, CompletionItemLabelDetails,
     CompletionList, CompletionResponse, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
     DocumentHighlight, DocumentHighlightKind, DocumentLink, DocumentSymbol, DocumentSymbolResponse,
-    Documentation, GotoDefinitionResponse, Hover, HoverContents, LanguageString, Location,
-    LocationLink, MarkedString, MarkupContent, MarkupKind, Position, PublishDiagnosticsParams,
-    Range, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit, Uri,
-    WorkspaceEdit,
+    Documentation, FoldingRange, FoldingRangeKind, GotoDefinitionResponse, Hover, HoverContents,
+    LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind, Position,
+    PublishDiagnosticsParams, Range, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit,
+    TextEdit, Uri, WorkspaceEdit,
 };
 
 use crate::get_dummy_source_path;
@@ -798,6 +798,44 @@ pub fn get_references_response(response_num: u32) -> Option<Vec<Location>> {
 #[must_use]
 pub fn get_type_definition_response(response_num: u32) -> Option<GotoTypeDefinitionResponse> {
     get_definition_response(response_num)
+}
+
+/// For use with `test_folding_range`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_folding_range_response(response_num: u32) -> Option<Vec<FoldingRange>> {
+    let item1 = FoldingRange {
+        start_line: 0,
+        start_character: None,
+        end_line: 1,
+        end_character: None,
+        kind: None,
+        collapsed_text: None,
+    };
+    let item2 = FoldingRange {
+        start_line: 2,
+        start_character: Some(3),
+        end_line: 4,
+        end_character: Some(5),
+        kind: None,
+        collapsed_text: None,
+    };
+    let item3 = FoldingRange {
+        start_line: 6,
+        start_character: Some(7),
+        end_line: 8,
+        end_character: Some(8),
+        kind: Some(FoldingRangeKind::Comment),
+        collapsed_text: Some("collapsed text".to_string()),
+    };
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![item1]),
+        2 => Some(vec![item2]),
+        3 => Some(vec![item3]),
+        4 => Some(vec![item1, item2, item3]),
+        _ => None,
+    }
 }
 
 /// For use with `test_formatting`.

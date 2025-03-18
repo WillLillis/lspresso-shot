@@ -4,7 +4,7 @@ pub mod types;
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens, Diagnostic,
-    DocumentHighlight, DocumentLink, DocumentSymbolResponse, FormattingOptions,
+    DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
     GotoDefinitionResponse, Hover, Location, TextEdit, WorkspaceEdit,
 };
 
@@ -20,11 +20,11 @@ use types::{
     CleanResponse, CodeLensMismatchError, CodeLensResolveMismatchError, CompletionMismatchError,
     CompletionResult, DeclarationMismatchError, DefinitionMismatchError, DiagnosticMismatchError,
     DocumentHighlightMismatchError, DocumentLinkMismatchError, DocumentLinkResolveMismatchError,
-    DocumentSymbolMismatchError, Empty, EmptyResult, FormattingMismatchError, FormattingResult,
-    HoverMismatchError, ImplementationMismatchError, IncomingCallsMismatchError,
-    OutgoingCallsMismatchError, PrepareCallHierachyMismatchError, ReferencesMismatchError,
-    RenameMismatchError, TestCase, TestError, TestResult, TestSetupError, TestType, TimeoutError,
-    TypeDefinitionMismatchError,
+    DocumentSymbolMismatchError, Empty, EmptyResult, FoldingRangeMismatchError,
+    FormattingMismatchError, FormattingResult, HoverMismatchError, ImplementationMismatchError,
+    IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
+    ReferencesMismatchError, RenameMismatchError, TestCase, TestError, TestResult, TestSetupError,
+    TestType, TimeoutError, TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -631,6 +631,34 @@ pub fn test_document_symbol(
 
         Ok(())
     })
+}
+
+/// Tests the server's response to a 'textDocument/foldingRange' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_folding_range(
+    mut test_case: TestCase,
+    expected: Option<&Vec<FoldingRange>>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::FoldingRange);
+    collect_results(
+        &test_case,
+        None,
+        expected,
+        |expected, actual: &Vec<FoldingRange>| {
+            if expected != actual {
+                Err(FoldingRangeMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'textDocument/formatting' request. If `options`

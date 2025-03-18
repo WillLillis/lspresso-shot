@@ -103,6 +103,7 @@ So far, we have:
 - [x] `textDocument/documentHighlight`
 - [x] `textDocument/documentLink`
 - [x] `textDocument/documentSymbol`
+- [x] `textDocument/foldingRange`
 - [x] `textDocument/formatting`
 - [x] `textDocument/implementation`
 - [x] `textDocument/hover`

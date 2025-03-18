@@ -10,6 +10,7 @@ mod document_highlight;
 mod document_link;
 mod document_link_resolve;
 mod document_symbol;
+mod folding_range;
 mod formatting;
 mod hover;
 mod implementation;
