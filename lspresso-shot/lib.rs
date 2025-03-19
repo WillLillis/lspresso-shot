@@ -5,7 +5,7 @@ use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens, Diagnostic,
     DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
-    GotoDefinitionResponse, Hover, Location, TextEdit, WorkspaceEdit,
+    GotoDefinitionResponse, Hover, Location, Position, SelectionRange, TextEdit, WorkspaceEdit,
 };
 
 use std::{
@@ -23,8 +23,8 @@ use types::{
     DocumentSymbolMismatchError, Empty, EmptyResult, FoldingRangeMismatchError,
     FormattingMismatchError, FormattingResult, HoverMismatchError, ImplementationMismatchError,
     IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
-    ReferencesMismatchError, RenameMismatchError, TestCase, TestError, TestResult, TestSetupError,
-    TestType, TimeoutError, TypeDefinitionMismatchError,
+    ReferencesMismatchError, RenameMismatchError, SelectionRangeMismatchError, TestCase, TestError,
+    TestResult, TestSetupError, TestType, TimeoutError, TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -993,6 +993,41 @@ pub fn test_rename(
                     expected: expected.clone(),
                     actual: actual.clone(),
                 }))?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Tests the server's response to a 'textDocument/typeDefinition' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `positions` fails
+pub fn test_selection_range(
+    mut test_case: TestCase,
+    positions: &Vec<Position>,
+    expected: Option<&Vec<SelectionRange>>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::SelectionRange);
+    let positions_str =
+        serde_json::to_string_pretty(positions).expect("JSON deserialzation of `positions` failed");
+
+    collect_results(
+        &test_case,
+        Some(&vec![("POSITIONS", positions_str)]),
+        expected,
+        |expected, actual: &Vec<SelectionRange>| {
+            if expected != actual {
+                Err(SelectionRangeMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
             }
             Ok(())
         },

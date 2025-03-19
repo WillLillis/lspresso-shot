@@ -14,7 +14,8 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens,
     CompletionItem, CompletionList, CompletionResponse, Diagnostic, DocumentChangeOperation,
     DocumentChanges, DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange,
-    GotoDefinitionResponse, Hover, Location, Position, ResourceOp, TextEdit, Uri, WorkspaceEdit,
+    GotoDefinitionResponse, Hover, Location, Position, ResourceOp, SelectionRange, TextEdit, Uri,
+    WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -63,6 +64,8 @@ pub enum TestType {
     References,
     /// Test `textDocument/rename` requests
     Rename,
+    /// Test `textDocument/selectionRange` requests
+    SelectionRange,
     /// Test `textDocument/typeDefinition` requests
     TypeDefinition,
 }
@@ -92,6 +95,7 @@ impl std::fmt::Display for TestType {
                 Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
                 Self::References => "textDocument/references",
                 Self::Rename => "textDocument/rename",
+                Self::SelectionRange => "textDocument/selectionRange",
                 Self::TypeDefinition => "textDocument/typeDefinition",
             }
         )?;
@@ -587,6 +591,8 @@ pub enum TestError {
     ReferencesMismatch(#[from] ReferencesMismatchError),
     #[error(transparent)]
     RenameMismatch(#[from] Box<RenameMismatchError>),
+    #[error(transparent)]
+    SelectionRangeMismatch(#[from] SelectionRangeMismatchError),
     #[error(transparent)]
     TypeDefinitionMismatch(#[from] Box<TypeDefinitionMismatchError>),
     #[error("Test {0}: No results were written")]
@@ -1278,6 +1284,25 @@ impl std::fmt::Display for RenameMismatchError {
     }
 }
 
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct SelectionRangeMismatchError {
+    pub test_id: String,
+    pub expected: Vec<SelectionRange>,
+    pub actual: Vec<SelectionRange>,
+}
+
+impl std::fmt::Display for SelectionRangeMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Selection Range response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Selection Range", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub struct TypeDefinitionMismatchError {
     pub test_id: String,
@@ -1329,6 +1354,7 @@ impl Empty for Vec<CallHierarchyIncomingCall> {}
 impl Empty for Vec<CallHierarchyOutgoingCall> {}
 impl Empty for Vec<FoldingRange> {}
 impl Empty for Vec<Location> {}
+impl Empty for Vec<SelectionRange> {}
 impl Empty for Vec<TextEdit> {}
 impl Empty for WorkspaceEdit {}
 
@@ -1471,6 +1497,7 @@ impl CleanResponse for Vec<Location> {
         Ok(self)
     }
 }
+impl CleanResponse for Vec<SelectionRange> {}
 impl CleanResponse for Vec<TextEdit> {}
 impl CleanResponse for WorkspaceEdit {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {

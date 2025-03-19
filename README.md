@@ -111,6 +111,7 @@ So far, we have:
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`
 - [x] `textDocument/rename`
+- [x] `textDocument/selectionRange`
 - [x] `textDocument/typeDefinition`
 
 ## Gotchas/Known Issues

@@ -19,4 +19,5 @@ mod outgoing_calls;
 mod prepare_call_hierarchy;
 mod references;
 mod rename;
+mod selection_range;
 mod type_definition;
