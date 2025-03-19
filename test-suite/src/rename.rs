@@ -25,8 +25,7 @@ mod test {
     #[test]
     fn test_server_rename_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::new(0, 0)));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -34,7 +33,7 @@ mod test {
         send_capabiltiies(&rename_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_rename(test_case, "", None));
+        lspresso_shot!(test_rename(test_case, &Position::default(), "", None));
     }
 
     #[rstest]
@@ -43,8 +42,7 @@ mod test {
     ) {
         let edits = test_server::responses::get_rename_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::new(0, 0)));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -52,7 +50,7 @@ mod test {
         send_capabiltiies(&rename_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_rename(test_case.clone(), "", None);
+        let test_result = test_rename(test_case.clone(), &Position::default(), "", None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{edits:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -63,8 +61,7 @@ mod test {
     ) {
         let edits = test_server::responses::get_rename_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::new(0, 0)));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -72,7 +69,12 @@ mod test {
         send_capabiltiies(&rename_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_rename(test_case, "", Some(&edits)));
+        lspresso_shot!(test_rename(
+            test_case,
+            &Position::default(),
+            "",
+            Some(&edits)
+        ));
     }
 
     #[test]
@@ -88,12 +90,12 @@ mod test {
                 NonZeroU32::new(5).unwrap(),
                 "rustAnalyzer/Indexing".to_string(),
             ))
-            .cursor_pos(Some(Position::new(1, 9)))
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_rename(
             rename_test_case,
+            &Position::new(1, 9),
             "bar",
             Some(&WorkspaceEdit {
                 changes: None,

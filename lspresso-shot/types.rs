@@ -532,8 +532,6 @@ pub enum TestSetupError {
     InvalidFileExtension(String),
     #[error("Source file path \"{0}\" is invalid")]
     InvalidFilePath(String),
-    #[error("Cursor position must be specified for {0} tests")]
-    InvalidCursorPosition(TestType),
     #[error("{0}")]
     IO(String),
 }

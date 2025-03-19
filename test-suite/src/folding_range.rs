@@ -22,8 +22,7 @@ mod test {
     #[test]
     fn test_server_folding_range_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
         let test_case_root = test_case
             .get_lspresso_dir()

@@ -37,8 +37,7 @@ mod test {
     #[test]
     fn test_server_completion_exact_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -46,7 +45,7 @@ mod test {
         send_capabiltiies(&completion_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_completion(test_case, None));
+        lspresso_shot!(test_completion(test_case, &Position::default(), None));
     }
 
     #[rstest]
@@ -55,8 +54,7 @@ mod test {
     ) {
         let resp = test_server::responses::get_completion_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -64,7 +62,7 @@ mod test {
         send_capabiltiies(&completion_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_completion(test_case.clone(), None);
+        let test_result = test_completion(test_case.clone(), &Position::default(), None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -76,8 +74,7 @@ mod test {
         let resp = test_server::responses::get_completion_response(response_num).unwrap();
         let comp_result = CompletionResult::Exact(resp);
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -85,7 +82,11 @@ mod test {
         send_capabiltiies(&completion_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_completion(test_case, Some(&comp_result)));
+        lspresso_shot!(test_completion(
+            test_case,
+            &Position::default(),
+            Some(&comp_result)
+        ));
     }
 
     #[rstest]
@@ -100,8 +101,7 @@ mod test {
             }
         };
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -109,7 +109,11 @@ mod test {
         send_capabiltiies(&completion_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_completion(test_case, Some(&comp_result)));
+        lspresso_shot!(test_completion(
+            test_case,
+            &Position::default(),
+            Some(&comp_result)
+        ));
     }
 
     // TODO: The end user experience for debugging completions test with CompletionResult::Contains
@@ -214,9 +218,12 @@ println!("format {local_variable} arguments");
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
-            .cursor_pos(Some(Position::new(1, 9)))
             .other_file(cargo_dot_toml());
 
-        lspresso_shot!(test_completion(test_case, Some(&expected_comps)));
+        lspresso_shot!(test_completion(
+            test_case,
+            &Position::new(1, 9),
+            Some(&expected_comps)
+        ));
     }
 }
