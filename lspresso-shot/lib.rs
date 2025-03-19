@@ -24,7 +24,7 @@ use types::{
     FormattingMismatchError, FormattingResult, HoverMismatchError, ImplementationMismatchError,
     IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
     ReferencesMismatchError, RenameMismatchError, SelectionRangeMismatchError, TestCase, TestError,
-    TestResult, TestSetupError, TestType, TimeoutError, TypeDefinitionMismatchError,
+    TestResult, TestType, TimeoutError, TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -235,6 +235,16 @@ where
     }
 }
 
+fn get_cursor_replacement(cursor_pos: &Position) -> (&str, String) {
+    (
+        "SET_CURSOR_POSITION",
+        format!(
+            "position = {{ line = {}, character = {} }}",
+            cursor_pos.line, cursor_pos.character
+        ),
+    )
+}
+
 pub type CodeLensComparator = fn(&Vec<CodeLens>, &Vec<CodeLens>, &TestCase) -> bool;
 
 /// Tests the server's response to a 'textDocument/codeLens' request
@@ -351,23 +361,25 @@ pub fn test_code_lens_resolve(
 /// or some other failure occurs
 pub fn test_completion(
     mut test_case: TestCase,
+    cursor_pos: &Position,
     expected: Option<&CompletionResult>,
 ) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(TestType::Completion))?;
-    }
     test_case.test_type = Some(TestType::Completion);
-
-    collect_results(&test_case, None, expected, |expected, actual| {
-        if !expected.results_satisfy(actual) {
-            Err(CompletionMismatchError {
-                test_id: test_case.test_id.clone(),
-                expected: (*expected).clone(),
-                actual: actual.clone(),
-            })?;
-        }
-        Ok(())
-    })
+    collect_results(
+        &test_case,
+        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        expected,
+        |expected, actual| {
+            if !expected.results_satisfy(actual) {
+                Err(CompletionMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: (*expected).clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'textDocument/declaration' request
@@ -377,41 +389,44 @@ pub fn test_completion(
 /// Returns `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_declaration(
     mut test_case: TestCase,
+    cursor_pos: &Position,
     expected: Option<&GotoDeclarationResponse>,
 ) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(TestType::Declaration))?;
-    }
     test_case.test_type = Some(TestType::Declaration);
-    collect_results(&test_case, None, expected, |expected, actual| {
-        // HACK: Since the `GotoDeclarationResponse` is untagged, there's no way to differentiate
-        // between the `Array` and `Link` if we get an empty vector in response. Just
-        // treat this as a special case and say it's ok.
-        match (expected, actual) {
-            (
-                GotoDeclarationResponse::Array(array_items),
-                GotoDeclarationResponse::Link(link_items),
-            )
-            | (
-                GotoDeclarationResponse::Link(link_items),
-                GotoDeclarationResponse::Array(array_items),
-            ) => {
-                if array_items.is_empty() && link_items.is_empty() {
-                    return Ok(());
+    collect_results(
+        &test_case,
+        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        expected,
+        |expected, actual| {
+            // HACK: Since the `GotoDeclarationResponse` is untagged, there's no way to differentiate
+            // between the `Array` and `Link` if we get an empty vector in response. Just
+            // treat this as a special case and say it's ok.
+            match (expected, actual) {
+                (
+                    GotoDeclarationResponse::Array(array_items),
+                    GotoDeclarationResponse::Link(link_items),
+                )
+                | (
+                    GotoDeclarationResponse::Link(link_items),
+                    GotoDeclarationResponse::Array(array_items),
+                ) => {
+                    if array_items.is_empty() && link_items.is_empty() {
+                        return Ok(());
+                    }
                 }
+                _ => {}
             }
-            _ => {}
-        }
 
-        if *expected != *actual {
-            Err(Box::new(DeclarationMismatchError {
-                test_id: test_case.test_id.clone(),
-                expected: expected.clone(),
-                actual: actual.clone(),
-            }))?;
-        }
-        Ok(())
-    })
+            if *expected != *actual {
+                Err(Box::new(DeclarationMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                }))?;
+            }
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'textDocument/definition' request
@@ -421,41 +436,44 @@ pub fn test_declaration(
 /// Returns `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_definition(
     mut test_case: TestCase,
+    cursor_pos: &Position,
     expected: Option<&GotoDefinitionResponse>,
 ) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(TestType::Definition))?;
-    }
     test_case.test_type = Some(TestType::Definition);
-    collect_results(&test_case, None, expected, |expected, actual| {
-        // HACK: Since the `GotoDefinitionResponse` is untagged, there's no way to differentiate
-        // between the `Array` and `Link` if we get an empty vector in response. Just
-        // treat this as a special case and say it's ok.
-        match (expected, actual) {
-            (
-                GotoDefinitionResponse::Array(array_items),
-                GotoDefinitionResponse::Link(link_items),
-            )
-            | (
-                GotoDefinitionResponse::Link(link_items),
-                GotoDefinitionResponse::Array(array_items),
-            ) => {
-                if array_items.is_empty() && link_items.is_empty() {
-                    return Ok(());
+    collect_results(
+        &test_case,
+        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        expected,
+        |expected, actual| {
+            // HACK: Since the `GotoDefinitionResponse` is untagged, there's no way to differentiate
+            // between the `Array` and `Link` if we get an empty vector in response. Just
+            // treat this as a special case and say it's ok.
+            match (expected, actual) {
+                (
+                    GotoDefinitionResponse::Array(array_items),
+                    GotoDefinitionResponse::Link(link_items),
+                )
+                | (
+                    GotoDefinitionResponse::Link(link_items),
+                    GotoDefinitionResponse::Array(array_items),
+                ) => {
+                    if array_items.is_empty() && link_items.is_empty() {
+                        return Ok(());
+                    }
                 }
+                _ => {}
             }
-            _ => {}
-        }
 
-        if *expected != *actual {
-            Err(Box::new(DefinitionMismatchError {
-                test_id: test_case.test_id.clone(),
-                expected: expected.clone(),
-                actual: actual.clone(),
-            }))?;
-        }
-        Ok(())
-    })
+            if *expected != *actual {
+                Err(Box::new(DefinitionMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                }))?;
+            }
+            Ok(())
+        },
+    )
 }
 
 // NOTE: As far as I can tell, we can't directly accept a `PublishDiagnosticsParams` object,
@@ -503,17 +521,13 @@ pub fn test_diagnostics(mut test_case: TestCase, expected: &Vec<Diagnostic>) -> 
 /// or some other failure occurs
 pub fn test_document_highlight(
     mut test_case: TestCase,
+    cursor_pos: &Position,
     expected: Option<&Vec<DocumentHighlight>>,
 ) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(
-            TestType::DocumentHighlight,
-        ))?;
-    }
     test_case.test_type = Some(TestType::DocumentHighlight);
     collect_results(
         &test_case,
-        None,
+        Some(&vec![get_cursor_replacement(cursor_pos)]),
         expected,
         |expected, actual: &Vec<DocumentHighlight>| {
             if expected != actual {
@@ -762,21 +776,27 @@ pub fn test_formatting(
 ///
 /// Returns `TestError` if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
-pub fn test_hover(mut test_case: TestCase, expected: Option<&Hover>) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(TestType::Hover))?;
-    }
+pub fn test_hover(
+    mut test_case: TestCase,
+    cursor_pos: &Position,
+    expected: Option<&Hover>,
+) -> TestResult<()> {
     test_case.test_type = Some(TestType::Hover);
-    collect_results(&test_case, None, expected, |expected, actual| {
-        if expected != actual {
-            Err(Box::new(HoverMismatchError {
-                test_id: test_case.test_id.clone(),
-                expected: expected.clone(),
-                actual: actual.clone(),
-            }))?;
-        }
-        Ok(())
-    })
+    collect_results(
+        &test_case,
+        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        expected,
+        |expected, actual| {
+            if expected != actual {
+                Err(Box::new(HoverMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                }))?;
+            }
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'textDocument/implementation' request
@@ -787,43 +807,44 @@ pub fn test_hover(mut test_case: TestCase, expected: Option<&Hover>) -> TestResu
 /// or some other failure occurs
 pub fn test_implementation(
     mut test_case: TestCase,
+    cursor_pos: &Position,
     expected: Option<&GotoImplementationResponse>,
 ) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(
-            TestType::Implementation,
-        ))?;
-    }
     test_case.test_type = Some(TestType::Implementation);
-    collect_results(&test_case, None, expected, |expected, actual| {
-        // HACK: Since `GotoImplementationResponse` is untagged, there is no way to
-        // differentiate between the `Array` and `Link` variants if we get an empty
-        // vector in response.
-        // Just treat this as a special case and say it's ok.
-        match (expected, actual) {
-            (
-                GotoImplementationResponse::Array(array_items),
-                GotoImplementationResponse::Link(link_items),
-            )
-            | (
-                GotoImplementationResponse::Link(link_items),
-                GotoImplementationResponse::Array(array_items),
-            ) => {
-                if array_items.is_empty() && link_items.is_empty() {
-                    return Ok(());
+    collect_results(
+        &test_case,
+        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        expected,
+        |expected, actual| {
+            // HACK: Since `GotoImplementationResponse` is untagged, there is no way to
+            // differentiate between the `Array` and `Link` variants if we get an empty
+            // vector in response.
+            // Just treat this as a special case and say it's ok.
+            match (expected, actual) {
+                (
+                    GotoImplementationResponse::Array(array_items),
+                    GotoImplementationResponse::Link(link_items),
+                )
+                | (
+                    GotoImplementationResponse::Link(link_items),
+                    GotoImplementationResponse::Array(array_items),
+                ) => {
+                    if array_items.is_empty() && link_items.is_empty() {
+                        return Ok(());
+                    }
                 }
+                _ => {}
             }
-            _ => {}
-        }
-        if expected != actual {
-            Err(Box::new(ImplementationMismatchError {
-                test_id: test_case.test_id.clone(),
-                expected: expected.clone(),
-                actual: actual.clone(),
-            }))?;
-        }
-        Ok(())
-    })
+            if expected != actual {
+                Err(Box::new(ImplementationMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                }))?;
+            }
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'callHierarchy/incomingCalls' request
@@ -908,17 +929,13 @@ pub fn test_outgoing_calls(
 /// or some other failure occurs
 pub fn test_prepare_call_hierarchy(
     mut test_case: TestCase,
+    cursor_pos: &Position,
     expected: Option<&Vec<CallHierarchyItem>>,
 ) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(
-            TestType::PrepareCallHierarchy,
-        ))?;
-    }
     test_case.test_type = Some(TestType::PrepareCallHierarchy);
     collect_results(
         &test_case,
-        None,
+        Some(&vec![get_cursor_replacement(cursor_pos)]),
         expected,
         |expected, actual: &Vec<CallHierarchyItem>| {
             if expected != actual {
@@ -940,19 +957,20 @@ pub fn test_prepare_call_hierarchy(
 /// Returns `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_references(
     mut test_case: TestCase,
+    cursor_pos: &Position,
     include_declaration: bool,
     expected: Option<&Vec<Location>>,
 ) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(TestType::References))?;
-    }
     test_case.test_type = Some(TestType::References);
     collect_results(
         &test_case,
-        Some(&vec![(
-            "SET_CONTEXT",
-            format!("context = {{ includeDeclaration = {include_declaration} }}"),
-        )]),
+        Some(&vec![
+            get_cursor_replacement(cursor_pos),
+            (
+                "SET_CONTEXT",
+                format!("context = {{ includeDeclaration = {include_declaration} }}"),
+            ),
+        ]),
         expected,
         |expected, actual: &Vec<Location>| {
             if expected != actual {
@@ -975,16 +993,17 @@ pub fn test_references(
 #[allow(clippy::missing_panics_doc)]
 pub fn test_rename(
     mut test_case: TestCase,
+    cursor_pos: &Position,
     new_name: &str,
     expected: Option<&WorkspaceEdit>,
 ) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(TestType::Rename))?;
-    }
     test_case.test_type = Some(TestType::Rename);
     collect_results(
         &test_case,
-        Some(&vec![("NEW_NAME", format!("newName = '{new_name}'"))]),
+        Some(&vec![
+            get_cursor_replacement(cursor_pos),
+            ("NEW_NAME", format!("newName = '{new_name}'")),
+        ]),
         expected,
         |expected, actual| {
             if expected != actual {
@@ -1041,41 +1060,42 @@ pub fn test_selection_range(
 /// Returns `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_type_definition(
     mut test_case: TestCase,
+    cursor_pos: &Position,
     expected: Option<&GotoTypeDefinitionResponse>,
 ) -> TestResult<()> {
-    if test_case.cursor_pos.is_none() {
-        Err(TestSetupError::InvalidCursorPosition(
-            TestType::TypeDefinition,
-        ))?;
-    }
     test_case.test_type = Some(TestType::TypeDefinition);
-    collect_results(&test_case, None, expected, |expected, actual| {
-        // HACK: Since the `GotoTypeDefinitionResponse` is untagged, there's no way
-        // to differentiate between the `Array` and `Link` if we get an empty vector
-        // in response. Just treat this as a special case and say it's ok.
-        match (expected, actual) {
-            (
-                GotoTypeDefinitionResponse::Array(array_items),
-                GotoTypeDefinitionResponse::Link(link_items),
-            )
-            | (
-                GotoTypeDefinitionResponse::Link(link_items),
-                GotoTypeDefinitionResponse::Array(array_items),
-            ) => {
-                if array_items.is_empty() && link_items.is_empty() {
-                    return Ok(());
+    collect_results(
+        &test_case,
+        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        expected,
+        |expected, actual| {
+            // HACK: Since the `GotoTypeDefinitionResponse` is untagged, there's no way
+            // to differentiate between the `Array` and `Link` if we get an empty vector
+            // in response. Just treat this as a special case and say it's ok.
+            match (expected, actual) {
+                (
+                    GotoTypeDefinitionResponse::Array(array_items),
+                    GotoTypeDefinitionResponse::Link(link_items),
+                )
+                | (
+                    GotoTypeDefinitionResponse::Link(link_items),
+                    GotoTypeDefinitionResponse::Array(array_items),
+                ) => {
+                    if array_items.is_empty() && link_items.is_empty() {
+                        return Ok(());
+                    }
                 }
+                _ => {}
             }
-            _ => {}
-        }
 
-        if *expected != *actual {
-            Err(Box::new(TypeDefinitionMismatchError {
-                test_id: test_case.test_id.clone(),
-                expected: expected.clone(),
-                actual: actual.clone(),
-            }))?;
-        }
-        Ok(())
-    })
+            if *expected != *actual {
+                Err(Box::new(TypeDefinitionMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                }))?;
+            }
+            Ok(())
+        },
+    )
 }

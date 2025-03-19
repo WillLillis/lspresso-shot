@@ -74,12 +74,6 @@ pub fn get_init_dot_lua(
         }
     }
 
-    let set_cursor_position = test_case.cursor_pos.map_or_else(String::new, |cursor_pos| {
-        format!(
-            "position = {{ line = {}, character = {} }}",
-            cursor_pos.line, cursor_pos.character
-        )
-    });
     let final_init = raw_init
         .replace("RESULTS_FILE", results_file_path.to_str().unwrap())
         .replace(
@@ -91,7 +85,6 @@ pub fn get_init_dot_lua(
         .replace("LOG_PATH", log_path.to_str().unwrap())
         .replace("EMPTY_PATH", empty_path.to_str().unwrap())
         .replace("FILE_EXTENSION", source_extension)
-        .replace("SET_CURSOR_POSITION", &set_cursor_position)
         .replace("COMMANDS", "") // clear out commands placeholder if they weren't set by `custom_replacements`
         .replace(
             "PROGRESS_THRESHOLD",

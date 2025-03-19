@@ -7,7 +7,7 @@ mod test {
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
-    use lsp_types::{CodeLens, CodeLensOptions, Position, Range, ServerCapabilities};
+    use lsp_types::{CodeLens, CodeLensOptions, Range, ServerCapabilities};
     use rstest::rstest;
 
     fn code_lens_resolve_capabilities_simple() -> ServerCapabilities {
@@ -31,8 +31,7 @@ mod test {
     #[test]
     fn test_server_code_lens_resolve_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
