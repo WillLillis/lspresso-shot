@@ -57,6 +57,7 @@ pub fn get_init_dot_lua(
         | TestType::PrepareCallHierarchy
         | TestType::References
         | TestType::Rename
+        | TestType::SelectionRange
         | TestType::TypeDefinition => {
             raw_init = raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type));
         }
@@ -136,6 +137,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::PrepareCallHierarchy => include_str!("lua_templates/prepare_call_hierarchy_action.lua"),
         TestType::References => include_str!("lua_templates/references_action.lua"),
         TestType::Rename => include_str!("lua_templates/rename_action.lua"),
+        TestType::SelectionRange => include_str!("lua_templates/selection_range_action.lua"),
         TestType::TypeDefinition => include_str!("lua_templates/type_definition_action.lua"),
     }
     .to_string()

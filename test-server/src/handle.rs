@@ -11,12 +11,13 @@ use lsp_types::{
         DocumentHighlightRequest, DocumentLinkRequest, DocumentLinkResolve, DocumentSymbolRequest,
         FoldingRangeRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
         GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
-        HoverRequest, References, Rename, Request as _,
+        HoverRequest, References, Rename, Request as _, SelectionRangeRequest,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeLens, CodeLensParams, CompletionParams, DocumentFormattingParams, DocumentHighlightParams,
     DocumentLink, DocumentLinkParams, DocumentSymbolParams, FoldingRangeParams,
-    GotoDefinitionParams, HoverParams, ReferenceParams, RenameParams, ServerCapabilities, Uri,
+    GotoDefinitionParams, HoverParams, ReferenceParams, RenameParams, SelectionRangeParams,
+    ServerCapabilities, Uri,
 };
 
 use crate::{
@@ -29,7 +30,7 @@ use crate::{
         get_formatting_response, get_hover_response, get_implementation_response,
         get_incoming_calls_response, get_outgoing_calls_response,
         get_prepare_call_hierachy_response, get_references_response, get_rename_response,
-        get_type_definition_response,
+        get_selection_range_response, get_type_definition_response,
     },
 };
 
@@ -376,6 +377,15 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: RenameParams| -> Uri { params.text_document_position.text_document.uri }
+            )?;
+        }
+        SelectionRangeRequest::METHOD => {
+            handle_request!(
+                SelectionRangeRequest,
+                get_selection_range_response,
+                req,
+                conn,
+                |params: SelectionRangeParams| -> Uri { params.text_document.uri }
             )?;
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),

@@ -8,8 +8,8 @@ use lsp_types::{
     DocumentHighlight, DocumentHighlightKind, DocumentLink, DocumentSymbol, DocumentSymbolResponse,
     Documentation, FoldingRange, FoldingRangeKind, GotoDefinitionResponse, Hover, HoverContents,
     LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind, Position,
-    PublishDiagnosticsParams, Range, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit,
-    TextEdit, Uri, WorkspaceEdit,
+    PublishDiagnosticsParams, Range, SelectionRange, SymbolInformation, SymbolKind, SymbolTag,
+    TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
 };
 
 use crate::get_dummy_source_path;
@@ -787,6 +787,32 @@ pub fn get_references_response(response_num: u32) -> Option<Vec<Location>> {
                 },
             },
         ]),
+        _ => None,
+    }
+}
+
+/// For use with `test_selection_range`.
+#[must_use]
+pub fn get_selection_range_response(response_num: u32) -> Option<Vec<SelectionRange>> {
+    let item1 = SelectionRange {
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        parent: None,
+    };
+    let item2 = SelectionRange {
+        range: Range {
+            start: Position::new(5, 6),
+            end: Position::new(7, 8),
+        },
+        parent: Some(Box::new(item1.clone())),
+    };
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![item1]),
+        2 => Some(vec![item2]),
+        3 => Some(vec![item1, item2]),
         _ => None,
     }
 }
