@@ -14,8 +14,8 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens,
     CompletionItem, CompletionList, CompletionResponse, Diagnostic, DocumentChangeOperation,
     DocumentChanges, DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange,
-    GotoDefinitionResponse, Hover, Location, Position, ResourceOp, SelectionRange, TextEdit, Uri,
-    WorkspaceEdit,
+    GotoDefinitionResponse, Hover, Location, Position, ResourceOp, SelectionRange, SemanticTokens,
+    TextEdit, Uri, WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -66,6 +66,8 @@ pub enum TestType {
     Rename,
     /// Test `textDocument/selectionRange` requests
     SelectionRange,
+    /// Test `textDocument/semanticTokens` requests
+    SemanticTokensFull,
     /// Test `textDocument/typeDefinition` requests
     TypeDefinition,
 }
@@ -96,6 +98,7 @@ impl std::fmt::Display for TestType {
                 Self::References => "textDocument/references",
                 Self::Rename => "textDocument/rename",
                 Self::SelectionRange => "textDocument/selectionRange",
+                Self::SemanticTokensFull => "textDocument/semanticTokens/full",
                 Self::TypeDefinition => "textDocument/typeDefinition",
             }
         )?;
@@ -591,6 +594,8 @@ pub enum TestError {
     RenameMismatch(#[from] Box<RenameMismatchError>),
     #[error(transparent)]
     SelectionRangeMismatch(#[from] SelectionRangeMismatchError),
+    #[error(transparent)]
+    SematicTokensFullMismatch(#[from] SemanticTokensFullMismatchError),
     #[error(transparent)]
     TypeDefinitionMismatch(#[from] Box<TypeDefinitionMismatchError>),
     #[error("Test {0}: No results were written")]
@@ -1301,6 +1306,25 @@ impl std::fmt::Display for SelectionRangeMismatchError {
     }
 }
 
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct SemanticTokensFullMismatchError {
+    pub test_id: String,
+    pub expected: SemanticTokens,
+    pub actual: SemanticTokens,
+}
+
+impl std::fmt::Display for SemanticTokensFullMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Semantic Tokens Full response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Semantic Tokens", &self.expected, &self.actual, 0)?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub struct TypeDefinitionMismatchError {
     pub test_id: String,
@@ -1342,6 +1366,7 @@ impl Empty for DocumentSymbolResponse {}
 impl Empty for FormattingResult {}
 impl Empty for GotoDefinitionResponse {}
 impl Empty for Hover {}
+impl Empty for SemanticTokens {}
 impl Empty for String {}
 impl Empty for Vec<CallHierarchyItem> {}
 impl Empty for Vec<Diagnostic> {}
@@ -1446,6 +1471,7 @@ impl CleanResponse for GotoDefinitionResponse {
     }
 }
 impl CleanResponse for Hover {}
+impl CleanResponse for SemanticTokens {}
 impl CleanResponse for String {}
 impl CleanResponse for Vec<Diagnostic> {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {

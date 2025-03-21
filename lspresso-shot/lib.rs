@@ -5,7 +5,8 @@ use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens, Diagnostic,
     DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
-    GotoDefinitionResponse, Hover, Location, Position, SelectionRange, TextEdit, WorkspaceEdit,
+    GotoDefinitionResponse, Hover, Location, Position, SelectionRange, SemanticTokens, TextEdit,
+    WorkspaceEdit,
 };
 
 use std::{
@@ -23,8 +24,9 @@ use types::{
     DocumentSymbolMismatchError, Empty, EmptyResult, FoldingRangeMismatchError,
     FormattingMismatchError, FormattingResult, HoverMismatchError, ImplementationMismatchError,
     IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
-    ReferencesMismatchError, RenameMismatchError, SelectionRangeMismatchError, TestCase, TestError,
-    TestResult, TestType, TimeoutError, TypeDefinitionMismatchError,
+    ReferencesMismatchError, RenameMismatchError, SelectionRangeMismatchError,
+    SemanticTokensFullMismatchError, TestCase, TestError, TestResult, TestType, TimeoutError,
+    TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -1051,6 +1053,28 @@ pub fn test_selection_range(
             Ok(())
         },
     )
+}
+
+/// Tests the server's response to a 'textDocument/semanticTokens/full' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+pub fn test_semantic_tokens_full(
+    mut test_case: TestCase,
+    expected: Option<&SemanticTokens>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::SemanticTokensFull);
+    collect_results(&test_case, None, expected, |expected, actual| {
+        if expected != actual {
+            Err(SemanticTokensFullMismatchError {
+                test_id: test_case.test_id.clone(),
+                expected: expected.clone(),
+                actual: actual.clone(),
+            })?;
+        }
+        Ok(())
+    })
 }
 
 /// Tests the server's response to a 'textDocument/typeDefinition' request

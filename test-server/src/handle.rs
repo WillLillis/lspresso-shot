@@ -12,6 +12,7 @@ use lsp_types::{
         FoldingRangeRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
         GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
         HoverRequest, References, Rename, Request as _, SelectionRangeRequest,
+        SemanticTokensFullRequest,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeLens, CodeLensParams, CompletionParams, DocumentFormattingParams, DocumentHighlightParams,
@@ -30,7 +31,8 @@ use crate::{
         get_formatting_response, get_hover_response, get_implementation_response,
         get_incoming_calls_response, get_outgoing_calls_response,
         get_prepare_call_hierachy_response, get_references_response, get_rename_response,
-        get_selection_range_response, get_type_definition_response,
+        get_selection_range_response, get_semantic_tokens_full_response,
+        get_type_definition_response,
     },
 };
 
@@ -386,6 +388,15 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: SelectionRangeParams| -> Uri { params.text_document.uri }
+            )?;
+        }
+        SemanticTokensFullRequest::METHOD => {
+            handle_request!(
+                SemanticTokensFullRequest,
+                get_semantic_tokens_full_response,
+                req,
+                conn,
+                |params: lsp_types::SemanticTokensParams| -> Uri { params.text_document.uri }
             )?;
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),
