@@ -27,13 +27,14 @@ fn it_does_the_hover_thing() {
         "Path to server",
         TestFile::new("Source file name", "Contents")
     )
-    .cursor_pos(Some(Position::new(0, 0)))
     .other_file( // Optional
         TestFile::new("Other file name", "Other contents")
     );
 
+    let cursor_pos = Position::new(1, 2);
     lspresso_shot!(test_hover(
         hover_test_case,
+        &cursor_pos,
         Some(&Hover {
             range: Some(Range {
                 start: lsp_types::Position {
@@ -41,8 +42,8 @@ fn it_does_the_hover_thing() {
                     character: 2,
                 },
                 end: lsp_types::Position {
-                    line: 1,
-                    character: 3,
+                    line: 3,
+                    character: 4,
                 },
             }),
             contents: lsp_types::HoverContents::Markup(MarkupContent {

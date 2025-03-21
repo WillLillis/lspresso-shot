@@ -10,8 +10,7 @@ mod test {
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
     use lsp_types::{
-        DocumentLink, DocumentLinkOptions, Position, Range, ServerCapabilities, Uri,
-        WorkDoneProgressOptions,
+        DocumentLink, DocumentLinkOptions, Range, ServerCapabilities, Uri, WorkDoneProgressOptions,
     };
     use rstest::rstest;
 
@@ -68,8 +67,7 @@ mod test {
         let resp =
             test_server::responses::get_document_link_resolve_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
         let test_case_root = test_case
             .get_lspresso_dir()
