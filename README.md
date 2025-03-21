@@ -108,6 +108,7 @@ So far, we have:
 - [x] `textDocument/references`
 - [x] `textDocument/rename`
 - [x] `textDocument/selectionRange`
+- [x] `textDocument/semanticTokens/full`
 - [x] `textDocument/typeDefinition`
 
 ## Gotchas/Known Issues

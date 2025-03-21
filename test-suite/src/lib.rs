@@ -20,4 +20,5 @@ mod prepare_call_hierarchy;
 mod references;
 mod rename;
 mod selection_range;
+mod semantic_tokens_full;
 mod type_definition;

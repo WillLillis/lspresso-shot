@@ -8,8 +8,8 @@ use lsp_types::{
     DocumentHighlight, DocumentHighlightKind, DocumentLink, DocumentSymbol, DocumentSymbolResponse,
     Documentation, FoldingRange, FoldingRangeKind, GotoDefinitionResponse, Hover, HoverContents,
     LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind, Position,
-    PublishDiagnosticsParams, Range, SelectionRange, SymbolInformation, SymbolKind, SymbolTag,
-    TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
+    PublishDiagnosticsParams, Range, SelectionRange, SemanticToken, SemanticTokens,
+    SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
 };
 
 use crate::get_dummy_source_path;
@@ -813,6 +813,60 @@ pub fn get_selection_range_response(response_num: u32) -> Option<Vec<SelectionRa
         1 => Some(vec![item1]),
         2 => Some(vec![item2]),
         3 => Some(vec![item1, item2]),
+        _ => None,
+    }
+}
+
+/// For use with `test_selection_range`.
+#[must_use]
+pub fn get_semantic_tokens_full_response(response_num: u32) -> Option<SemanticTokens> {
+    let item1 = SemanticToken {
+        delta_line: 1,
+        delta_start: 2,
+        length: 3,
+        token_type: 4,
+        token_modifiers_bitset: 5,
+    };
+    let item2 = SemanticToken {
+        delta_line: 5,
+        delta_start: 7,
+        length: 8,
+        token_type: 9,
+        token_modifiers_bitset: 10,
+    };
+    match response_num {
+        0 => Some(SemanticTokens {
+            result_id: None,
+            data: vec![],
+        }),
+        1 => Some(SemanticTokens {
+            result_id: Some("result_id_1".to_string()),
+            data: vec![],
+        }),
+        2 => Some(SemanticTokens {
+            result_id: None,
+            data: vec![item1],
+        }),
+        3 => Some(SemanticTokens {
+            result_id: Some("result_id_1".to_string()),
+            data: vec![item1],
+        }),
+        4 => Some(SemanticTokens {
+            result_id: None,
+            data: vec![item2],
+        }),
+        5 => Some(SemanticTokens {
+            result_id: Some("result_id_2".to_string()),
+            data: vec![item2],
+        }),
+        6 => Some(SemanticTokens {
+            result_id: None,
+            data: vec![item1, item2],
+        }),
+        7 => Some(SemanticTokens {
+            result_id: Some("result_id_3".to_string()),
+            data: vec![item1, item2],
+        }),
         _ => None,
     }
 }
