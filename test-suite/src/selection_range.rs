@@ -24,8 +24,7 @@ mod test {
     #[test]
     fn test_server_selection_range_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -42,8 +41,7 @@ mod test {
     ) {
         let resp = test_server::responses::get_selection_range_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
@@ -63,8 +61,7 @@ mod test {
     ) {
         let resp = test_server::responses::get_selection_range_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");

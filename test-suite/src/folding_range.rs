@@ -9,7 +9,7 @@ mod test {
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
-    use lsp_types::{FoldingRange, FoldingRangeProviderCapability, Position, ServerCapabilities};
+    use lsp_types::{FoldingRange, FoldingRangeProviderCapability, ServerCapabilities};
     use rstest::rstest;
 
     fn folding_range_capabilities_simple() -> ServerCapabilities {
@@ -40,8 +40,7 @@ mod test {
     ) {
         let resp = test_server::responses::get_folding_range_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
         let test_case_root = test_case
             .get_lspresso_dir()
@@ -61,8 +60,7 @@ mod test {
     ) {
         let resp = test_server::responses::get_folding_range_response(response_num).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file)
-            .cursor_pos(Some(Position::default()));
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
         let test_case_root = test_case
             .get_lspresso_dir()
@@ -88,7 +86,6 @@ mod test {
                 "rustAnalyzer/Indexing".to_string(),
             ))
             .timeout(Duration::from_secs(20))
-            .cursor_pos(Some(Position::new(1, 5)))
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_folding_range(
