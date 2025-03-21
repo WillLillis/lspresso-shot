@@ -5,8 +5,8 @@ use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens, Diagnostic,
     DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
-    GotoDefinitionResponse, Hover, Location, Position, SelectionRange, SemanticTokens, TextEdit,
-    WorkspaceEdit,
+    GotoDefinitionResponse, Hover, Location, Position, SelectionRange, SemanticTokens,
+    SemanticTokensPartialResult, SemanticTokensResult, TextEdit, WorkspaceEdit,
 };
 
 use std::{
@@ -1062,10 +1062,37 @@ pub fn test_selection_range(
 /// Returns `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_semantic_tokens_full(
     mut test_case: TestCase,
-    expected: Option<&SemanticTokens>,
+    expected: Option<&SemanticTokensResult>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SemanticTokensFull);
     collect_results(&test_case, None, expected, |expected, actual| {
+        // HACK: Since the `SemanticTokensResult` is untagged, there's no way to differentiate
+        // between `SemanticTokensResult::Tokens` and `SemanticTokensResult::Partial`, as they
+        // are structurally identical when we have
+        // `SemanticTokensResult::Tokens(SemanticTokens { result_id: None, ...)`
+        // Treat this as a special case and say it's ok.
+        match (expected, actual) {
+            (
+                SemanticTokensResult::Tokens(SemanticTokens {
+                    result_id: None,
+                    data: token_data,
+                }),
+                SemanticTokensResult::Partial(SemanticTokensPartialResult { data: partial_data }),
+            )
+            | (
+                SemanticTokensResult::Partial(SemanticTokensPartialResult { data: partial_data }),
+                SemanticTokensResult::Tokens(SemanticTokens {
+                    result_id: None,
+                    data: token_data,
+                }),
+            ) => {
+                if token_data == partial_data {
+                    return Ok(());
+                }
+            }
+            _ => {}
+        }
+
         if expected != actual {
             Err(SemanticTokensFullMismatchError {
                 test_id: test_case.test_id.clone(),
