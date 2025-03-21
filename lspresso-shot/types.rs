@@ -14,8 +14,8 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens,
     CompletionItem, CompletionList, CompletionResponse, Diagnostic, DocumentChangeOperation,
     DocumentChanges, DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange,
-    GotoDefinitionResponse, Hover, Location, Position, ResourceOp, SelectionRange, SemanticTokens,
-    TextEdit, Uri, WorkspaceEdit,
+    GotoDefinitionResponse, Hover, Location, Position, ResourceOp, SelectionRange,
+    SemanticTokensResult, TextEdit, Uri, WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -1309,8 +1309,8 @@ impl std::fmt::Display for SelectionRangeMismatchError {
 #[derive(Debug, Error, PartialEq, Eq)]
 pub struct SemanticTokensFullMismatchError {
     pub test_id: String,
-    pub expected: SemanticTokens,
-    pub actual: SemanticTokens,
+    pub expected: SemanticTokensResult,
+    pub actual: SemanticTokensResult,
 }
 
 impl std::fmt::Display for SemanticTokensFullMismatchError {
@@ -1366,7 +1366,7 @@ impl Empty for DocumentSymbolResponse {}
 impl Empty for FormattingResult {}
 impl Empty for GotoDefinitionResponse {}
 impl Empty for Hover {}
-impl Empty for SemanticTokens {}
+impl Empty for SemanticTokensResult {}
 impl Empty for String {}
 impl Empty for Vec<CallHierarchyItem> {}
 impl Empty for Vec<Diagnostic> {}
@@ -1471,7 +1471,7 @@ impl CleanResponse for GotoDefinitionResponse {
     }
 }
 impl CleanResponse for Hover {}
-impl CleanResponse for SemanticTokens {}
+impl CleanResponse for SemanticTokensResult {}
 impl CleanResponse for String {}
 impl CleanResponse for Vec<Diagnostic> {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
