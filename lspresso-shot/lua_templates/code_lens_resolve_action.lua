@@ -21,7 +21,7 @@ CODE_LENS
         range = code_lens.range,
         command = code_lens.command,
         data = code_lens.data,
-    }, 1000)
+    })
 
     if not code_lens_result then
         ---@diagnostic disable-next-line: undefined-global

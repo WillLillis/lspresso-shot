@@ -12,7 +12,7 @@ local function check_progress_result()
         textDocument = vim.lsp.util.make_text_document_params(0),
         ---@diagnostic disable-next-line: undefined-global
         SET_CURSOR_POSITION,
-    }, 1000)
+    })
 
     if not completion_result then
         ---@diagnostic disable-next-line: undefined-global

@@ -10,7 +10,7 @@ local function check_progress_result()
     report_log('Issuing code lens request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
     local code_lens_result = vim.lsp.buf_request_sync(0, 'textDocument/codeLens', {
         textDocument = vim.lsp.util.make_text_document_params(0),
-    }, 1000)
+    })
 
     if not code_lens_result then
         ---@diagnostic disable-next-line: undefined-global

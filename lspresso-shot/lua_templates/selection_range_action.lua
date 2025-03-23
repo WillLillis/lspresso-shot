@@ -19,7 +19,7 @@ POSITIONS
         textDocument = vim.lsp.util.make_text_document_params(0),
         ---@diagnostic disable-next-line: undefined-global
         positions = positions
-    }, 1000)
+    })
 
     if not selection_range_results then
         ---@diagnostic disable-next-line: undefined-global

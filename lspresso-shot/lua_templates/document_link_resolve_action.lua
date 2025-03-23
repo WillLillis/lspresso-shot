@@ -23,7 +23,7 @@ DOC_LINK
         target = doc_link.target,
         tooltip = doc_link.tooltip,
         data = doc_link.data,
-    }, 1000)
+    })
 
     if not doc_link_resolve_result then
         ---@diagnostic disable-next-line: undefined-global

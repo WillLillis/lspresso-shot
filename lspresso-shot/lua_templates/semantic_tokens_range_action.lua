@@ -18,7 +18,7 @@ RANGE
     local semantic_tokens_range_result = vim.lsp.buf_request_sync(0, 'textDocument/semanticTokens/range', {
         textDocument = vim.lsp.util.make_text_document_params(0),
         range = range
-    }, 1000)
+    })
 
     if not semantic_tokens_range_result then
         ---@diagnostic disable-next-line: undefined-global

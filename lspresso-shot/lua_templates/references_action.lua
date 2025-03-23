@@ -14,7 +14,7 @@ local function check_progress_result()
         SET_CURSOR_POSITION,
         SET_CONTEXT
         ---@diagnostic enable: undefined-global
-    }, 1000)
+    })
     if not reference_result then
         ---@diagnostic disable-next-line: undefined-global
         report_log('No valid reference result returned: ' .. vim.inspect(reference_result) .. '\n') ---@diagnostic disable-line: undefined-global

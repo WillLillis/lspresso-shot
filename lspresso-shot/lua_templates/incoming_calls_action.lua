@@ -17,7 +17,7 @@ CALL_ITEM
     report_log('Issuing incoming calls request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
     local incoming_calls_result = vim.lsp.buf_request_sync(0, 'callHierarchy/incomingCalls', {
         item = call_item
-    }, 1000)
+    })
 
     if not incoming_calls_result then
         ---@diagnostic disable-next-line: undefined-global

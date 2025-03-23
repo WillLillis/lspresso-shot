@@ -14,7 +14,7 @@ local function check_progress_result()
         SET_CURSOR_POSITION,
         NEW_NAME
         ---@diagnostic enable: undefined-global
-    }, 1000)
+    })
 
     if not rename_result then
         ---@diagnostic disable-next-line: undefined-global

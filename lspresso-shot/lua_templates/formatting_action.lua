@@ -37,7 +37,7 @@ JSON_OPTIONS
         local formatting_result = vim.lsp.buf_request_sync(0, 'textDocument/formatting', {
             textDocument = vim.lsp.util.make_text_document_params(0),
             options = format_opts
-        }, 1000)
+        })
         if not formatting_result then
             ---@diagnostic disable-next-line: undefined-global
             report_log('No valid formatting result returned: ' .. vim.inspect(formatting_result) .. '\n')

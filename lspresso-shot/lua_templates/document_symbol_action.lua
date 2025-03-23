@@ -11,7 +11,7 @@ local function check_progress_result()
     local doc_sym_result = vim.lsp.buf_request_sync(0, 'textDocument/documentSymbol', {
         textDocument = vim.lsp.util.make_text_document_params(0),
         ---@diagnostic disable-next-line: undefined-global
-    }, 1000)
+    })
 
     if not doc_sym_result then
         ---@diagnostic disable-next-line: undefined-global

@@ -10,7 +10,7 @@ local function check_progress_result()
     report_log('Issuing document link request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
     local doc_link_result = vim.lsp.buf_request_sync(0, 'textDocument/documentLink', {
         textDocument = vim.lsp.util.make_text_document_params(0),
-    }, 1000)
+    })
 
     if not doc_link_result then
         ---@diagnostic disable-next-line: undefined-global
