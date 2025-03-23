@@ -110,6 +110,7 @@ So far, we have:
 - [x] `textDocument/rename`
 - [x] `textDocument/selectionRange`
 - [x] `textDocument/semanticTokens/full`
+- [x] `textDocument/semanticTokens/full/delta` -- Could use some work
 - [x] `textDocument/typeDefinition`
 
 ## Gotchas/Known Issues

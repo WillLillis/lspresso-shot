@@ -6,7 +6,8 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens, Diagnostic,
     DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
     GotoDefinitionResponse, Hover, Location, Position, SelectionRange, SemanticTokens,
-    SemanticTokensPartialResult, SemanticTokensResult, TextEdit, WorkspaceEdit,
+    SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensPartialResult,
+    SemanticTokensResult, TextEdit, WorkspaceEdit,
 };
 
 use std::{
@@ -25,8 +26,8 @@ use types::{
     FormattingMismatchError, FormattingResult, HoverMismatchError, ImplementationMismatchError,
     IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
     ReferencesMismatchError, RenameMismatchError, SelectionRangeMismatchError,
-    SemanticTokensFullMismatchError, TestCase, TestError, TestResult, TestType, TimeoutError,
-    TypeDefinitionMismatchError,
+    SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError, TestCase, TestError,
+    TestResult, TestType, TimeoutError, TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -1099,6 +1100,105 @@ pub fn test_semantic_tokens_full(
                 expected: expected.clone(),
                 actual: actual.clone(),
             })?;
+        }
+        Ok(())
+    })
+}
+
+/// Tests the server's response to a 'textDocument/semanticTokens/full/delta' request
+///
+/// First sends a `textDocument/semanticTokens/full` request to get the initial state,
+/// and then issues a `textDocument/semanticTokens/full/delta` request if the first
+/// response contained a `result_id`.
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+pub fn test_semantic_tokens_full_delta(
+    mut test_case: TestCase,
+    expected: Option<&SemanticTokensFullDeltaResult>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::SemanticTokensFullDelta);
+    collect_results(&test_case, None, expected, |expected, actual| {
+        match (expected, actual) {
+            (
+                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                    result_id: None,
+                    data: token_data,
+                }),
+                SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                    result_id: None,
+                    edits: edit_data,
+                }),
+            )
+            | (
+                SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                    result_id: None,
+                    edits: edit_data,
+                }),
+                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                    result_id: None,
+                    data: token_data,
+                }),
+            ) if token_data.is_empty() && edit_data.is_empty() => return Ok(()),
+            (
+                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                    result_id: None,
+                    data: token_data,
+                }),
+                SemanticTokensFullDeltaResult::PartialTokensDelta {
+                    edits: partial_data,
+                },
+            )
+            | (
+                SemanticTokensFullDeltaResult::PartialTokensDelta {
+                    edits: partial_data,
+                },
+                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                    result_id: None,
+                    data: token_data,
+                }),
+            ) if token_data.is_empty() && partial_data.is_empty() => return Ok(()),
+            (
+                SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                    result_id: None,
+                    edits: edit_data,
+                }),
+                SemanticTokensFullDeltaResult::PartialTokensDelta {
+                    edits: partial_data,
+                },
+            )
+            | (
+                SemanticTokensFullDeltaResult::PartialTokensDelta {
+                    edits: partial_data,
+                },
+                SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                    result_id: None,
+                    edits: edit_data,
+                }),
+            ) if edit_data.is_empty() && partial_data.is_empty() => return Ok(()),
+            (
+                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                    result_id: None,
+                    data: token_data,
+                }),
+                SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
+            )
+            | (
+                SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
+                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                    result_id: None,
+                    data: token_data,
+                }),
+            ) if edit_data.is_empty() && token_data.is_empty() => return Ok(()),
+            _ => {}
+        }
+        if expected != actual {
+            Err(Box::new(SemanticTokensFullDeltaMismatchError {
+                test_id: test_case.test_id.clone(),
+                expected: expected.clone(),
+                actual: actual.clone(),
+            }))?;
         }
         Ok(())
     })

@@ -12,13 +12,13 @@ use lsp_types::{
         FoldingRangeRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
         GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
         HoverRequest, References, Rename, Request as _, SelectionRangeRequest,
-        SemanticTokensFullRequest,
+        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeLens, CodeLensParams, CompletionParams, DocumentFormattingParams, DocumentHighlightParams,
     DocumentLink, DocumentLinkParams, DocumentSymbolParams, FoldingRangeParams,
     GotoDefinitionParams, HoverParams, ReferenceParams, RenameParams, SelectionRangeParams,
-    ServerCapabilities, Uri,
+    SemanticTokensDeltaParams, SemanticTokensParams, ServerCapabilities, Uri,
 };
 
 use crate::{
@@ -31,8 +31,8 @@ use crate::{
         get_formatting_response, get_hover_response, get_implementation_response,
         get_incoming_calls_response, get_outgoing_calls_response,
         get_prepare_call_hierachy_response, get_references_response, get_rename_response,
-        get_selection_range_response, get_semantic_tokens_full_response,
-        get_type_definition_response,
+        get_selection_range_response, get_semantic_tokens_full_delta_response,
+        get_semantic_tokens_full_response, get_type_definition_response,
     },
 };
 
@@ -396,7 +396,16 @@ pub fn handle_request(
                 get_semantic_tokens_full_response,
                 req,
                 conn,
-                |params: lsp_types::SemanticTokensParams| -> Uri { params.text_document.uri }
+                |params: SemanticTokensParams| -> Uri { params.text_document.uri }
+            )?;
+        }
+        SemanticTokensFullDeltaRequest::METHOD => {
+            handle_request!(
+                SemanticTokensFullDeltaRequest,
+                get_semantic_tokens_full_delta_response,
+                req,
+                conn,
+                |params: SemanticTokensDeltaParams| -> Uri { params.text_document.uri }
             )?;
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),
