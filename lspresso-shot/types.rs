@@ -15,7 +15,7 @@ use lsp_types::{
     CompletionItem, CompletionList, CompletionResponse, Diagnostic, DocumentChangeOperation,
     DocumentChanges, DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange,
     GotoDefinitionResponse, Hover, Location, Position, ResourceOp, SelectionRange,
-    SemanticTokensResult, TextEdit, Uri, WorkspaceEdit,
+    SemanticTokensFullDeltaResult, SemanticTokensResult, TextEdit, Uri, WorkspaceEdit,
 };
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -66,8 +66,10 @@ pub enum TestType {
     Rename,
     /// Test `textDocument/selectionRange` requests
     SelectionRange,
-    /// Test `textDocument/semanticTokens` requests
+    /// Test `textDocument/semanticTokens/full` requests
     SemanticTokensFull,
+    /// Test `textDocument/semanticTokens/full/delta` requests
+    SemanticTokensFullDelta,
     /// Test `textDocument/typeDefinition` requests
     TypeDefinition,
 }
@@ -99,6 +101,7 @@ impl std::fmt::Display for TestType {
                 Self::Rename => "textDocument/rename",
                 Self::SelectionRange => "textDocument/selectionRange",
                 Self::SemanticTokensFull => "textDocument/semanticTokens/full",
+                Self::SemanticTokensFullDelta => "textDocument/semanticTokens/full/delta",
                 Self::TypeDefinition => "textDocument/typeDefinition",
             }
         )?;
@@ -596,6 +599,8 @@ pub enum TestError {
     SelectionRangeMismatch(#[from] SelectionRangeMismatchError),
     #[error(transparent)]
     SematicTokensFullMismatch(#[from] SemanticTokensFullMismatchError),
+    #[error(transparent)]
+    SematicTokensFullDeltaMismatch(#[from] Box<SemanticTokensFullDeltaMismatchError>),
     #[error(transparent)]
     TypeDefinitionMismatch(#[from] Box<TypeDefinitionMismatchError>),
     #[error("Test {0}: No results were written")]
@@ -1325,6 +1330,31 @@ impl std::fmt::Display for SemanticTokensFullMismatchError {
     }
 }
 
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct SemanticTokensFullDeltaMismatchError {
+    pub test_id: String,
+    pub expected: SemanticTokensFullDeltaResult,
+    pub actual: SemanticTokensFullDeltaResult,
+}
+
+impl std::fmt::Display for SemanticTokensFullDeltaMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Semantic Tokens Full Delta response:",
+            self.test_id
+        )?;
+        write_fields_comparison(
+            f,
+            "Semantic Tokens Full Delta",
+            &self.expected,
+            &self.actual,
+            0,
+        )?;
+        Ok(())
+    }
+}
+
 #[derive(Debug, Error, PartialEq)]
 pub struct TypeDefinitionMismatchError {
     pub test_id: String,
@@ -1367,6 +1397,7 @@ impl Empty for FormattingResult {}
 impl Empty for GotoDefinitionResponse {}
 impl Empty for Hover {}
 impl Empty for SemanticTokensResult {}
+impl Empty for SemanticTokensFullDeltaResult {}
 impl Empty for String {}
 impl Empty for Vec<CallHierarchyItem> {}
 impl Empty for Vec<Diagnostic> {}
@@ -1472,6 +1503,7 @@ impl CleanResponse for GotoDefinitionResponse {
 }
 impl CleanResponse for Hover {}
 impl CleanResponse for SemanticTokensResult {}
+impl CleanResponse for SemanticTokensFullDeltaResult {}
 impl CleanResponse for String {}
 impl CleanResponse for Vec<Diagnostic> {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {

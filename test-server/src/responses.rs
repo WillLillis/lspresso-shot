@@ -9,6 +9,7 @@ use lsp_types::{
     Documentation, FoldingRange, FoldingRangeKind, GotoDefinitionResponse, Hover, HoverContents,
     LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind, Position,
     PublishDiagnosticsParams, Range, SelectionRange, SemanticToken, SemanticTokens,
+    SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
     SemanticTokensPartialResult, SemanticTokensResult, SymbolInformation, SymbolKind, SymbolTag,
     TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
 };
@@ -818,7 +819,8 @@ pub fn get_selection_range_response(response_num: u32) -> Option<Vec<SelectionRa
     }
 }
 
-/// For use with `test_selection_range`.
+// TODO: Make this work...
+/// For use with `test_semantic_tokens_full`.
 #[must_use]
 pub fn get_semantic_tokens_full_response(response_num: u32) -> Option<SemanticTokensResult> {
     let item1 = SemanticToken {
@@ -880,6 +882,183 @@ pub fn get_semantic_tokens_full_response(response_num: u32) -> Option<SemanticTo
         11 => Some(SemanticTokensResult::Partial(SemanticTokensPartialResult {
             data: vec![item1, item2],
         })),
+        // NOTE: Because testing `textDocument/semanticTokens/full/delta` relies
+        // on getting *some* response for its initial `textDocument/semanticTokens/full`
+        // request, we send a valid response even though we don't explicitly test
+        // for it
+        100..200 => Some(SemanticTokensResult::Tokens(SemanticTokens {
+            result_id: Some("some_result_type".to_string()),
+            data: vec![item1],
+        })),
+        _ => None,
+    }
+}
+
+/// For use with `test_semantic_tokens_full_delta`.
+///
+/// Response numbers start at 100 for comaptibility with `test_semantic_tokens_full_response`
+#[must_use]
+#[allow(clippy::too_many_lines)]
+pub fn get_semantic_tokens_full_delta_response(
+    response_num: u32,
+) -> Option<SemanticTokensFullDeltaResult> {
+    let token1 = SemanticToken {
+        delta_line: 1,
+        delta_start: 2,
+        length: 3,
+        token_type: 4,
+        token_modifiers_bitset: 5,
+    };
+    let token2 = SemanticToken {
+        delta_line: 1,
+        delta_start: 2,
+        length: 3,
+        token_type: 4,
+        token_modifiers_bitset: 5,
+    };
+    let semantic_tokens1 = SemanticTokens {
+        result_id: None,
+        data: vec![],
+    };
+    let semantic_tokens2 = SemanticTokens {
+        result_id: Some("result_id_1a".to_string()),
+        data: vec![],
+    };
+    let semantic_tokens3 = SemanticTokens {
+        result_id: Some("result_id_1a".to_string()),
+        data: vec![token1],
+    };
+    let semantic_tokens4 = SemanticTokens {
+        result_id: Some("result_id_1a".to_string()),
+        data: vec![token2],
+    };
+    let semantic_tokens5 = SemanticTokens {
+        result_id: Some("result_id_1a".to_string()),
+        data: vec![token1, token2],
+    };
+    let edits1 = SemanticTokensEdit {
+        start: 1,
+        delete_count: 2,
+        data: None,
+    };
+    let edits2 = SemanticTokensEdit {
+        start: 1,
+        delete_count: 2,
+        data: Some(vec![]),
+    };
+    let edits3 = SemanticTokensEdit {
+        start: 1,
+        delete_count: 2,
+        data: Some(vec![token1]),
+    };
+    let edits4 = SemanticTokensEdit {
+        start: 1,
+        delete_count: 2,
+        data: Some(vec![token2]),
+    };
+    let edits5 = SemanticTokensEdit {
+        start: 1,
+        delete_count: 2,
+        data: Some(vec![token1, token2]),
+    };
+    match response_num {
+        100 => Some(SemanticTokensFullDeltaResult::Tokens(semantic_tokens1)),
+        101 => Some(SemanticTokensFullDeltaResult::Tokens(semantic_tokens2)),
+        102 => Some(SemanticTokensFullDeltaResult::Tokens(semantic_tokens3)),
+        103 => Some(SemanticTokensFullDeltaResult::Tokens(semantic_tokens4)),
+        104 => Some(SemanticTokensFullDeltaResult::Tokens(semantic_tokens5)),
+        105 => Some(SemanticTokensFullDeltaResult::TokensDelta(
+            SemanticTokensDelta {
+                result_id: None,
+                edits: vec![],
+            },
+        )),
+        106 => Some(SemanticTokensFullDeltaResult::TokensDelta(
+            SemanticTokensDelta {
+                result_id: Some("result_id_1b".to_string()),
+                edits: vec![],
+            },
+        )),
+        107 => Some(SemanticTokensFullDeltaResult::TokensDelta(
+            SemanticTokensDelta {
+                result_id: Some("result_id_2b".to_string()),
+                edits: vec![SemanticTokensEdit {
+                    start: 1,
+                    delete_count: 2,
+                    data: None,
+                }],
+            },
+        )),
+        108 => Some(SemanticTokensFullDeltaResult::TokensDelta(
+            SemanticTokensDelta {
+                result_id: Some("result_id_3b".to_string()),
+                edits: vec![SemanticTokensEdit {
+                    start: 1,
+                    delete_count: 2,
+                    data: None,
+                }],
+            },
+        )),
+        109 => Some(SemanticTokensFullDeltaResult::TokensDelta(
+            SemanticTokensDelta {
+                result_id: Some("result_id_4b".to_string()),
+                edits: vec![SemanticTokensEdit {
+                    start: 3,
+                    delete_count: 4,
+                    data: Some(vec![]),
+                }],
+            },
+        )),
+        110 => Some(SemanticTokensFullDeltaResult::TokensDelta(
+            SemanticTokensDelta {
+                result_id: Some("result_id_5b".to_string()),
+                edits: vec![SemanticTokensEdit {
+                    start: 5,
+                    delete_count: 6,
+                    data: Some(vec![token1]),
+                }],
+            },
+        )),
+        111 => Some(SemanticTokensFullDeltaResult::TokensDelta(
+            SemanticTokensDelta {
+                result_id: Some("result_id_6b".to_string()),
+                edits: vec![SemanticTokensEdit {
+                    start: 7,
+                    delete_count: 8,
+                    data: Some(vec![token2]),
+                }],
+            },
+        )),
+        112 => Some(SemanticTokensFullDeltaResult::TokensDelta(
+            SemanticTokensDelta {
+                result_id: Some("result_id_7b".to_string()),
+                edits: vec![SemanticTokensEdit {
+                    start: 8,
+                    delete_count: 9,
+                    data: Some(vec![token1, token2]),
+                }],
+            },
+        )),
+        113 => Some(SemanticTokensFullDeltaResult::PartialTokensDelta { edits: vec![] }),
+        114 => Some(SemanticTokensFullDeltaResult::PartialTokensDelta {
+            edits: vec![edits1],
+        }),
+        115 => Some(SemanticTokensFullDeltaResult::PartialTokensDelta {
+            edits: vec![edits2],
+        }),
+        116 => Some(SemanticTokensFullDeltaResult::PartialTokensDelta {
+            edits: vec![edits3],
+        }),
+        117 => Some(SemanticTokensFullDeltaResult::PartialTokensDelta {
+            edits: vec![edits4],
+        }),
+        118 => Some(SemanticTokensFullDeltaResult::PartialTokensDelta {
+            edits: vec![edits5],
+        }),
+        // This is getting ridiculous...
+        119 => Some(SemanticTokensFullDeltaResult::PartialTokensDelta {
+            edits: vec![edits1, edits2, edits3, edits4, edits5],
+        }),
         _ => None,
     }
 }
