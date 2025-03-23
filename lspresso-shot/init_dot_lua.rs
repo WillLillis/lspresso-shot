@@ -60,6 +60,7 @@ pub fn get_init_dot_lua(
         | TestType::SelectionRange
         | TestType::SemanticTokensFull
         | TestType::SemanticTokensFullDelta
+        | TestType::SemanticTokensRange
         | TestType::TypeDefinition => {
             raw_init = raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type));
         }
@@ -135,6 +136,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::SelectionRange => include_str!("lua_templates/selection_range_action.lua"),
         TestType::SemanticTokensFull => include_str!("lua_templates/semantic_tokens_full_action.lua"),
         TestType::SemanticTokensFullDelta => include_str!("lua_templates/semantic_tokens_full_delta_action.lua"),
+        TestType::SemanticTokensRange => include_str!("lua_templates/semantic_tokens_range_action.lua"),
         TestType::TypeDefinition => include_str!("lua_templates/type_definition_action.lua"),
     }
     .to_string()

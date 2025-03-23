@@ -5,9 +5,9 @@ use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens, Diagnostic,
     DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
-    GotoDefinitionResponse, Hover, Location, Position, SelectionRange, SemanticTokens,
+    GotoDefinitionResponse, Hover, Location, Position, Range, SelectionRange, SemanticTokens,
     SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensPartialResult,
-    SemanticTokensResult, TextEdit, WorkspaceEdit,
+    SemanticTokensRangeResult, SemanticTokensResult, TextEdit, WorkspaceEdit,
 };
 
 use std::{
@@ -26,8 +26,9 @@ use types::{
     FormattingMismatchError, FormattingResult, HoverMismatchError, ImplementationMismatchError,
     IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
     ReferencesMismatchError, RenameMismatchError, SelectionRangeMismatchError,
-    SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError, TestCase, TestError,
-    TestResult, TestType, TimeoutError, TypeDefinitionMismatchError,
+    SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError,
+    SemanticTokensRangeMismatchError, TestCase, TestError, TestResult, TestType, TimeoutError,
+    TypeDefinitionMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -1202,6 +1203,72 @@ pub fn test_semantic_tokens_full_delta(
         }
         Ok(())
     })
+}
+
+/// Tests the server's response to a 'textDocument/semanticTokens/range' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `range` fails
+pub fn test_semantic_tokens_range(
+    mut test_case: TestCase,
+    range: &Range,
+    expected: Option<&SemanticTokensRangeResult>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::SemanticTokensRange);
+
+    let range_json =
+        serde_json::to_string_pretty(range).expect("JSON deserialzation of range failed");
+    collect_results(
+        &test_case,
+        Some(&vec![("RANGE", range_json)]),
+        expected,
+        |expected, actual| {
+            // HACK: Since the `SemanticTokensRangeResult` is untagged, there's no way
+            // to differentiate between `SemanticTokensRangeResult::Tokens` and
+            // `SemanticTokensRangeResult::Partial`, as they are structurally identical
+            // when we have `SemanticTokensResult::Tokens(SemanticTokens { result_id: None, ...)`
+            // Treat this as a special case and say it's ok.
+            match (expected, actual) {
+                (
+                    SemanticTokensRangeResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: token_data,
+                    }),
+                    SemanticTokensRangeResult::Partial(SemanticTokensPartialResult {
+                        data: partial_data,
+                    }),
+                )
+                | (
+                    SemanticTokensRangeResult::Partial(SemanticTokensPartialResult {
+                        data: partial_data,
+                    }),
+                    SemanticTokensRangeResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: token_data,
+                    }),
+                ) => {
+                    if token_data == partial_data {
+                        return Ok(());
+                    }
+                }
+                _ => {}
+            }
+
+            if expected != actual {
+                Err(SemanticTokensRangeMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'textDocument/typeDefinition' request
