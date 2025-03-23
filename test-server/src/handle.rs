@@ -12,13 +12,14 @@ use lsp_types::{
         FoldingRangeRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
         GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
         HoverRequest, References, Rename, Request as _, SelectionRangeRequest,
-        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest,
+        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeLens, CodeLensParams, CompletionParams, DocumentFormattingParams, DocumentHighlightParams,
     DocumentLink, DocumentLinkParams, DocumentSymbolParams, FoldingRangeParams,
     GotoDefinitionParams, HoverParams, ReferenceParams, RenameParams, SelectionRangeParams,
-    SemanticTokensDeltaParams, SemanticTokensParams, ServerCapabilities, Uri,
+    SemanticTokensDeltaParams, SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities,
+    Uri,
 };
 
 use crate::{
@@ -32,7 +33,8 @@ use crate::{
         get_incoming_calls_response, get_outgoing_calls_response,
         get_prepare_call_hierachy_response, get_references_response, get_rename_response,
         get_selection_range_response, get_semantic_tokens_full_delta_response,
-        get_semantic_tokens_full_response, get_type_definition_response,
+        get_semantic_tokens_full_response, get_semantic_tokens_range_response,
+        get_type_definition_response,
     },
 };
 
@@ -406,6 +408,15 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: SemanticTokensDeltaParams| -> Uri { params.text_document.uri }
+            )?;
+        }
+        SemanticTokensRangeRequest::METHOD => {
+            handle_request!(
+                SemanticTokensRangeRequest,
+                get_semantic_tokens_range_response,
+                req,
+                conn,
+                |params: SemanticTokensRangeParams| -> Uri { params.text_document.uri }
             )?;
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),

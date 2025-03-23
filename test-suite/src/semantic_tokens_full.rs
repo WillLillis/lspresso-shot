@@ -120,7 +120,7 @@ mod test {
     }
 
     #[test]
-    fn rust_analyzer_semantic_tokens() {
+    fn rust_analyzer_semantic_tokens_full() {
         let source_file = TestFile::new(
             "src/main.rs",
             "pub fn main() {

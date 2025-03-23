@@ -22,4 +22,5 @@ mod rename;
 mod selection_range;
 mod semantic_tokens_full;
 mod semantic_tokens_full_delta;
+mod semantic_tokens_range;
 mod type_definition;

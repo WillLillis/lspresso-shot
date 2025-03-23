@@ -10,8 +10,8 @@ use lsp_types::{
     LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind, Position,
     PublishDiagnosticsParams, Range, SelectionRange, SemanticToken, SemanticTokens,
     SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
-    SemanticTokensPartialResult, SemanticTokensResult, SymbolInformation, SymbolKind, SymbolTag,
-    TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
+    SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult,
+    SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
 };
 
 use crate::get_dummy_source_path;
@@ -819,7 +819,6 @@ pub fn get_selection_range_response(response_num: u32) -> Option<Vec<SelectionRa
     }
 }
 
-// TODO: Make this work...
 /// For use with `test_semantic_tokens_full`.
 #[must_use]
 pub fn get_semantic_tokens_full_response(response_num: u32) -> Option<SemanticTokensResult> {
@@ -890,6 +889,62 @@ pub fn get_semantic_tokens_full_response(response_num: u32) -> Option<SemanticTo
             result_id: Some("some_result_type".to_string()),
             data: vec![item1],
         })),
+        _ => None,
+    }
+}
+
+/// For use with `test_semantic_tokens_range`.
+#[must_use]
+pub fn get_semantic_tokens_range_response(response_num: u32) -> Option<SemanticTokensRangeResult> {
+    let item1 = SemanticToken {
+        delta_line: 1,
+        delta_start: 2,
+        length: 3,
+        token_type: 4,
+        token_modifiers_bitset: 5,
+    };
+    let item2 = SemanticToken {
+        delta_line: 5,
+        delta_start: 7,
+        length: 8,
+        token_type: 9,
+        token_modifiers_bitset: 10,
+    };
+    match response_num {
+        0 => Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
+            result_id: None,
+            data: vec![],
+        })),
+        1 => Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
+            result_id: Some("result_id_1".to_string()),
+            data: vec![],
+        })),
+        2 => Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
+            result_id: None,
+            data: vec![item1],
+        })),
+        3 => Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
+            result_id: Some("result_id_2".to_string()),
+            data: vec![item2],
+        })),
+        4 => Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
+            result_id: Some("result_id_3".to_string()),
+            data: vec![item1, item2],
+        })),
+        5 => Some(SemanticTokensRangeResult::Partial(
+            SemanticTokensPartialResult { data: vec![] },
+        )),
+        6 => Some(SemanticTokensRangeResult::Partial(
+            SemanticTokensPartialResult { data: vec![item1] },
+        )),
+        7 => Some(SemanticTokensRangeResult::Partial(
+            SemanticTokensPartialResult { data: vec![item2] },
+        )),
+        8 => Some(SemanticTokensRangeResult::Partial(
+            SemanticTokensPartialResult {
+                data: vec![item1, item2],
+            },
+        )),
         _ => None,
     }
 }
