@@ -5,7 +5,10 @@ mod test {
     use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
         lspresso_shot, test_semantic_tokens_full,
-        types::{SemanticTokensFullMismatchError, ServerStartType, TestCase, TestError, TestFile},
+        types::{
+            semantic_tokens::SemanticTokensFullMismatchError, ServerStartType, TestCase, TestError,
+            TestFile,
+        },
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 

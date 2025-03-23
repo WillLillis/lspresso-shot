@@ -19,16 +19,30 @@ use std::{
 };
 
 use types::{
-    CleanResponse, CodeLensMismatchError, CodeLensResolveMismatchError, CompletionMismatchError,
-    CompletionResult, DeclarationMismatchError, DefinitionMismatchError, DiagnosticMismatchError,
-    DocumentHighlightMismatchError, DocumentLinkMismatchError, DocumentLinkResolveMismatchError,
-    DocumentSymbolMismatchError, Empty, EmptyResult, FoldingRangeMismatchError,
-    FormattingMismatchError, FormattingResult, HoverMismatchError, ImplementationMismatchError,
-    IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
-    ReferencesMismatchError, RenameMismatchError, SelectionRangeMismatchError,
-    SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError,
-    SemanticTokensRangeMismatchError, TestCase, TestError, TestResult, TestType, TimeoutError,
-    TypeDefinitionMismatchError,
+    call_hierarchy::{
+        IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
+    },
+    code_lens::{CodeLensMismatchError, CodeLensResolveMismatchError},
+    completion::{CompletionMismatchError, CompletionResult},
+    declaration::DeclarationMismatchError,
+    definition::DefinitionMismatchError,
+    diagnostic::DiagnosticMismatchError,
+    document_highlight::DocumentHighlightMismatchError,
+    document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
+    document_symbol::DocumentSymbolMismatchError,
+    folding_range::FoldingRangeMismatchError,
+    formatting::{FormattingMismatchError, FormattingResult},
+    hover::HoverMismatchError,
+    implementation::ImplementationMismatchError,
+    references::ReferencesMismatchError,
+    rename::RenameMismatchError,
+    selection_range::SelectionRangeMismatchError,
+    semantic_tokens::{
+        SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError,
+        SemanticTokensRangeMismatchError,
+    },
+    type_definition::TypeDefinitionMismatchError,
+    CleanResponse, Empty, EmptyResult, TestCase, TestError, TestResult, TestType, TimeoutError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
