@@ -1,5 +1,51 @@
+pub mod call_hierarchy;
+pub mod code_lens;
+pub mod completion;
+pub mod declaration;
+pub mod definition;
+pub mod diagnostic;
+pub mod document_highlight;
+pub mod document_link;
+pub mod document_symbol;
+pub mod folding_range;
+pub mod formatting;
+pub mod hover;
+pub mod implementation;
+pub mod references;
+pub mod rename;
+pub mod selection_range;
+pub mod semantic_tokens;
+pub mod type_definition;
+
+use crate::types::{
+    call_hierarchy::{
+        IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
+    },
+    code_lens::{CodeLensMismatchError, CodeLensResolveMismatchError},
+    completion::CompletionMismatchError,
+    declaration::DeclarationMismatchError,
+    definition::DefinitionMismatchError,
+    diagnostic::DiagnosticMismatchError,
+    document_highlight::DocumentHighlightMismatchError,
+    document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
+    document_symbol::DocumentSymbolMismatchError,
+    folding_range::FoldingRangeMismatchError,
+    formatting::FormattingMismatchError,
+    hover::HoverMismatchError,
+    implementation::ImplementationMismatchError,
+    references::ReferencesMismatchError,
+    rename::RenameMismatchError,
+    selection_range::SelectionRangeMismatchError,
+    semantic_tokens::{
+        SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError,
+        SemanticTokensRangeMismatchError,
+    },
+    type_definition::TypeDefinitionMismatchError,
+};
+use crate::init_dot_lua::get_init_dot_lua;
+
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     env::temp_dir,
     fs,
     num::NonZeroU32,
@@ -9,20 +55,10 @@ use std::{
 };
 
 use anstyle::{AnsiColor, Color, Style};
-use lsp_types::{
-    request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens,
-    CompletionItem, CompletionList, CompletionResponse, Diagnostic, DocumentChangeOperation,
-    DocumentChanges, DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange,
-    GotoDefinitionResponse, Hover, Location, Position, ResourceOp, SelectionRange,
-    SemanticTokensFullDeltaResult, SemanticTokensRangeResult, SemanticTokensResult, TextEdit, Uri,
-    WorkspaceEdit,
-};
+use lsp_types::{Position, Uri};
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
-use crate::init_dot_lua::get_init_dot_lua;
 
 /// Specifies the type of test to run
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -785,620 +821,6 @@ fn write_fields_comparison<T: Serialize>(
     Ok(())
 }
 
-#[derive(Debug, Error, PartialEq)]
-pub struct CodeLensMismatchError {
-    pub test_id: String,
-    pub expected: Vec<CodeLens>,
-    pub actual: Vec<CodeLens>,
-}
-
-impl std::fmt::Display for CodeLensMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect CodeLens response:", self.test_id)?;
-        write_fields_comparison(f, "CodeLens", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq)]
-pub struct CodeLensResolveMismatchError {
-    pub test_id: String,
-    pub expected: CodeLens,
-    pub actual: CodeLens,
-}
-
-impl std::fmt::Display for CodeLensResolveMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect CodeLens Resolve response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "CodeLens", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-// `textDocument/completion` is a bit different from other requests. Servers commonly
-// send a *bunch* of completion items and rely on the editor's lsp client to filter
-// them out/ display the most relevant ones first. This is fine, but it means that
-// doing a simple equality check for this isn't realistic and would be a serious
-// pain for library consumers. I'd like to experiment with the different ways we
-// can handle this, but for now we'll just allow for exact matching, and a simple
-// "contains" check.
-#[derive(Debug, Clone, PartialEq)]
-pub enum CompletionResult {
-    /// Expect this exact set of completion items in the provided order
-    Exact(CompletionResponse),
-    /// Expect to at least see these completion items in any order.
-    /// NOTE: This discards the `CompletionList.is_incomplete` field and only
-    /// considers `CompletionList.items`
-    Contains(Vec<CompletionItem>),
-}
-
-impl CompletionResult {
-    /// Compares the expected results in `self` to the `actual` results, respecting
-    /// the intended behavior for each enum variant of `Self`
-    ///
-    /// Returns true if the two are considered equal, false otherwise
-    #[must_use]
-    pub fn results_satisfy(&self, actual: &CompletionResponse) -> bool {
-        match self {
-            Self::Contains(expected_results) => {
-                let actual_items = match actual {
-                    CompletionResponse::Array(a) => a,
-                    CompletionResponse::List(CompletionList { items, .. }) => items,
-                };
-                let mut expected = expected_results.clone();
-                for item in actual_items {
-                    if let Some(i) = expected
-                        .iter()
-                        .enumerate()
-                        .find(|(_, e)| *e == item)
-                        .map(|(i, _)| i)
-                    {
-                        expected.remove(i);
-                    };
-                }
-
-                expected.is_empty()
-            }
-            Self::Exact(expected_results) => match (expected_results, actual) {
-                (CompletionResponse::Array(expected), CompletionResponse::Array(actual)) => {
-                    expected == actual
-                }
-                (
-                    CompletionResponse::List(CompletionList {
-                        is_incomplete: expected_is_incomplete,
-                        items: expected_items,
-                    }),
-                    CompletionResponse::List(CompletionList {
-                        is_incomplete: actual_is_incomplete,
-                        items: actual_items,
-                    }),
-                ) => {
-                    expected_is_incomplete == actual_is_incomplete && expected_items == actual_items
-                }
-                (CompletionResponse::Array(_), CompletionResponse::List(_))
-                | (CompletionResponse::List(_), CompletionResponse::Array(_)) => false,
-            },
-        }
-    }
-}
-
-#[derive(Debug, Error, PartialEq)]
-pub struct CompletionMismatchError {
-    pub test_id: String,
-    pub expected: CompletionResult,
-    pub actual: CompletionResponse,
-}
-
-// TODO: Cleanup/ consolidate this logic with Self::compare_results
-impl std::fmt::Display for CompletionMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match &self.expected {
-            CompletionResult::Contains(expected_results) => {
-                let actual_items = match &self.actual {
-                    CompletionResponse::Array(a) => a,
-                    CompletionResponse::List(CompletionList { items, .. }) => items,
-                };
-                let mut expected = expected_results.clone();
-                for item in actual_items {
-                    if let Some(i) = expected
-                        .iter()
-                        .enumerate()
-                        .find(|(_, e)| **e == *item)
-                        .map(|(i, _)| i)
-                    {
-                        expected.remove(i);
-                    };
-                }
-
-                writeln!(
-                    f,
-                    "Unprovided item{}:",
-                    if expected.len() > 1 { "s" } else { "" }
-                )?;
-                for item in &expected {
-                    writeln!(
-                        f,
-                        "{}",
-                        paint(RED, &format!("{}", serde_json::to_value(item).unwrap()))
-                    )?;
-                }
-                writeln!(
-                    f,
-                    "\nProvided item{}:",
-                    if actual_items.len() > 1 { "s" } else { "" }
-                )?;
-                for item in actual_items {
-                    writeln!(
-                        f,
-                        "{}",
-                        paint(RED, &format!("{}", serde_json::to_value(item).unwrap()))
-                    )?;
-                }
-            }
-            CompletionResult::Exact(expected_results) => match (expected_results, &self.actual) {
-                (CompletionResponse::Array(_), CompletionResponse::Array(_))
-                | (CompletionResponse::List(_), CompletionResponse::List(_)) => {
-                    write_fields_comparison(
-                        f,
-                        "CompletionResponse",
-                        expected_results,
-                        &self.actual,
-                        0,
-                    )?;
-                }
-                // Different completion types, indicate so and compare the inner items
-                (
-                    CompletionResponse::Array(expected_items),
-                    CompletionResponse::List(CompletionList {
-                        items: actual_items,
-                        ..
-                    }),
-                ) => {
-                    writeln!(
-                        f,
-                        "Expected `CompletionResponse::Array`, got `CompletionResponse::List`"
-                    )?;
-                    write_fields_comparison(
-                        f,
-                        "CompletionResponse",
-                        expected_items,
-                        actual_items,
-                        0,
-                    )?;
-                }
-                (
-                    CompletionResponse::List(CompletionList {
-                        items: expected_items,
-                        ..
-                    }),
-                    CompletionResponse::Array(actual_items),
-                ) => {
-                    writeln!(
-                        f,
-                        "Expected `CompletionResponse::List`, got `CompletionResponse::Array`"
-                    )?;
-                    write_fields_comparison(
-                        f,
-                        "CompletionResponse",
-                        expected_items,
-                        actual_items,
-                        0,
-                    )?;
-                }
-            },
-        };
-
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq)]
-pub struct DeclarationMismatchError {
-    pub test_id: String,
-    pub expected: GotoDeclarationResponse,
-    pub actual: GotoDeclarationResponse,
-}
-
-impl std::fmt::Display for DeclarationMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect GotoDeclaration response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "GotoDeclaration", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq)]
-pub struct DefinitionMismatchError {
-    pub test_id: String,
-    pub expected: GotoDefinitionResponse,
-    pub actual: GotoDefinitionResponse,
-}
-
-impl std::fmt::Display for DefinitionMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect GotoDefinition response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "GotoDefinition", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct DiagnosticMismatchError {
-    pub test_id: String,
-    pub expected: Vec<Diagnostic>,
-    pub actual: Vec<Diagnostic>,
-}
-
-impl std::fmt::Display for DiagnosticMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Diagnostic response:", self.test_id)?;
-        write_fields_comparison(f, "Diagnostics", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct DocumentHighlightMismatchError {
-    pub test_id: String,
-    pub expected: Vec<DocumentHighlight>,
-    pub actual: Vec<DocumentHighlight>,
-}
-
-impl std::fmt::Display for DocumentHighlightMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Document Highlight response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Document Highlight", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct DocumentLinkMismatchError {
-    pub test_id: String,
-    pub expected: Vec<DocumentLink>,
-    pub actual: Vec<DocumentLink>,
-}
-
-impl std::fmt::Display for DocumentLinkMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Document Link response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Document Link", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct DocumentLinkResolveMismatchError {
-    pub test_id: String,
-    pub expected: DocumentLink,
-    pub actual: DocumentLink,
-}
-
-impl std::fmt::Display for DocumentLinkResolveMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Document Link Resolve response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Document Link", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq)]
-pub struct DocumentSymbolMismatchError {
-    pub test_id: String,
-    pub expected: DocumentSymbolResponse,
-    pub actual: DocumentSymbolResponse,
-}
-
-impl std::fmt::Display for DocumentSymbolMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Document Symbol response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Document Symbols", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct FoldingRangeMismatchError {
-    pub test_id: String,
-    pub expected: Vec<FoldingRange>,
-    pub actual: Vec<FoldingRange>,
-}
-
-impl std::fmt::Display for FoldingRangeMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Folding Range response:", self.test_id)?;
-        write_fields_comparison(f, "FoldingRange", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub enum FormattingResult {
-    /// Check if the file's formatted state matches the expected contents
-    EndState(String),
-    /// Check if the server's response matches the exected edits
-    Response(Vec<TextEdit>),
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct FormattingMismatchError {
-    pub test_id: String,
-    pub expected: FormattingResult,
-    pub actual: FormattingResult,
-}
-
-impl std::fmt::Display for FormattingMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Formatting response:", self.test_id)?;
-        match (&self.expected, &self.actual) {
-            (
-                FormattingResult::Response(expected_edits),
-                FormattingResult::Response(actual_edits),
-            ) => {
-                write_fields_comparison(f, "TextEdit", expected_edits, actual_edits, 0)?;
-            }
-            (
-                FormattingResult::EndState(expected_end_state),
-                FormattingResult::EndState(actual_end_state),
-            ) => {
-                write_fields_comparison(f, "EndState", expected_end_state, actual_end_state, 0)?;
-            }
-            _ => unreachable!(),
-        }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct HoverMismatchError {
-    pub test_id: String,
-    pub expected: Hover,
-    pub actual: Hover,
-}
-
-impl std::fmt::Display for HoverMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Hover response:", self.test_id)?;
-        write_fields_comparison(f, "Hover", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq)]
-pub struct ImplementationMismatchError {
-    pub test_id: String,
-    pub expected: GotoImplementationResponse,
-    pub actual: GotoImplementationResponse,
-}
-
-impl std::fmt::Display for ImplementationMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Implementation response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Implementation", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq)]
-pub struct IncomingCallsMismatchError {
-    pub test_id: String,
-    pub expected: Vec<CallHierarchyIncomingCall>,
-    pub actual: Vec<CallHierarchyIncomingCall>,
-}
-
-impl std::fmt::Display for IncomingCallsMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect IncomingCalls response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Implementation", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq)]
-pub struct OutgoingCallsMismatchError {
-    pub test_id: String,
-    pub expected: Vec<CallHierarchyOutgoingCall>,
-    pub actual: Vec<CallHierarchyOutgoingCall>,
-}
-
-impl std::fmt::Display for OutgoingCallsMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect OutgoingCalls response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Implementation", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq)]
-pub struct PrepareCallHierachyMismatchError {
-    pub test_id: String,
-    pub expected: Vec<CallHierarchyItem>,
-    pub actual: Vec<CallHierarchyItem>,
-}
-
-impl std::fmt::Display for PrepareCallHierachyMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Prepare Call Hierarchy response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Prepare Call Hierarchy", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct ReferencesMismatchError {
-    pub test_id: String,
-    pub expected: Vec<Location>,
-    pub actual: Vec<Location>,
-}
-
-impl std::fmt::Display for ReferencesMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect References response:", self.test_id)?;
-        write_fields_comparison(f, "Location", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct RenameMismatchError {
-    pub test_id: String,
-    pub expected: WorkspaceEdit,
-    pub actual: WorkspaceEdit,
-}
-
-impl std::fmt::Display for RenameMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Rename response:", self.test_id)?;
-        write_fields_comparison(f, "WorkspaceEdit", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct SelectionRangeMismatchError {
-    pub test_id: String,
-    pub expected: Vec<SelectionRange>,
-    pub actual: Vec<SelectionRange>,
-}
-
-impl std::fmt::Display for SelectionRangeMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Selection Range response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Selection Range", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct SemanticTokensFullMismatchError {
-    pub test_id: String,
-    pub expected: SemanticTokensResult,
-    pub actual: SemanticTokensResult,
-}
-
-impl std::fmt::Display for SemanticTokensFullMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Semantic Tokens Full response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Semantic Tokens", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct SemanticTokensFullDeltaMismatchError {
-    pub test_id: String,
-    pub expected: SemanticTokensFullDeltaResult,
-    pub actual: SemanticTokensFullDeltaResult,
-}
-
-impl std::fmt::Display for SemanticTokensFullDeltaMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Semantic Tokens Full Delta response:",
-            self.test_id
-        )?;
-        write_fields_comparison(
-            f,
-            "Semantic Tokens Full Delta",
-            &self.expected,
-            &self.actual,
-            0,
-        )?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct SemanticTokensRangeMismatchError {
-    pub test_id: String,
-    pub expected: SemanticTokensRangeResult,
-    pub actual: SemanticTokensRangeResult,
-}
-
-impl std::fmt::Display for SemanticTokensRangeMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Semantic Tokens Range response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Semantic Tokens", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Error, PartialEq)]
-pub struct TypeDefinitionMismatchError {
-    pub test_id: String,
-    pub expected: GotoTypeDefinitionResponse,
-    pub actual: GotoTypeDefinitionResponse,
-}
-
-impl std::fmt::Display for TypeDefinitionMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect GotoTypeDefinition response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "GotoTypeDefinition", &self.expected, &self.actual, 0)?;
-        Ok(())
-    }
-}
-
 pub(crate) trait Empty {
     fn is_empty() -> bool {
         false
@@ -1406,7 +828,7 @@ pub(crate) trait Empty {
 }
 
 #[derive(Debug, serde::Deserialize)]
-pub(crate) struct EmptyResult {}
+pub(crate) struct EmptyResult;
 
 impl Empty for EmptyResult {
     fn is_empty() -> bool {
@@ -1414,29 +836,7 @@ impl Empty for EmptyResult {
     }
 }
 
-impl Empty for CodeLens {}
-impl Empty for CompletionResponse {}
-impl Empty for DocumentLink {}
-impl Empty for DocumentSymbolResponse {}
-impl Empty for FormattingResult {}
-impl Empty for GotoDefinitionResponse {}
-impl Empty for Hover {}
-impl Empty for SemanticTokensResult {}
-impl Empty for SemanticTokensFullDeltaResult {}
-impl Empty for SemanticTokensRangeResult {}
 impl Empty for String {}
-impl Empty for Vec<CallHierarchyItem> {}
-impl Empty for Vec<Diagnostic> {}
-impl Empty for Vec<DocumentHighlight> {}
-impl Empty for Vec<DocumentLink> {}
-impl Empty for Vec<CodeLens> {}
-impl Empty for Vec<CallHierarchyIncomingCall> {}
-impl Empty for Vec<CallHierarchyOutgoingCall> {}
-impl Empty for Vec<FoldingRange> {}
-impl Empty for Vec<Location> {}
-impl Empty for Vec<SelectionRange> {}
-impl Empty for Vec<TextEdit> {}
-impl Empty for WorkspaceEdit {}
 
 /// Cleans a given `Uri` object of any information internal to the case
 ///
@@ -1473,154 +873,5 @@ where
     }
 }
 
-impl CleanResponse for CodeLens {}
-impl CleanResponse for Vec<CodeLens> {}
-impl CleanResponse for Vec<CallHierarchyItem> {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
-        for item in &mut self {
-            item.uri = clean_uri(&item.uri, test_case)?;
-        }
-        Ok(self)
-    }
-}
 impl CleanResponse for EmptyResult {}
-impl CleanResponse for CompletionResponse {}
-impl CleanResponse for DocumentLink {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
-        if let Some(ref mut uri) = self.target {
-            *uri = clean_uri(uri, test_case)?;
-        }
-        Ok(self)
-    }
-}
-impl CleanResponse for DocumentSymbolResponse {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
-        match &mut self {
-            Self::Flat(syms) => {
-                for sym in syms {
-                    sym.location.uri = clean_uri(&sym.location.uri, test_case)?;
-                }
-            }
-            Self::Nested(_) => {}
-        }
-        Ok(self)
-    }
-}
-impl CleanResponse for FormattingResult {}
-impl CleanResponse for GotoDefinitionResponse {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
-        match &mut self {
-            Self::Scalar(location) => {
-                location.uri = clean_uri(&location.uri, test_case)?;
-            }
-            Self::Array(locs) => {
-                for loc in locs {
-                    loc.uri = clean_uri(&loc.uri, test_case)?;
-                }
-            }
-            Self::Link(links) => {
-                for link in links {
-                    link.target_uri = clean_uri(&link.target_uri, test_case)?;
-                }
-            }
-        }
-        Ok(self)
-    }
-}
-impl CleanResponse for Hover {}
-impl CleanResponse for SemanticTokensResult {}
-impl CleanResponse for SemanticTokensFullDeltaResult {}
-impl CleanResponse for SemanticTokensRangeResult {}
 impl CleanResponse for String {}
-impl CleanResponse for Vec<Diagnostic> {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
-        for diagnostic in &mut self {
-            if let Some(info) = diagnostic.related_information.as_mut() {
-                for related in info {
-                    related.location.uri = clean_uri(&related.location.uri, test_case)?;
-                }
-            }
-        }
-        Ok(self)
-    }
-}
-impl CleanResponse for Vec<CallHierarchyIncomingCall> {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
-        for call in &mut self {
-            call.from.uri = clean_uri(&call.from.uri, test_case)?;
-        }
-        Ok(self)
-    }
-}
-impl CleanResponse for Vec<CallHierarchyOutgoingCall> {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
-        for call in &mut self {
-            call.to.uri = clean_uri(&call.to.uri, test_case)?;
-        }
-        Ok(self)
-    }
-}
-impl CleanResponse for Vec<DocumentHighlight> {}
-impl CleanResponse for Vec<DocumentLink> {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
-        for link in &mut self {
-            if let Some(ref mut uri) = link.target {
-                *uri = clean_uri(uri, test_case)?;
-            }
-        }
-        Ok(self)
-    }
-}
-impl CleanResponse for Vec<FoldingRange> {}
-impl CleanResponse for Vec<Location> {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
-        for loc in &mut self {
-            loc.uri = clean_uri(&loc.uri, test_case)?;
-        }
-        Ok(self)
-    }
-}
-impl CleanResponse for Vec<SelectionRange> {}
-impl CleanResponse for Vec<TextEdit> {}
-impl CleanResponse for WorkspaceEdit {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
-        if let Some(ref mut changes) = self.changes {
-            let mut new_changes = HashMap::new();
-            for (uri, edits) in changes.drain() {
-                let cleaned_uri = clean_uri(&uri, test_case)?;
-                new_changes.insert(cleaned_uri, edits);
-            }
-            *changes = new_changes;
-        }
-        match self.document_changes {
-            Some(DocumentChanges::Edits(ref mut edits)) => {
-                for edit in edits {
-                    edit.text_document.uri = clean_uri(&edit.text_document.uri, test_case)?;
-                }
-            }
-            Some(DocumentChanges::Operations(ref mut ops)) => {
-                for op in ops {
-                    match op {
-                        DocumentChangeOperation::Op(ref mut op) => match op {
-                            ResourceOp::Create(ref mut create) => {
-                                create.uri = clean_uri(&create.uri, test_case)?;
-                            }
-                            ResourceOp::Rename(ref mut rename) => {
-                                rename.old_uri = clean_uri(&rename.old_uri, test_case)?;
-                                rename.new_uri = clean_uri(&rename.new_uri, test_case)?;
-                            }
-                            ResourceOp::Delete(ref mut delete) => {
-                                delete.uri = clean_uri(&delete.uri, test_case)?;
-                            }
-                        },
-                        DocumentChangeOperation::Edit(edit) => {
-                            edit.text_document.uri = clean_uri(&edit.text_document.uri, test_case)?;
-                        }
-                    }
-                }
-            }
-            None => {}
-        }
-        Ok(self)
-    }
-}
