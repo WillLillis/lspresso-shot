@@ -1,7 +1,7 @@
 use lsp_types::Location;
 use thiserror::Error;
 
-use super::{clean_uri, write_fields_comparison, CleanResponse, Empty, TestCase, TestResult};
+use super::{clean_uri, compare::Compare as _, CleanResponse, Empty, TestCase, TestResult};
 
 impl Empty for Vec<Location> {}
 
@@ -24,7 +24,6 @@ pub struct ReferencesMismatchError {
 impl std::fmt::Display for ReferencesMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Test {}: Incorrect References response:", self.test_id)?;
-        write_fields_comparison(f, "Location", &self.expected, &self.actual, 0)?;
-        Ok(())
+        <Vec<Location>>::compare(f, None, &self.expected, &self.actual, 0, None)
     }
 }
