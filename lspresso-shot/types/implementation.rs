@@ -1,7 +1,7 @@
 use lsp_types::request::GotoImplementationResponse;
 use thiserror::Error;
 
-use super::write_fields_comparison;
+use super::compare::Compare as _;
 
 #[derive(Debug, Error, PartialEq)]
 pub struct ImplementationMismatchError {
@@ -17,7 +17,6 @@ impl std::fmt::Display for ImplementationMismatchError {
             "Test {}: Incorrect Implementation response:",
             self.test_id
         )?;
-        write_fields_comparison(f, "Implementation", &self.expected, &self.actual, 0)?;
-        Ok(())
+        GotoImplementationResponse::compare(f, None, &self.expected, &self.actual, 0, None)
     }
 }

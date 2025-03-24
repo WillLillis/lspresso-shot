@@ -1,7 +1,7 @@
 use lsp_types::GotoDefinitionResponse;
 use thiserror::Error;
 
-use super::{clean_uri, write_fields_comparison, CleanResponse, Empty, TestCase, TestResult};
+use super::{clean_uri, compare::Compare as _, CleanResponse, Empty, TestCase, TestResult};
 
 impl Empty for GotoDefinitionResponse {}
 
@@ -40,7 +40,6 @@ impl std::fmt::Display for DefinitionMismatchError {
             "Test {}: Incorrect GotoDefinition response:",
             self.test_id
         )?;
-        write_fields_comparison(f, "GotoDefinition", &self.expected, &self.actual, 0)?;
-        Ok(())
+        GotoDefinitionResponse::compare(f, None, &self.expected, &self.actual, 0, None)
     }
 }
