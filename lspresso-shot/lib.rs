@@ -902,6 +902,43 @@ pub fn test_incoming_calls(
     )
 }
 
+/// Tests the server's response to a 'textDocument/inlayHint' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `range` fails
+pub fn test_outgoing_calls(
+    mut test_case: TestCase,
+    range: &Range,
+    expected: Option<&Vec<InlayHint>>,
+) {
+    test_case.test_type = Some(TestType::InlayHint);
+    collect_results(
+        &test_case,
+        Some(&vec![(
+            "RANGE",
+            serde_json::to_string_pretty(call_item)
+                .expect("JSON deserialzation of call range failed"),
+        )]),
+        expected,
+        |expected, actual: &Vec<InlayHint>| {
+            if expected != actual {
+                Err(IncomingCallsMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
 /// Tests the server's response to a 'textDocument/prepareCallHierarchy' request
 ///
 /// # Errors

@@ -12,6 +12,7 @@ pub mod folding_range;
 pub mod formatting;
 pub mod hover;
 pub mod implementation;
+pub mod inlay_hint;
 pub mod references;
 pub mod rename;
 pub mod selection_range;
@@ -92,6 +93,8 @@ pub enum TestType {
     Implementation,
     /// Test `callHierarchy/incomingCalls` requests
     IncomingCalls,
+    /// Test `textDocument/inlayHint` requests
+    InlayHint,
     /// Test `callHierarchy/outgoingCalls` requests
     OutgoingCalls,
     /// Test `textDocument/prepareCallHierarchy` requests
