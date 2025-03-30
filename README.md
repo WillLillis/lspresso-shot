@@ -104,6 +104,7 @@ So far, we have:
 - [x] `textDocument/formatting`
 - [x] `textDocument/implementation`
 - [x] `textDocument/hover`
+- [x] `textDocument/moniker`
 - [x] `textDocument/prepareCallHierarchy`
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`

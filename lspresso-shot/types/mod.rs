@@ -12,6 +12,7 @@ pub mod folding_range;
 pub mod formatting;
 pub mod hover;
 pub mod implementation;
+pub mod moniker;
 pub mod references;
 pub mod rename;
 pub mod selection_range;
@@ -55,6 +56,7 @@ use std::{
 };
 
 use lsp_types::{Position, Uri};
+use moniker::MonikerMismatchError;
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -92,6 +94,8 @@ pub enum TestType {
     Implementation,
     /// Test `callHierarchy/incomingCalls` requests
     IncomingCalls,
+    /// Test `textDocument/moniker` requests
+    Moniker,
     /// Test `callHierarchy/outgoingCalls` requests
     OutgoingCalls,
     /// Test `textDocument/prepareCallHierarchy` requests
@@ -133,6 +137,7 @@ impl std::fmt::Display for TestType {
                 Self::Hover => "textDocument/hover",
                 Self::Implementation => "textDocument/implementation",
                 Self::IncomingCalls => "callHierarchy/incomingCalls",
+                Self::Moniker => "textDocument/moniker",
                 Self::OutgoingCalls => "callHierarchy/outgoingCalls",
                 Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
                 Self::References => "textDocument/references",
@@ -626,6 +631,8 @@ pub enum TestError {
     ImplementationMismatch(#[from] Box<ImplementationMismatchError>),
     #[error(transparent)]
     IncomingCallsMismatch(#[from] IncomingCallsMismatchError),
+    #[error(transparent)]
+    MonikerMismatch(#[from] MonikerMismatchError),
     #[error(transparent)]
     OutgoingCallsMismatch(#[from] OutgoingCallsMismatchError),
     #[error(transparent)]

@@ -11,15 +11,15 @@ use lsp_types::{
         DocumentHighlightRequest, DocumentLinkRequest, DocumentLinkResolve, DocumentSymbolRequest,
         FoldingRangeRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
         GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
-        HoverRequest, References, Rename, Request as _, SelectionRangeRequest,
+        HoverRequest, MonikerRequest, References, Rename, Request as _, SelectionRangeRequest,
         SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeLens, CodeLensParams, CompletionParams, DocumentFormattingParams, DocumentHighlightParams,
     DocumentLink, DocumentLinkParams, DocumentSymbolParams, FoldingRangeParams,
-    GotoDefinitionParams, HoverParams, ReferenceParams, RenameParams, SelectionRangeParams,
-    SemanticTokensDeltaParams, SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities,
-    Uri,
+    GotoDefinitionParams, HoverParams, MonikerParams, ReferenceParams, RenameParams,
+    SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
+    SemanticTokensRangeParams, ServerCapabilities, Uri,
 };
 
 use crate::{
@@ -30,7 +30,7 @@ use crate::{
         get_document_highlight_response, get_document_link_resolve_response,
         get_document_link_response, get_document_symbol_response, get_folding_range_response,
         get_formatting_response, get_hover_response, get_implementation_response,
-        get_incoming_calls_response, get_outgoing_calls_response,
+        get_incoming_calls_response, get_moniker_response, get_outgoing_calls_response,
         get_prepare_call_hierachy_response, get_references_response, get_rename_response,
         get_selection_range_response, get_semantic_tokens_full_delta_response,
         get_semantic_tokens_full_response, get_semantic_tokens_range_response,
@@ -359,6 +359,17 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: HoverParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
+            )?;
+        }
+        MonikerRequest::METHOD => {
+            handle_request!(
+                MonikerRequest,
+                get_moniker_response,
+                req,
+                conn,
+                |params: MonikerParams| -> Uri {
                     params.text_document_position_params.text_document.uri
                 }
             )?;
