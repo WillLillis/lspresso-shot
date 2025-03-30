@@ -169,16 +169,16 @@ impl TestFile {
 /// Describes a test case to be used in an lspresso-shot test.
 ///
 /// - `test_id`: internal identifier for a single run of a test case, *not* to be
-///    set by the user.
+///   set by the user.
 /// - `test_type`: internal marker for the test type to be run, *not to be set by
-///    the user.
+///   the user.
 /// - `executable_path`: path to the language server's executable.
 /// - `nvim_path`: path to/command for the Neovim executable. The default is "nvim".
 /// - `source_file`: the source file to be opened by Neovim.
 /// - `cursor_pos`: the position of the cursor within `source_contents` when the
-///    lsp request being tested is executed.
+///   lsp request being tested is executed.
 /// - `other_files`: other files to be placed in the mock directory (e.g. other source
-///    files, server configuration, etc.).
+///   files, server configuration, etc.).
 /// - `start_type`: indicates when the server is ready to service requests
 /// - `timeout`: timeout for the test's run in Neovim. The default is 1000ms.
 /// - `cleanup`: whether to delete the temporary directory on test completion.
@@ -599,7 +599,7 @@ pub enum TestError {
     #[error(transparent)]
     CodeLensMismatch(#[from] CodeLensMismatchError),
     #[error(transparent)]
-    CodeLensResolveMismatch(#[from] CodeLensResolveMismatchError),
+    CodeLensResolveMismatch(#[from] Box<CodeLensResolveMismatchError>),
     #[error(transparent)]
     CompletionMismatch(#[from] CompletionMismatchError),
     #[error(transparent)]
@@ -613,7 +613,7 @@ pub enum TestError {
     #[error(transparent)]
     DocumentLinkMismatch(#[from] DocumentLinkMismatchError),
     #[error(transparent)]
-    DocumentLinkResolveMismatch(#[from] DocumentLinkResolveMismatchError),
+    DocumentLinkResolveMismatch(#[from] Box<DocumentLinkResolveMismatchError>),
     #[error(transparent)]
     DocumentSymbolMismatch(#[from] DocumentSymbolMismatchError),
     #[error(transparent)]

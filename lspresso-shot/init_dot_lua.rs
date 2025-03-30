@@ -69,7 +69,7 @@ pub fn get_init_dot_lua(
             raw_init = raw_init.replace("LSP_ACTION", "");
             raw_init.push_str(include_str!("lua_templates/diagnostic_autocmd.lua"));
         }
-    };
+    }
 
     if let Some(replacements) = custom_replacements {
         for (from, to) in replacements {

@@ -53,7 +53,7 @@ impl CompletionResult {
                         .map(|(i, _)| i)
                     {
                         expected.remove(i);
-                    };
+                    }
                 }
 
                 expected.is_empty()
@@ -107,7 +107,7 @@ impl std::fmt::Display for CompletionMismatchError {
                         .map(|(i, _)| i)
                     {
                         expected.remove(i);
-                    };
+                    }
                 }
 
                 writeln!(
@@ -189,7 +189,7 @@ impl std::fmt::Display for CompletionMismatchError {
                     )?;
                 }
             },
-        };
+        }
 
         Ok(())
     }

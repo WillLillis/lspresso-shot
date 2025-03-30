@@ -360,11 +360,11 @@ pub fn test_code_lens_resolve(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(CodeLensResolveMismatchError {
+                Err(Box::new(CodeLensResolveMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: (*expected).clone(),
                     actual: actual.clone(),
-                })?;
+                }))?;
             }
             Ok(())
         },
@@ -612,11 +612,11 @@ pub fn test_document_link_resolve(
         expected,
         |expected, actual: &DocumentLink| {
             if expected != actual {
-                Err(DocumentLinkResolveMismatchError {
+                Err(Box::new(DocumentLinkResolveMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),
-                })?;
+                }))?;
             }
             Ok(())
         },
