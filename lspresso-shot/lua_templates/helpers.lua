@@ -32,6 +32,23 @@ local function mark_empty_file()
     ---@diagnostic enable: need-check-nil
 end
 
+local messages = {}
+
+local original_notify = vim.notify
+---@diagnostic disable-next-line: duplicate-set-field
+vim.notify = function(message, log_level, opts)
+    table.insert(messages, message)
+    return original_notify(message, log_level, opts)
+end
+
+---@diagnostic disable-next-line: unused-local, unused-function
+local function exit()
+    for _, message in ipairs(messages) do
+        report_error(message)
+    end
+    vim.cmd('qa!')
+end
+
 local capabilities = vim.lsp.protocol.make_client_capabilities()
 capabilities.experimental = {
     commands = {

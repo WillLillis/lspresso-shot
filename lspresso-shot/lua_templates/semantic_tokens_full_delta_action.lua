@@ -16,18 +16,18 @@ local function check_progress_result()
     if not semantic_tokens_full_result then
         ---@diagnostic disable-next-line: undefined-global
         report_log('No valid semantic tokens full result returned: ' .. vim.inspect(semantic_tokens_full_result) .. '\n') ---@diagnostic disable-line: undefined-global
-        vim.cmd('qa!')
+        exit() ---@diagnostic disable-line: undefined-global
     elseif semantic_tokens_full_result and #semantic_tokens_full_result >= 1 and semantic_tokens_full_result[1].result then
         result_id = semantic_tokens_full_result[1].result.resultId
     else
         ---@diagnostic disable-next-line: undefined-global
         report_log('Empty semantic tokens full result returned: ' .. vim.inspect(semantic_tokens_full_result) .. '\n')
-        vim.cmd('qa!')
+        exit() ---@diagnostic disable-line: undefined-global
     end
 
     if not result_id then
         report_error('nil resultId returned') ---@diagnostic disable-line: undefined-global
-        vim.cmd('qa!')
+        exit() ---@diagnostic disable-line: undefined-global
     end
 
     report_log('Issuing semantic tokens full delta request\n') ---@diagnostic disable-line: undefined-global
@@ -43,7 +43,7 @@ local function check_progress_result()
         local results_file = io.open('RESULTS_FILE', "w")
         if not results_file then
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
-            vim.cmd('qa!')
+            exit() ---@diagnostic disable-line: undefined-global
         end
 
         ---@diagnostic disable: need-check-nil
@@ -56,5 +56,5 @@ local function check_progress_result()
             vim.inspect(semantic_tokens_full_delta_result) .. '\n')
         mark_empty_file() ---@diagnostic disable-line: undefined-global
     end
-    vim.cmd('qa!')
+    exit() ---@diagnostic disable-line: undefined-global
 end

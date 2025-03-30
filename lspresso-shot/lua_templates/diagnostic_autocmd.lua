@@ -13,7 +13,7 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
             local results_file = io.open('RESULTS_FILE', 'w')
             if not results_file then
                 report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
-                vim.cmd('qa!')
+                exit() ---@diagnostic disable-line: undefined-global
             end
 
             local diagnostics = {}
@@ -29,6 +29,6 @@ vim.api.nvim_create_autocmd('DiagnosticChanged', {
             ---@diagnostic disable-next-line: undefined-global
             mark_empty_file() ---@diagnostic disable-line: undefined-global
         end
-        vim.cmd('qa!')
+        exit() ---@diagnostic disable-line: undefined-global
     end,
 })

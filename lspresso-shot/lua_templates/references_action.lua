@@ -23,7 +23,8 @@ local function check_progress_result()
         if not results_file then
             ---@diagnostic disable-next-line: undefined-global
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
-            vim.cmd('qa!')
+            ---@diagnostic disable-next-line: undefined-global
+            exit() ---@diagnostic disable-line: undefined-global
         end
 
         ---@diagnostic disable: need-check-nil
@@ -34,5 +35,6 @@ local function check_progress_result()
         ---@diagnostic disable-next-line: undefined-global
         mark_empty_file() ---@diagnostic disable-line: undefined-global
     end
-    vim.cmd('qa!')
+    ---@diagnostic disable-next-line: undefined-global
+    exit() ---@diagnostic disable-line: undefined-global
 end
