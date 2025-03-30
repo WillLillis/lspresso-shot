@@ -20,7 +20,7 @@ local function check_progress_result()
         if not results_file then
             ---@diagnostic disable-next-line: undefined-global
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
-            vim.cmd('qa!')
+            exit() ---@diagnostic disable-line: undefined-global
         end
         ---@diagnostic disable: need-check-nil
         results_file:write(vim.json.encode(semantic_tokens_full_result[1].result, { escape_slash = true }))
@@ -30,5 +30,5 @@ local function check_progress_result()
         ---@diagnostic disable-next-line: undefined-global
         mark_empty_file() ---@diagnostic disable-line: undefined-global
     end
-    vim.cmd('qa!')
+    exit() ---@diagnostic disable-line: undefined-global
 end

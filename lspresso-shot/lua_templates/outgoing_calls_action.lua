@@ -26,7 +26,7 @@ CALL_ITEM
         local results_file = io.open('RESULTS_FILE', 'w')
         if not results_file then
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
-            vim.cmd('qa!')
+            exit() ---@diagnostic disable-line: undefined-global
         end
         ---@diagnostic disable: need-check-nil
         results_file:write(vim.json.encode(outgoing_calls_result[1].result, { escape_slash = true }))
@@ -36,5 +36,5 @@ CALL_ITEM
         ---@diagnostic disable-next-line: undefined-global
         mark_empty_file() ---@diagnostic disable-line: undefined-global
     end
-    vim.cmd('qa!')
+    exit() ---@diagnostic disable-line: undefined-global
 end

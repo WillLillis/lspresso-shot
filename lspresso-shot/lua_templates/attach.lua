@@ -9,7 +9,7 @@ vim.api.nvim_create_autocmd('FileType', {
     callback = function(ev)
         if vim.bo[ev.buf].buftype == 'nofile' then
             report_error('Invalid buffer type opened') ---@diagnostic disable-line: undefined-global
-            vim.cmd('qa!')
+            exit() ---@diagnostic disable-line: undefined-global
         end
         vim.lsp.start {
             name = 'lspresso_shot',
