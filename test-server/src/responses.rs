@@ -7,11 +7,12 @@ use lsp_types::{
     CompletionList, CompletionResponse, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
     DocumentHighlight, DocumentHighlightKind, DocumentLink, DocumentSymbol, DocumentSymbolResponse,
     Documentation, FoldingRange, FoldingRangeKind, GotoDefinitionResponse, Hover, HoverContents,
-    LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind, Position,
-    PublishDiagnosticsParams, Range, SelectionRange, SemanticToken, SemanticTokens,
-    SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
+    LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind, Moniker,
+    MonikerKind, Position, PublishDiagnosticsParams, Range, SelectionRange, SemanticToken,
+    SemanticTokens, SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
     SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult,
-    SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit, Uri, WorkspaceEdit,
+    SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit, UniquenessLevel, Uri,
+    WorkspaceEdit,
 };
 
 use crate::get_dummy_source_path;
@@ -453,6 +454,30 @@ pub fn get_incoming_calls_response(response_num: u32) -> Option<Vec<CallHierarch
             start: Position::new(9, 10),
             end: Position::new(11, 12),
         }],
+    };
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![item1]),
+        2 => Some(vec![item2]),
+        3 => Some(vec![item1, item2]),
+        _ => None,
+    }
+}
+
+/// For use with `test_moniker`.
+#[must_use]
+pub fn get_moniker_response(response_num: u32) -> Option<Vec<Moniker>> {
+    let item1 = Moniker {
+        scheme: "scheme1".to_string(),
+        identifier: "identifier1".to_string(),
+        unique: UniquenessLevel::Document,
+        kind: Some(MonikerKind::Export),
+    };
+    let item2 = Moniker {
+        scheme: "scheme2".to_string(),
+        identifier: "identifier2".to_string(),
+        unique: UniquenessLevel::Project,
+        kind: Some(MonikerKind::Import),
     };
     match response_num {
         0 => Some(vec![]),

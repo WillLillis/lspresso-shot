@@ -5,9 +5,10 @@ use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens, Diagnostic,
     DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
-    GotoDefinitionResponse, Hover, Location, Position, Range, SelectionRange, SemanticTokens,
-    SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensPartialResult,
-    SemanticTokensRangeResult, SemanticTokensResult, TextEdit, WorkspaceEdit,
+    GotoDefinitionResponse, Hover, Location, Moniker, Position, Range, SelectionRange,
+    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
+    SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, TextEdit,
+    WorkspaceEdit,
 };
 
 use std::{
@@ -34,6 +35,7 @@ use types::{
     formatting::{FormattingMismatchError, FormattingResult},
     hover::HoverMismatchError,
     implementation::ImplementationMismatchError,
+    moniker::MonikerMismatchError,
     references::ReferencesMismatchError,
     rename::RenameMismatchError,
     selection_range::SelectionRangeMismatchError,
@@ -892,6 +894,39 @@ pub fn test_incoming_calls(
         |expected, actual: &Vec<CallHierarchyIncomingCall>| {
             if expected != actual {
                 Err(IncomingCallsMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Tests the server's response to a 'textDocument/prepareCallHierarchy' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `call_item` fails
+pub fn test_moniker(
+    mut test_case: TestCase,
+    cursor_pos: &Position,
+    expected: Option<&Vec<Moniker>>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::Moniker);
+    collect_results(
+        &test_case,
+        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        expected,
+        |expected, actual: &Vec<Moniker>| {
+            if expected != actual {
+                Err(MonikerMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),
