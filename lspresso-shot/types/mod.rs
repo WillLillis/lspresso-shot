@@ -55,6 +55,7 @@ use std::{
     time::Duration,
 };
 
+use completion::CompletionResolveMismatchError;
 use lsp_types::{Position, Uri};
 use moniker::MonikerMismatchError;
 use rand::distr::Distribution as _;
@@ -70,6 +71,8 @@ pub enum TestType {
     CodeLensResolve,
     /// Test `textDocument/completion` requests
     Completion,
+    /// Test `completionItem/resolve` requests
+    CompletionResolve,
     /// Test `textDocument/declaration` requests
     Declaration,
     /// Test `textDocument/definition` requests
@@ -125,6 +128,7 @@ impl std::fmt::Display for TestType {
                 Self::CodeLens => "textDocument/codeLens",
                 Self::CodeLensResolve => "codeLens/resolve",
                 Self::Completion => "textDocument/completion",
+                Self::CompletionResolve => "completionItem/resolve",
                 Self::Declaration => "textDocument/declaration",
                 Self::Definition => "textDocument/definition",
                 Self::Diagnostic => "textDocument/publishDiagnostics",
@@ -607,6 +611,8 @@ pub enum TestError {
     CodeLensResolveMismatch(#[from] Box<CodeLensResolveMismatchError>),
     #[error(transparent)]
     CompletionMismatch(#[from] CompletionMismatchError),
+    #[error(transparent)]
+    CompletionResolveMismatch(#[from] Box<CompletionResolveMismatchError>),
     #[error(transparent)]
     DeclarationMismatch(#[from] Box<DeclarationMismatchError>),
     #[error(transparent)]

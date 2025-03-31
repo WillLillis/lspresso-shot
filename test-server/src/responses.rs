@@ -305,6 +305,60 @@ pub fn get_completion_response(response_num: u32) -> Option<CompletionResponse> 
     }
 }
 
+/// For use with `test_completion_resolve`.
+#[must_use]
+pub fn get_completion_resolve_response(response_num: u32) -> Option<CompletionItem> {
+    match response_num {
+        0 => Some(CompletionItem {
+            label: "label1".to_string(),
+            label_details: Some(CompletionItemLabelDetails {
+                detail: Some("detail1".to_string()),
+                description: Some("description1".to_string()),
+            }),
+            kind: Some(CompletionItemKind::TEXT),
+            detail: Some("detail1".to_string()),
+            documentation: Some(Documentation::String("doc string1".to_string())),
+            deprecated: Some(false),
+            preselect: Some(true),
+            sort_text: Some("sort text1".to_string()),
+            filter_text: Some("filter_text1".to_string()),
+            insert_text: Some("insert_text1".to_string()),
+            insert_text_format: None,
+            insert_text_mode: None,
+            text_edit: None,
+            additional_text_edits: None,
+            command: None,
+            commit_characters: None,
+            data: None,
+            tags: None,
+        }),
+        1 => Some(CompletionItem {
+            label: "label2".to_string(),
+            label_details: Some(CompletionItemLabelDetails {
+                detail: Some("detail2".to_string()),
+                description: Some("description2".to_string()),
+            }),
+            kind: Some(CompletionItemKind::TEXT),
+            detail: Some("detail2".to_string()),
+            documentation: Some(Documentation::String("doc string2".to_string())),
+            deprecated: Some(false),
+            preselect: Some(true),
+            sort_text: Some("sort text2".to_string()),
+            filter_text: Some("filter_text2".to_string()),
+            insert_text: Some("insert_text2".to_string()),
+            insert_text_format: None,
+            insert_text_mode: None,
+            text_edit: None,
+            additional_text_edits: None,
+            command: None,
+            commit_characters: None,
+            data: None,
+            tags: None,
+        }),
+        _ => None,
+    }
+}
+
 /// For use with `test_hover`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]

@@ -3,10 +3,10 @@ pub mod types;
 
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens, Diagnostic,
-    DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
-    GotoDefinitionResponse, Hover, Location, Moniker, Position, Range, SelectionRange,
-    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens,
+    CompletionItem, Diagnostic, DocumentHighlight, DocumentLink, DocumentSymbolResponse,
+    FoldingRange, FormattingOptions, GotoDefinitionResponse, Hover, Location, Moniker, Position,
+    Range, SelectionRange, SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
     SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, TextEdit,
     WorkspaceEdit,
 };
@@ -24,7 +24,7 @@ use types::{
         IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
     },
     code_lens::{CodeLensMismatchError, CodeLensResolveMismatchError},
-    completion::{CompletionMismatchError, CompletionResult},
+    completion::{CompletionMismatchError, CompletionResolveMismatchError, CompletionResult},
     declaration::DeclarationMismatchError,
     definition::DefinitionMismatchError,
     diagnostic::DiagnosticMismatchError,
@@ -396,6 +396,42 @@ pub fn test_completion(
                     expected: (*expected).clone(),
                     actual: actual.clone(),
                 })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Tests the server's response to a 'completionItem/resolve' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `completion_item` fails
+pub fn test_completion_resolve(
+    mut test_case: TestCase,
+    completion_item: &CompletionItem,
+    expected: Option<&CompletionItem>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::CompletionResolve);
+
+    let completion_item = serde_json::to_string_pretty(completion_item)
+        .expect("JSON deserialzation of completion item failed");
+    collect_results(
+        &test_case,
+        Some(&vec![("COMPLETION_ITEM", completion_item)]),
+        expected,
+        |expected, actual| {
+            if expected != actual {
+                Err(Box::new(CompletionResolveMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: (*expected).clone(),
+                    actual: actual.clone(),
+                }))?;
             }
             Ok(())
         },

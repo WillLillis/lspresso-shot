@@ -42,6 +42,7 @@ pub fn get_init_dot_lua(
         TestType::CodeLens
         | TestType::CodeLensResolve
         | TestType::Completion
+        | TestType::CompletionResolve
         | TestType::Declaration
         | TestType::Definition
         | TestType::DocumentHighlight
@@ -118,6 +119,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::CodeLens => include_str!("lua_templates/code_lens_action.lua"),
         TestType::CodeLensResolve => include_str!("lua_templates/code_lens_resolve_action.lua"),
         TestType::Completion => include_str!("lua_templates/completion_action.lua"),
+        TestType::CompletionResolve => include_str!("lua_templates/completion_resolve_action.lua"),
         TestType::Declaration => include_str!("lua_templates/declaration_action.lua"),
         TestType::Definition => include_str!("lua_templates/definition_action.lua"),
         TestType::Diagnostic => "\n-- NOTE: No `check_progress_result` function for diagnostics, instead handled by `DiagnosticChanged` autocmd\n",

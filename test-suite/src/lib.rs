@@ -3,6 +3,7 @@ pub mod test_helpers;
 mod code_lens;
 mod code_lens_resolve;
 mod completion;
+mod completion_resolve;
 mod declaration;
 mod definition;
 mod diagnostics;
