@@ -88,5 +88,5 @@ mod test {
     }
 
     // NOTE: It's difficult to test `codeLens/resolve` requests with rust-analyzer, as its
-    // responses contain JSON data that are speciic to the ephemeral test directory
+    // responses contain JSON data that are specific to the ephemeral test directory
 }

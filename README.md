@@ -92,6 +92,7 @@ So far, we have:
 
 - [x] `callHierarchy/incomingCalls`
 - [x] `codeLens/resolve`
+- [x] `completionItem/resolve`
 - [x] `documentLink/resolve`
 - [x] `textDocument/codeLens`
 - [x] `textDocument/completion`
