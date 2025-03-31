@@ -4,11 +4,11 @@ pub mod types;
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens,
-    CompletionItem, Diagnostic, DocumentHighlight, DocumentLink, DocumentSymbolResponse,
-    FoldingRange, FormattingOptions, GotoDefinitionResponse, Hover, Location, Moniker, Position,
-    Range, SelectionRange, SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
-    SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, TextEdit,
-    WorkspaceEdit,
+    CompletionItem, Diagnostic, DocumentDiagnosticReport, DocumentHighlight, DocumentLink,
+    DocumentSymbolResponse, FoldingRange, FormattingOptions, GotoDefinitionResponse, Hover,
+    Location, Moniker, Position, Range, SelectionRange, SemanticTokens, SemanticTokensDelta,
+    SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
+    SemanticTokensResult, TextEdit, WorkspaceEdit,
 };
 
 use std::{
@@ -27,7 +27,7 @@ use types::{
     completion::{CompletionMismatchError, CompletionResolveMismatchError, CompletionResult},
     declaration::DeclarationMismatchError,
     definition::DefinitionMismatchError,
-    diagnostic::PublishDiagnosticsMismatchError,
+    diagnostic::{DiagnosticMismatchError, PublishDiagnosticsMismatchError},
     document_highlight::DocumentHighlightMismatchError,
     document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
     document_symbol::DocumentSymbolMismatchError,
@@ -522,6 +522,54 @@ pub fn test_definition(
 
             if *expected != *actual {
                 Err(Box::new(DefinitionMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                }))?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Tests the server's response to a 'textDocument/diagnostic' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `identifier` or `previous_result_id` fails
+pub fn test_diagnostic(
+    mut test_case: TestCase,
+    identifier: Option<&str>,
+    previous_result_id: Option<&str>,
+    expected: &DocumentDiagnosticReport,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::Diagnostic);
+    let identifier = identifier.map_or_else(
+        || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
+        |id| serde_json::to_string_pretty(id).expect("JSON deserialzation of identifier failed"),
+    );
+    let previous_result_id = previous_result_id.map_or_else(
+        || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
+        |id| {
+            serde_json::to_string_pretty(id)
+                .expect("JSON deserialzation of previous result id failed")
+        },
+    );
+    collect_results(
+        &test_case,
+        Some(&vec![
+            ("IDENTIFIER", identifier),
+            ("PREVIOUS_RESULT_ID", previous_result_id),
+        ]),
+        Some(expected),
+        |expected: &DocumentDiagnosticReport, actual: &DocumentDiagnosticReport| {
+            if expected != actual {
+                Err(Box::new(DiagnosticMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),

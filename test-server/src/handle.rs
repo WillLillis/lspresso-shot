@@ -28,14 +28,15 @@ use crate::{
     responses::{
         get_code_lens_resolve_response, get_code_lens_response, get_completion_resolve_response,
         get_completion_response, get_declaration_response, get_definition_response,
-        get_document_highlight_response, get_document_link_resolve_response,
-        get_document_link_response, get_document_symbol_response, get_folding_range_response,
-        get_formatting_response, get_hover_response, get_implementation_response,
-        get_incoming_calls_response, get_moniker_response, get_outgoing_calls_response,
-        get_prepare_call_hierachy_response, get_publish_diagnostics_response,
-        get_references_response, get_rename_response, get_selection_range_response,
-        get_semantic_tokens_full_delta_response, get_semantic_tokens_full_response,
-        get_semantic_tokens_range_response, get_type_definition_response,
+        get_diagnostic_response, get_document_highlight_response,
+        get_document_link_resolve_response, get_document_link_response,
+        get_document_symbol_response, get_folding_range_response, get_formatting_response,
+        get_hover_response, get_implementation_response, get_incoming_calls_response,
+        get_moniker_response, get_outgoing_calls_response, get_prepare_call_hierachy_response,
+        get_publish_diagnostics_response, get_references_response, get_rename_response,
+        get_selection_range_response, get_semantic_tokens_full_delta_response,
+        get_semantic_tokens_full_response, get_semantic_tokens_range_response,
+        get_type_definition_response,
     },
 };
 
@@ -258,13 +259,27 @@ pub fn handle_request(
             )?;
         }
         DocumentDiagnosticRequest::METHOD => {
-            let (id, params) = cast_req::<DocumentDiagnosticRequest>(req)
-                .expect("Failed to cast `DocumentDiagnosticRequest` request");
+            let (id, params) = cast_req::<DocumentDiagnosticRequest>(req).expect(concat!(
+                "Failed to cast `",
+                stringify!(DocumentDiagnosticRequest),
+                "` request"
+            ));
             info!(
                 "Received `{}` request ({id}): {params:?}",
-                DocumentDiagnosticRequest::METHOD
+                <DocumentDiagnosticRequest>::METHOD
             );
-            send_diagnostic_resp(&params.text_document.uri, conn)?;
+            let uri = params.text_document.uri;
+            let Some(root_path) = get_root_test_path(&uri) else {
+                error!(
+                    "Failed to retrieve root path from provided uri: {}",
+                    uri.as_str()
+                );
+                return Ok(());
+            };
+            let response_num = receive_response_num(&root_path)?;
+            info!("response_num: {response_num}");
+            let resp = get_diagnostic_response(response_num, &uri);
+            send_req_resp(id, resp, conn)?;
         }
         DocumentHighlightRequest::METHOD => {
             handle_request!(

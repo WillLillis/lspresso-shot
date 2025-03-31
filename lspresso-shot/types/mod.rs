@@ -56,6 +56,7 @@ use std::{
 };
 
 use completion::CompletionResolveMismatchError;
+use diagnostic::DiagnosticMismatchError;
 use lsp_types::{Position, Uri};
 use moniker::MonikerMismatchError;
 use rand::distr::Distribution as _;
@@ -77,6 +78,8 @@ pub enum TestType {
     Declaration,
     /// Test `textDocument/definition` requests
     Definition,
+    /// Test 'textDocument/diagnostic' requests
+    Diagnostic,
     /// Test `textDocument/documentHighlight` requests
     DocumentHighlight,
     /// Test `textDocument/documentLink` requests
@@ -131,6 +134,7 @@ impl std::fmt::Display for TestType {
                 Self::CompletionResolve => "completionItem/resolve",
                 Self::Declaration => "textDocument/declaration",
                 Self::Definition => "textDocument/definition",
+                Self::Diagnostic => "textDocument/diagnostic",
                 Self::DocumentHighlight => "textDocument/documentHighlight",
                 Self::DocumentLink => "textDocument/documentLink",
                 Self::DocumentLinkResolve => "documentLink/resolve",
@@ -617,6 +621,8 @@ pub enum TestError {
     DeclarationMismatch(#[from] Box<DeclarationMismatchError>),
     #[error(transparent)]
     DefinitionMismatch(#[from] Box<DefinitionMismatchError>),
+    #[error(transparent)]
+    DiagnosticMismatch(#[from] Box<DiagnosticMismatchError>),
     #[error(transparent)]
     PublishDiagnosticsMismatch(#[from] PublishDiagnosticsMismatchError),
     #[error(transparent)]

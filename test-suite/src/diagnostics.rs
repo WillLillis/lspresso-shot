@@ -4,16 +4,19 @@ mod tests {
 
     use crate::test_helpers::cargo_dot_toml;
     use lspresso_shot::{
-        lspresso_shot, test_publish_diagnostics,
+        lspresso_shot, test_diagnostic, test_publish_diagnostics,
         types::{ServerStartType, TestCase, TestFile},
     };
-    use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
+    use test_server::{
+        get_dummy_server_path, get_dummy_source_path, send_capabiltiies, send_response_num,
+    };
 
     use lsp_types::{
         CodeDescription, Diagnostic, DiagnosticOptions, DiagnosticRelatedInformation,
-        DiagnosticServerCapabilities, DiagnosticSeverity, DiagnosticTag, Location, NumberOrString,
-        Position, Range, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind, Uri,
-        WorkDoneProgressOptions,
+        DiagnosticServerCapabilities, DiagnosticSeverity, DiagnosticTag, DocumentDiagnosticReport,
+        FullDocumentDiagnosticReport, Location, NumberOrString, Position, Range,
+        RelatedFullDocumentDiagnosticReport, ServerCapabilities, TextDocumentSyncCapability,
+        TextDocumentSyncKind, Uri, WorkDoneProgressOptions,
     };
     use rstest::rstest;
     use serde_json::Map;
@@ -34,7 +37,27 @@ mod tests {
     }
 
     #[rstest]
-    fn test_server_publish_diagnostics_simple_expect_some_got_some(#[values(0, 1, 2)] response_num: u32) {
+    fn test_server_diagnostic_simple_expect_some_got_some(
+        #[values(0, 1, 2, 3, 4)] response_num: u32,
+    ) {
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case root directory");
+        let uri = Uri::from_str(&get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_diagnostic_response(response_num, &uri).unwrap();
+        send_response_num(response_num, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&diagnostic_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_diagnostic(test_case, None, None, &resp));
+    }
+
+    #[rstest]
+    fn test_server_publish_diagnostics_simple_expect_some_got_some(
+        #[values(0, 1, 2)] response_num: u32,
+    ) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let resp =
             test_server::responses::get_publish_diagnostics_response(response_num, &uri).unwrap();
@@ -49,6 +72,41 @@ mod tests {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_publish_diagnostics(test_case, &resp.diagnostics));
+    }
+
+    #[test]
+    fn rust_analyzer_diagnostic() {
+        let source_file = TestFile::new(
+            "src/main.rs",
+            "pub fn main() {
+    let bar = 1;
+}",
+        );
+        let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                NonZeroU32::new(5).unwrap(),
+                "rustAnalyzer/Indexing".to_string(),
+            ))
+            .timeout(Duration::from_secs(20))
+            .other_file(cargo_dot_toml());
+
+        let mut data_map = Map::new();
+        data_map.insert(
+            "rendered".to_string(),
+            serde_json::Value::String("warning: unused variable: `bar`\n --> src/main.rs:2:9\n  |\n2 |     let bar = 1;\n  |         ^^^ help: if this is intentional, prefix it with an underscore: `_bar`\n  |\n  = note: `#[warn(unused_variables)]` on by default\n\n".to_string()),
+        );
+        lspresso_shot!(test_diagnostic(
+            diagnostic_test_case,
+            None,
+            None,
+            &DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
+                related_documents: None,
+                full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                    result_id: Some("rust-analyzer".to_string()),
+                    items: vec![],
+                }
+            }),
+        ));
     }
 
     #[test]
