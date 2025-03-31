@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use std::{num::NonZeroU32, time::Duration};
+    use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
     use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
@@ -9,7 +9,7 @@ mod test {
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
-    use lsp_types::{OneOf, Position, Range, ServerCapabilities, TextEdit};
+    use lsp_types::{OneOf, Position, Range, ServerCapabilities, TextEdit, Uri};
     use rstest::rstest;
 
     fn formatting_capabilities_simple() -> ServerCapabilities {
@@ -58,7 +58,8 @@ mod test {
     fn test_server_formatting_response_simple_expect_none_got_some(
         #[values(0, 1, 2, 3)] response_num: u32,
     ) {
-        let edits = test_server::responses::get_formatting_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let edits = test_server::responses::get_formatting_response(response_num, &uri).unwrap();
         let source_file =
             TestFile::new(test_server::get_dummy_source_path(), "Some source contents");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
@@ -78,7 +79,8 @@ mod test {
     fn test_server_formatting_response_simple_expect_some_got_some(
         #[values(0, 1, 2, 3)] response_num: u32,
     ) {
-        let edits = test_server::responses::get_formatting_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let edits = test_server::responses::get_formatting_response(response_num, &uri).unwrap();
         let source_file =
             TestFile::new(test_server::get_dummy_source_path(), "Some source contents");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);

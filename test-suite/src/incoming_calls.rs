@@ -71,7 +71,8 @@ mod test {
     fn test_server_incoming_calls_simple_expect_none_got_some(
         #[values(0, 1, 2, 3)] response_num: u32,
     ) {
-        let resp = test_server::responses::get_incoming_calls_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_incoming_calls_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
@@ -82,7 +83,7 @@ mod test {
         send_capabiltiies(&incoming_calls_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let mut call_item = get_prepare_call_hierachy_response(1).unwrap()[0].clone();
+        let mut call_item = get_prepare_call_hierachy_response(1, &uri).unwrap()[0].clone();
         call_item.uri = get_full_dummy_source_path(&test_case);
         let test_result = test_incoming_calls(test_case.clone(), &call_item, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
@@ -93,7 +94,8 @@ mod test {
     fn test_server_incoming_calls_simple_expect_some_got_some(
         #[values(0, 1, 2, 3)] response_num: u32,
     ) {
-        let resp = test_server::responses::get_incoming_calls_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_incoming_calls_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
@@ -104,7 +106,7 @@ mod test {
         send_capabiltiies(&incoming_calls_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let mut call_item = get_prepare_call_hierachy_response(1).unwrap()[0].clone();
+        let mut call_item = get_prepare_call_hierachy_response(1, &uri).unwrap()[0].clone();
         call_item.uri = get_full_dummy_source_path(&test_case);
         lspresso_shot!(test_incoming_calls(test_case, &call_item, Some(&resp)));
     }

@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod test {
+    use std::str::FromStr as _;
+
     use crate::test_helpers::NON_RESPONSE_NUM;
     use lspresso_shot::{
         lspresso_shot, test_moniker,
@@ -7,7 +9,7 @@ mod test {
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
-    use lsp_types::{OneOf, Position, ServerCapabilities};
+    use lsp_types::{OneOf, Position, ServerCapabilities, Uri};
     use rstest::rstest;
 
     fn moniker_capabilities_simple() -> ServerCapabilities {
@@ -34,7 +36,8 @@ mod test {
 
     #[rstest]
     fn test_server_moniker_simple_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
-        let resp = test_server::responses::get_moniker_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_moniker_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
@@ -52,7 +55,8 @@ mod test {
 
     #[rstest]
     fn test_server_moniker_simple_expect_some_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
-        let resp = test_server::responses::get_moniker_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_moniker_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
