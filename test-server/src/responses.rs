@@ -22,7 +22,11 @@ use crate::get_dummy_source_path;
 /// For use with `test_document_highlight`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_document_highlight_response(response_num: u32) -> Option<Vec<DocumentHighlight>> {
+pub fn get_document_highlight_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<Vec<DocumentHighlight>> {
+    _ = uri;
     let item1 = DocumentHighlight {
         range: Range {
             start: Position::new(1, 2),
@@ -49,7 +53,8 @@ pub fn get_document_highlight_response(response_num: u32) -> Option<Vec<Document
 /// For use with `test_document_link`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_document_link_response(response_num: u32) -> Option<Vec<DocumentLink>> {
+pub fn get_document_link_response(response_num: u32, uri: &Uri) -> Option<Vec<DocumentLink>> {
+    _ = uri;
     let item1 = DocumentLink {
         range: Range {
             start: Position::new(1, 2),
@@ -90,7 +95,8 @@ pub fn get_document_link_response(response_num: u32) -> Option<Vec<DocumentLink>
 /// For use with `test_document_link_resolve`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_document_link_resolve_response(response_num: u32) -> Option<DocumentLink> {
+pub fn get_document_link_resolve_response(response_num: u32, uri: &Uri) -> Option<DocumentLink> {
+    _ = uri;
     let item1 = DocumentLink {
         range: Range {
             start: Position::new(1, 2),
@@ -129,7 +135,11 @@ pub fn get_document_link_resolve_response(response_num: u32) -> Option<DocumentL
 /// For use with `test_document_symbol`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_document_symbol_response(response_num: u32) -> Option<DocumentSymbolResponse> {
+pub fn get_document_symbol_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<DocumentSymbolResponse> {
+    _ = uri;
     #[allow(deprecated)]
     match response_num {
         0 => Some(DocumentSymbolResponse::Flat(vec![])),
@@ -170,7 +180,8 @@ pub fn get_document_symbol_response(response_num: u32) -> Option<DocumentSymbolR
 
 /// For use with `test_code_lens`.
 #[must_use]
-pub fn get_code_lens_response(response_num: u32) -> Option<Vec<CodeLens>> {
+pub fn get_code_lens_response(response_num: u32, uri: &Uri) -> Option<Vec<CodeLens>> {
+    _ = uri;
     let item1 = CodeLens {
         range: Range {
             start: Position::new(1, 2),
@@ -202,7 +213,8 @@ pub fn get_code_lens_response(response_num: u32) -> Option<Vec<CodeLens>> {
 
 /// For use with `test_code_lens_resolve`.
 #[must_use]
-pub fn get_code_lens_resolve_response(response_num: u32) -> Option<CodeLens> {
+pub fn get_code_lens_resolve_response(response_num: u32, uri: &Uri) -> Option<CodeLens> {
+    _ = uri;
     let item1 = CodeLens {
         range: Range {
             start: Position::new(1, 2),
@@ -232,7 +244,8 @@ pub fn get_code_lens_resolve_response(response_num: u32) -> Option<CodeLens> {
 
 /// For use with `test_completion`.
 #[must_use]
-pub fn get_completion_response(response_num: u32) -> Option<CompletionResponse> {
+pub fn get_completion_response(response_num: u32, uri: &Uri) -> Option<CompletionResponse> {
+    _ = uri;
     let item1 = CompletionItem {
         label: "label1".to_string(),
         label_details: Some(CompletionItemLabelDetails {
@@ -309,7 +322,8 @@ pub fn get_completion_response(response_num: u32) -> Option<CompletionResponse> 
 
 /// For use with `test_completion_resolve`.
 #[must_use]
-pub fn get_completion_resolve_response(response_num: u32) -> Option<CompletionItem> {
+pub fn get_completion_resolve_response(response_num: u32, uri: &Uri) -> Option<CompletionItem> {
+    _ = uri;
     match response_num {
         0 => Some(CompletionItem {
             label: "label1".to_string(),
@@ -364,7 +378,8 @@ pub fn get_completion_resolve_response(response_num: u32) -> Option<CompletionIt
 /// For use with `test_hover`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_hover_response(response_num: u32) -> Option<Hover> {
+pub fn get_hover_response(response_num: u32, uri: &Uri) -> Option<Hover> {
+    _ = uri;
     match response_num {
         0 => Some(Hover {
             contents: HoverContents::Scalar(MarkedString::String(
@@ -459,14 +474,21 @@ pub fn get_hover_response(response_num: u32) -> Option<Hover> {
 /// Since `textDocument/definition` and `textDocument/implementation` have the same
 /// response, this just wraps `get_definition_response`.
 #[must_use]
-pub fn get_implementation_response(response_num: u32) -> Option<GotoImplementationResponse> {
-    get_definition_response(response_num)
+pub fn get_implementation_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<GotoImplementationResponse> {
+    get_definition_response(response_num, uri)
 }
 
 /// For use with `test_incoming_calls`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_incoming_calls_response(response_num: u32) -> Option<Vec<CallHierarchyIncomingCall>> {
+pub fn get_incoming_calls_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<Vec<CallHierarchyIncomingCall>> {
+    _ = uri;
     let item1 = CallHierarchyIncomingCall {
         from: CallHierarchyItem {
             name: "name1".to_string(),
@@ -522,7 +544,8 @@ pub fn get_incoming_calls_response(response_num: u32) -> Option<Vec<CallHierarch
 
 /// For use with `test_moniker`.
 #[must_use]
-pub fn get_moniker_response(response_num: u32) -> Option<Vec<Moniker>> {
+pub fn get_moniker_response(response_num: u32, uri: &Uri) -> Option<Vec<Moniker>> {
+    _ = uri;
     let item1 = Moniker {
         scheme: "scheme1".to_string(),
         identifier: "identifier1".to_string(),
@@ -547,7 +570,11 @@ pub fn get_moniker_response(response_num: u32) -> Option<Vec<Moniker>> {
 /// For use with `test_outgoing_calls`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_outgoing_calls_response(response_num: u32) -> Option<Vec<CallHierarchyOutgoingCall>> {
+pub fn get_outgoing_calls_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<Vec<CallHierarchyOutgoingCall>> {
+    _ = uri;
     let item1 = CallHierarchyOutgoingCall {
         to: CallHierarchyItem {
             name: "name1".to_string(),
@@ -604,7 +631,11 @@ pub fn get_outgoing_calls_response(response_num: u32) -> Option<Vec<CallHierarch
 /// For use with `test_prepare_call_hierarchy`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_prepare_call_hierachy_response(response_num: u32) -> Option<Vec<CallHierarchyItem>> {
+pub fn get_prepare_call_hierachy_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<Vec<CallHierarchyItem>> {
+    _ = uri;
     let item1 = CallHierarchyItem {
         name: "name1".to_string(),
         kind: SymbolKind::FILE,
@@ -816,14 +847,15 @@ pub fn get_publish_diagnostics_response(
 /// Since `textDocument/definition` and `textDocument/declaration` have the same response,
 /// this just wraps `get_definition_response`.
 #[must_use]
-pub fn get_declaration_response(response_num: u32) -> Option<GotoDeclarationResponse> {
-    get_definition_response(response_num)
+pub fn get_declaration_response(response_num: u32, uri: &Uri) -> Option<GotoDeclarationResponse> {
+    get_definition_response(response_num, uri)
 }
 
 /// For use with `test_definition`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_definition_response(response_num: u32) -> Option<GotoDefinitionResponse> {
+pub fn get_definition_response(response_num: u32, uri: &Uri) -> Option<GotoDefinitionResponse> {
+    _ = uri;
     let location_item = Location {
         uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
         range: Range {
@@ -867,7 +899,8 @@ pub fn get_definition_response(response_num: u32) -> Option<GotoDefinitionRespon
 /// For use with `test_rename`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
+pub fn get_rename_response(response_num: u32, uri: &Uri) -> Option<WorkspaceEdit> {
+    _ = uri;
     match response_num {
         0 => Some(WorkspaceEdit {
             changes: Some(HashMap::new()),
@@ -936,7 +969,8 @@ pub fn get_rename_response(response_num: u32) -> Option<WorkspaceEdit> {
 /// For use with `test_references`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_references_response(response_num: u32) -> Option<Vec<Location>> {
+pub fn get_references_response(response_num: u32, uri: &Uri) -> Option<Vec<Location>> {
+    _ = uri;
     let uri = Uri::from_str(&get_dummy_source_path()).unwrap();
     match response_num {
         0 => Some(vec![]),
@@ -992,7 +1026,8 @@ pub fn get_references_response(response_num: u32) -> Option<Vec<Location>> {
 
 /// For use with `test_selection_range`.
 #[must_use]
-pub fn get_selection_range_response(response_num: u32) -> Option<Vec<SelectionRange>> {
+pub fn get_selection_range_response(response_num: u32, uri: &Uri) -> Option<Vec<SelectionRange>> {
+    _ = uri;
     let item1 = SelectionRange {
         range: Range {
             start: Position::new(1, 2),
@@ -1018,7 +1053,11 @@ pub fn get_selection_range_response(response_num: u32) -> Option<Vec<SelectionRa
 
 /// For use with `test_semantic_tokens_full`.
 #[must_use]
-pub fn get_semantic_tokens_full_response(response_num: u32) -> Option<SemanticTokensResult> {
+pub fn get_semantic_tokens_full_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<SemanticTokensResult> {
+    _ = uri;
     let item1 = SemanticToken {
         delta_line: 1,
         delta_start: 2,
@@ -1092,7 +1131,11 @@ pub fn get_semantic_tokens_full_response(response_num: u32) -> Option<SemanticTo
 
 /// For use with `test_semantic_tokens_range`.
 #[must_use]
-pub fn get_semantic_tokens_range_response(response_num: u32) -> Option<SemanticTokensRangeResult> {
+pub fn get_semantic_tokens_range_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<SemanticTokensRangeResult> {
+    _ = uri;
     let item1 = SemanticToken {
         delta_line: 1,
         delta_start: 2,
@@ -1153,7 +1196,9 @@ pub fn get_semantic_tokens_range_response(response_num: u32) -> Option<SemanticT
 #[allow(clippy::too_many_lines)]
 pub fn get_semantic_tokens_full_delta_response(
     response_num: u32,
+    uri: &Uri,
 ) -> Option<SemanticTokensFullDeltaResult> {
+    _ = uri;
     let token1 = SemanticToken {
         delta_line: 1,
         delta_start: 2,
@@ -1320,14 +1365,18 @@ pub fn get_semantic_tokens_full_delta_response(
 /// Since `textDocument/definition` and `textDocument/typeDefinition` have the same
 /// response, this just wraps `get_definition_response`.
 #[must_use]
-pub fn get_type_definition_response(response_num: u32) -> Option<GotoTypeDefinitionResponse> {
-    get_definition_response(response_num)
+pub fn get_type_definition_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<GotoTypeDefinitionResponse> {
+    get_definition_response(response_num, uri)
 }
 
 /// For use with `test_folding_range`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_folding_range_response(response_num: u32) -> Option<Vec<FoldingRange>> {
+pub fn get_folding_range_response(response_num: u32, uri: &Uri) -> Option<Vec<FoldingRange>> {
+    _ = uri;
     let item1 = FoldingRange {
         start_line: 0,
         start_character: None,
@@ -1365,7 +1414,8 @@ pub fn get_folding_range_response(response_num: u32) -> Option<Vec<FoldingRange>
 /// For use with `test_formatting`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_formatting_response(response_num: u32) -> Option<Vec<TextEdit>> {
+pub fn get_formatting_response(response_num: u32, uri: &Uri) -> Option<Vec<TextEdit>> {
+    _ = uri;
     match response_num {
         // NOTE: The dummy tests rely on a `response_num` of 0 to return an empty edit response
         0 => Some(vec![]),

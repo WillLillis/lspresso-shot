@@ -1,5 +1,7 @@
 #[cfg(test)]
 mod test {
+    use std::str::FromStr as _;
+
     use crate::test_helpers::NON_RESPONSE_NUM;
     use lspresso_shot::{
         lspresso_shot, test_document_link,
@@ -7,7 +9,7 @@ mod test {
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
-    use lsp_types::{DocumentLinkOptions, ServerCapabilities, WorkDoneProgressOptions};
+    use lsp_types::{DocumentLinkOptions, ServerCapabilities, Uri, WorkDoneProgressOptions};
     use rstest::rstest;
 
     fn document_link_capabilities_simple() -> ServerCapabilities {
@@ -41,7 +43,8 @@ mod test {
     fn test_server_document_link_simple_expect_none_got_some(
         #[values(0, 1, 2, 3, 4)] response_num: u32,
     ) {
-        let resp = test_server::responses::get_document_link_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_document_link_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
@@ -61,7 +64,8 @@ mod test {
     fn test_server_document_link_simple_expect_some_got_some(
         #[values(0, 1, 2, 3, 4)] response_num: u32,
     ) {
-        let resp = test_server::responses::get_document_link_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_document_link_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
 

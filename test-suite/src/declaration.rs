@@ -40,7 +40,8 @@ mod test {
     fn test_server_declaration_simple_expect_none_got_some(
         #[values(0, 1, 2, 3, 4, 5, 6)] response_num: u32,
     ) {
-        let resp = test_server::responses::get_declaration_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_declaration_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
@@ -70,7 +71,8 @@ mod test {
     fn test_server_declaration_simple_expect_some_got_some(
         #[values(0, 1, 2, 3, 4, 5, 6)] response_num: u32,
     ) {
-        let resp = test_server::responses::get_declaration_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_declaration_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case

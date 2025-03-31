@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use std::{num::NonZeroU32, time::Duration};
+    use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
     use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
@@ -12,7 +12,7 @@ mod test {
     use lsp_types::{
         CompletionItem, CompletionItemKind, CompletionList, CompletionOptions,
         CompletionOptionsCompletionItem, CompletionResponse, CompletionTextEdit, Documentation,
-        InsertTextFormat, MarkupContent, Position, Range, ServerCapabilities, TextEdit,
+        InsertTextFormat, MarkupContent, Position, Range, ServerCapabilities, TextEdit, Uri,
         WorkDoneProgressOptions,
     };
     use rstest::rstest;
@@ -52,7 +52,8 @@ mod test {
     fn test_server_completion_exact_simple_expect_none_got_some(
         #[values(0, 1, 2, 3, 4, 5)] response_num: u32,
     ) {
-        let resp = test_server::responses::get_completion_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_completion_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
@@ -71,7 +72,8 @@ mod test {
     fn test_server_completion_exact_simple_expect_some_got_some(
         #[values(0, 1, 2, 3, 4, 5)] response_num: u32,
     ) {
-        let resp = test_server::responses::get_completion_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_completion_response(response_num, &uri).unwrap();
         let comp_result = CompletionResult::Exact(resp);
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
@@ -93,7 +95,8 @@ mod test {
     fn test_server_completion_contains_simple_expect_some_got_some(
         #[values(0, 1, 2, 3, 4, 5)] response_num: u32,
     ) {
-        let resp = test_server::responses::get_completion_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp = test_server::responses::get_completion_response(response_num, &uri).unwrap();
         let comp_result = match resp {
             CompletionResponse::Array(items)
             | CompletionResponse::List(CompletionList { items, .. }) => {

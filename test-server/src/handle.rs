@@ -16,11 +16,11 @@ use lsp_types::{
         SemanticTokensRangeRequest,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    CodeLens, CodeLensParams, CompletionItem, CompletionParams, DocumentFormattingParams,
-    DocumentHighlightParams, DocumentLink, DocumentLinkParams, DocumentSymbolParams,
-    FoldingRangeParams, GotoDefinitionParams, HoverParams, MonikerParams, ReferenceParams,
-    RenameParams, SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
-    SemanticTokensRangeParams, ServerCapabilities, Uri,
+    CodeLens, CodeLensParams, CompletionItem, CompletionParams, DocumentDiagnosticParams,
+    DocumentFormattingParams, DocumentHighlightParams, DocumentLink, DocumentLinkParams,
+    DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams, HoverParams, MonikerParams,
+    ReferenceParams, RenameParams, SelectionRangeParams, SemanticTokensDeltaParams,
+    SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities, Uri,
 };
 
 use crate::{
@@ -158,7 +158,7 @@ macro_rules! handle_request {
         let response_num = receive_response_num(&root_path)?;
         info!("response_num: {response_num}");
 
-        let resp = $resp_getter(response_num);
+        let resp = $resp_getter(response_num, &uri);
         send_req_resp(id, resp, $connection)
     }};
 }
@@ -259,27 +259,13 @@ pub fn handle_request(
             )?;
         }
         DocumentDiagnosticRequest::METHOD => {
-            let (id, params) = cast_req::<DocumentDiagnosticRequest>(req).expect(concat!(
-                "Failed to cast `",
-                stringify!(DocumentDiagnosticRequest),
-                "` request"
-            ));
-            info!(
-                "Received `{}` request ({id}): {params:?}",
-                <DocumentDiagnosticRequest>::METHOD
-            );
-            let uri = params.text_document.uri;
-            let Some(root_path) = get_root_test_path(&uri) else {
-                error!(
-                    "Failed to retrieve root path from provided uri: {}",
-                    uri.as_str()
-                );
-                return Ok(());
-            };
-            let response_num = receive_response_num(&root_path)?;
-            info!("response_num: {response_num}");
-            let resp = get_diagnostic_response(response_num, &uri);
-            send_req_resp(id, resp, conn)?;
+            handle_request!(
+                DocumentDiagnosticRequest,
+                get_diagnostic_response,
+                req,
+                conn,
+                |params: DocumentDiagnosticParams| -> Uri { params.text_document.uri }
+            )?;
         }
         DocumentHighlightRequest::METHOD => {
             handle_request!(

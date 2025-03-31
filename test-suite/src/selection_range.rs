@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use std::{num::NonZeroU32, time::Duration};
+    use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
     use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
@@ -10,7 +10,7 @@ mod test {
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
     use lsp_types::{
-        Position, Range, SelectionRange, SelectionRangeProviderCapability, ServerCapabilities,
+        Position, Range, SelectionRange, SelectionRangeProviderCapability, ServerCapabilities, Uri,
     };
     use rstest::rstest;
 
@@ -39,7 +39,9 @@ mod test {
     fn test_server_selection_range_simple_expect_none_got_some(
         #[values(0, 1, 2, 3)] response_num: u32,
     ) {
-        let resp = test_server::responses::get_selection_range_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp =
+            test_server::responses::get_selection_range_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
@@ -59,7 +61,9 @@ mod test {
     fn test_server_selection_range_simple_expect_some_got_some(
         #[values(0, 1, 2, 3)] response_num: u32,
     ) {
-        let resp = test_server::responses::get_selection_range_response(response_num).unwrap();
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp =
+            test_server::responses::get_selection_range_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
