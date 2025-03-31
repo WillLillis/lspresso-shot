@@ -28,7 +28,7 @@ use crate::types::{
     completion::CompletionMismatchError,
     declaration::DeclarationMismatchError,
     definition::DefinitionMismatchError,
-    diagnostic::DiagnosticMismatchError,
+    diagnostic::PublishDiagnosticsMismatchError,
     document_highlight::DocumentHighlightMismatchError,
     document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
     document_symbol::DocumentSymbolMismatchError,
@@ -77,8 +77,6 @@ pub enum TestType {
     Declaration,
     /// Test `textDocument/definition` requests
     Definition,
-    /// Test `textDocument/publishDiagnostics` requests
-    Diagnostic,
     /// Test `textDocument/documentHighlight` requests
     DocumentHighlight,
     /// Test `textDocument/documentLink` requests
@@ -103,6 +101,8 @@ pub enum TestType {
     OutgoingCalls,
     /// Test `textDocument/prepareCallHierarchy` requests
     PrepareCallHierarchy,
+    /// Test `textDocument/publishDiagnostics` requests
+    PublishDiagnostics,
     /// Test `textDocument/references` requests
     References,
     /// Test `textDocument/rename` requests
@@ -131,7 +131,6 @@ impl std::fmt::Display for TestType {
                 Self::CompletionResolve => "completionItem/resolve",
                 Self::Declaration => "textDocument/declaration",
                 Self::Definition => "textDocument/definition",
-                Self::Diagnostic => "textDocument/publishDiagnostics",
                 Self::DocumentHighlight => "textDocument/documentHighlight",
                 Self::DocumentLink => "textDocument/documentLink",
                 Self::DocumentLinkResolve => "documentLink/resolve",
@@ -144,6 +143,7 @@ impl std::fmt::Display for TestType {
                 Self::Moniker => "textDocument/moniker",
                 Self::OutgoingCalls => "callHierarchy/outgoingCalls",
                 Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
+                Self::PublishDiagnostics => "textDocument/publishDiagnostics",
                 Self::References => "textDocument/references",
                 Self::Rename => "textDocument/rename",
                 Self::SelectionRange => "textDocument/selectionRange",
@@ -618,7 +618,7 @@ pub enum TestError {
     #[error(transparent)]
     DefinitionMismatch(#[from] Box<DefinitionMismatchError>),
     #[error(transparent)]
-    DiagnosticMismatch(#[from] DiagnosticMismatchError),
+    PublishDiagnosticsMismatch(#[from] PublishDiagnosticsMismatchError),
     #[error(transparent)]
     DocumentHighlightMismatch(#[from] DocumentHighlightMismatchError),
     #[error(transparent)]

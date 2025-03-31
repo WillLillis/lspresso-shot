@@ -28,11 +28,11 @@ use crate::{
     responses::{
         get_code_lens_resolve_response, get_code_lens_response, get_completion_resolve_response,
         get_completion_response, get_declaration_response, get_definition_response,
-        get_diagnostics_response, get_document_highlight_response,
-        get_document_link_resolve_response, get_document_link_response,
-        get_document_symbol_response, get_folding_range_response, get_formatting_response,
-        get_hover_response, get_implementation_response, get_incoming_calls_response,
-        get_moniker_response, get_outgoing_calls_response, get_prepare_call_hierachy_response,
+        get_document_highlight_response, get_document_link_resolve_response,
+        get_document_link_response, get_document_symbol_response, get_folding_range_response,
+        get_formatting_response, get_hover_response, get_implementation_response,
+        get_incoming_calls_response, get_moniker_response, get_outgoing_calls_response,
+        get_prepare_call_hierachy_response, get_publish_diagnostics_response,
         get_references_response, get_rename_response, get_selection_range_response,
         get_semantic_tokens_full_delta_response, get_semantic_tokens_full_response,
         get_semantic_tokens_range_response, get_type_definition_response,
@@ -120,7 +120,7 @@ pub fn send_diagnostic_resp(uri: &Uri, connection: &Connection) -> Result<()> {
     };
     let response_num = receive_response_num(&root_path)?;
     info!("response_num: {response_num}");
-    let Some(publish_params) = get_diagnostics_response(response_num, uri) else {
+    let Some(publish_params) = get_publish_diagnostics_response(response_num, uri) else {
         error!("Invalid response number: {response_num}");
         return Ok(());
     };

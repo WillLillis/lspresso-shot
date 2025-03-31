@@ -644,10 +644,13 @@ pub fn get_prepare_call_hierachy_response(response_num: u32) -> Option<Vec<CallH
     }
 }
 
-/// For use with `test_diagnostics`.
+/// For use with `test_publish_diagnostics`.
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
-pub fn get_diagnostics_response(response_num: u32, uri: &Uri) -> Option<PublishDiagnosticsParams> {
+pub fn get_publish_diagnostics_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<PublishDiagnosticsParams> {
     let item = Diagnostic {
         range: Range {
             start: Position::new(1, 2),

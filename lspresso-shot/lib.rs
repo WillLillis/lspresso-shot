@@ -27,7 +27,7 @@ use types::{
     completion::{CompletionMismatchError, CompletionResolveMismatchError, CompletionResult},
     declaration::DeclarationMismatchError,
     definition::DefinitionMismatchError,
-    diagnostic::DiagnosticMismatchError,
+    diagnostic::PublishDiagnosticsMismatchError,
     document_highlight::DocumentHighlightMismatchError,
     document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
     document_symbol::DocumentSymbolMismatchError,
@@ -532,43 +532,6 @@ pub fn test_definition(
     )
 }
 
-// NOTE: As far as I can tell, we can't directly accept a `PublishDiagnosticsParams` object,
-// since diagnostics are requested via a `textDocument/publishDiagnostics` notification instead
-// of a request. The `vim.lsp.buf_notify` method only returns a boolean to indicate success,
-// so we can't access the actual data.
-/// Tests the server's response to a 'textDocument/publishDiagnostics' request.
-///
-/// Specifying a `ServerStartType::Progress` for a diagnostics test is overloaded to
-/// determine which `DiagnosticChanged` autocmd to use. This can be useful if your
-/// server sends multiple `textDocument/publishDiagnostics` notifications before
-/// fully analyzing a source file.
-///
-/// An `Option` is not used for `expected` because the LSP spec does not allow for
-/// nil parameters in the `textDocument/publishDiagnostics` notification.
-///
-/// # Errors
-///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
-/// or some other failure occurs
-pub fn test_diagnostics(mut test_case: TestCase, expected: &Vec<Diagnostic>) -> TestResult<()> {
-    test_case.test_type = Some(TestType::Diagnostic);
-    collect_results(
-        &test_case,
-        None,
-        Some(expected),
-        |expected: &Vec<Diagnostic>, actual: &Vec<Diagnostic>| {
-            if expected != actual {
-                Err(DiagnosticMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
-                })?;
-            }
-            Ok(())
-        },
-    )
-}
-
 /// Tests the server's response to a 'textDocument/documentHighlight' request
 ///
 /// # Errors
@@ -1029,6 +992,46 @@ pub fn test_prepare_call_hierarchy(
         |expected, actual: &Vec<CallHierarchyItem>| {
             if expected != actual {
                 Err(PrepareCallHierachyMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+// NOTE: As far as I can tell, we can't directly accept a `PublishDiagnosticsParams` object,
+// since diagnostics are requested via a `textDocument/publishDiagnostics` notification instead
+// of a request. The `vim.lsp.buf_notify` method only returns a boolean to indicate success,
+// so we can't access the actual data.
+/// Tests the server's response to a 'textDocument/publishDiagnostics' request.
+///
+/// Specifying a `ServerStartType::Progress` for a diagnostics test is overloaded to
+/// determine which `DiagnosticChanged` autocmd to use. This can be useful if your
+/// server sends multiple `textDocument/publishDiagnostics` notifications before
+/// fully analyzing a source file.
+///
+/// An `Option` is not used for `expected` because the LSP spec does not allow for
+/// nil parameters in the `textDocument/publishDiagnostics` notification.
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+pub fn test_publish_diagnostics(
+    mut test_case: TestCase,
+    expected: &Vec<Diagnostic>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::PublishDiagnostics);
+    collect_results(
+        &test_case,
+        None,
+        Some(expected),
+        |expected: &Vec<Diagnostic>, actual: &Vec<Diagnostic>| {
+            if expected != actual {
+                Err(PublishDiagnosticsMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),

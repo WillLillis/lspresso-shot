@@ -4,7 +4,7 @@ mod tests {
 
     use crate::test_helpers::cargo_dot_toml;
     use lspresso_shot::{
-        lspresso_shot, test_diagnostics,
+        lspresso_shot, test_publish_diagnostics,
         types::{ServerStartType, TestCase, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
@@ -34,9 +34,10 @@ mod tests {
     }
 
     #[rstest]
-    fn test_server_diagnostics_simple(#[values(0, 1, 2)] response_num: u32) {
+    fn test_server_publish_diagnostics_simple_expect_some_got_some(#[values(0, 1, 2)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
-        let resp = test_server::responses::get_diagnostics_response(response_num, &uri).unwrap();
+        let resp =
+            test_server::responses::get_publish_diagnostics_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
@@ -47,11 +48,11 @@ mod tests {
         send_capabiltiies(&diagnostic_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_diagnostics(test_case, &resp.diagnostics));
+        lspresso_shot!(test_publish_diagnostics(test_case, &resp.diagnostics));
     }
 
     #[test]
-    fn rust_analyzer_multi_diagnostics() {
+    fn rust_analyzer_publish_diagnostics_0() {
         let source_file = TestFile::new(
             "src/main.rs",
             "pub fn main() {
@@ -82,7 +83,7 @@ mod tests {
                 character: 11,
             },
         };
-        lspresso_shot!(test_diagnostics(
+        lspresso_shot!(test_publish_diagnostics(
             diagnostic_test_case,
             &vec![
                 Diagnostic {
@@ -124,7 +125,7 @@ mod tests {
     }
 
     #[test]
-    fn rust_analyzer_diagnostics() {
+    fn rust_analyzer_publish_diagnostics_1() {
         let source_file = TestFile::new(
             "src/main.rs",
             r#"pub fn main() {
@@ -144,7 +145,7 @@ mod tests {
             "rendered".to_string(),
             serde_json::Value::String("error[E0765]: unterminated double quote string\n --> src/main.rs:2:14\n  |\n2 |       println!(\"Hello, world!\n  |  ______________^\n3 | | }\n  | |_^\n\n".to_string()),
         );
-        lspresso_shot!(test_diagnostics(
+        lspresso_shot!(test_publish_diagnostics(
             diagnostic_test_case,
             &vec![Diagnostic {
                 range: Range {
