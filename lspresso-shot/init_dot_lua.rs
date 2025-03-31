@@ -66,7 +66,7 @@ pub fn get_init_dot_lua(
         | TestType::TypeDefinition => {
             raw_init = raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type));
         }
-        TestType::Diagnostic => {
+        TestType::PublishDiagnostics => {
             // Diagnostics are handled via an autocmd, no need to handle `$/progress`
             raw_init = raw_init.replace("LSP_ACTION", "");
             raw_init.push_str(include_str!("lua_templates/diagnostic_autocmd.lua"));
@@ -122,7 +122,6 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::CompletionResolve => include_str!("lua_templates/completion_resolve_action.lua"),
         TestType::Declaration => include_str!("lua_templates/declaration_action.lua"),
         TestType::Definition => include_str!("lua_templates/definition_action.lua"),
-        TestType::Diagnostic => "\n-- NOTE: No `check_progress_result` function for diagnostics, instead handled by `DiagnosticChanged` autocmd\n",
         TestType::DocumentHighlight => include_str!("lua_templates/document_highlight_action.lua"),
         TestType::DocumentLink => include_str!("lua_templates/document_link_action.lua"),
         TestType::DocumentLinkResolve => include_str!("lua_templates/document_link_resolve_action.lua"),
@@ -135,6 +134,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::Moniker => include_str!("lua_templates/moniker_action.lua"),
         TestType::OutgoingCalls => include_str!("lua_templates/outgoing_calls_action.lua"),
         TestType::PrepareCallHierarchy => include_str!("lua_templates/prepare_call_hierarchy_action.lua"),
+        TestType::PublishDiagnostics => "\n-- NOTE: No `check_progress_result` function for diagnostics, instead handled by `DiagnosticChanged` autocmd\n",
         TestType::References => include_str!("lua_templates/references_action.lua"),
         TestType::Rename => include_str!("lua_templates/rename_action.lua"),
         TestType::SelectionRange => include_str!("lua_templates/selection_range_action.lua"),

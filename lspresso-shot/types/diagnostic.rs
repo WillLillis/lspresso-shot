@@ -26,13 +26,13 @@ impl CleanResponse for Vec<Diagnostic> {
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
-pub struct DiagnosticMismatchError {
+pub struct PublishDiagnosticsMismatchError {
     pub test_id: String,
     pub expected: Vec<Diagnostic>,
     pub actual: Vec<Diagnostic>,
 }
 
-impl std::fmt::Display for DiagnosticMismatchError {
+impl std::fmt::Display for PublishDiagnosticsMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Test {}: Incorrect Diagnostic response:", self.test_id)?;
         <Vec<Diagnostic>>::compare(f, None, &self.expected, &self.actual, 0, None)
