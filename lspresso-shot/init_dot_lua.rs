@@ -45,6 +45,7 @@ pub fn get_init_dot_lua(
         | TestType::CompletionResolve
         | TestType::Declaration
         | TestType::Definition
+        | TestType::Diagnostic
         | TestType::DocumentHighlight
         | TestType::DocumentLink
         | TestType::DocumentLinkResolve
@@ -122,6 +123,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::CompletionResolve => include_str!("lua_templates/completion_resolve_action.lua"),
         TestType::Declaration => include_str!("lua_templates/declaration_action.lua"),
         TestType::Definition => include_str!("lua_templates/definition_action.lua"),
+        TestType::Diagnostic => include_str!("lua_templates/diagnostic_action.lua"),
         TestType::DocumentHighlight => include_str!("lua_templates/document_highlight_action.lua"),
         TestType::DocumentLink => include_str!("lua_templates/document_link_action.lua"),
         TestType::DocumentLinkResolve => include_str!("lua_templates/document_link_resolve_action.lua"),

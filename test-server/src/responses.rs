@@ -5,11 +5,13 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, ChangeAnnotation,
     CodeDescription, CodeLens, CompletionItem, CompletionItemKind, CompletionItemLabelDetails,
     CompletionList, CompletionResponse, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
-    DocumentHighlight, DocumentHighlightKind, DocumentLink, DocumentSymbol, DocumentSymbolResponse,
-    Documentation, FoldingRange, FoldingRangeKind, GotoDefinitionResponse, Hover, HoverContents,
-    LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind, Moniker,
-    MonikerKind, Position, PublishDiagnosticsParams, Range, SelectionRange, SemanticToken,
-    SemanticTokens, SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
+    DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentHighlight,
+    DocumentHighlightKind, DocumentLink, DocumentSymbol, DocumentSymbolResponse, Documentation,
+    FoldingRange, FoldingRangeKind, FullDocumentDiagnosticReport, GotoDefinitionResponse, Hover,
+    HoverContents, LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind,
+    Moniker, MonikerKind, Position, PublishDiagnosticsParams, Range,
+    RelatedFullDocumentDiagnosticReport, SelectionRange, SemanticToken, SemanticTokens,
+    SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
     SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult,
     SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit, UniquenessLevel, Uri,
     WorkspaceEdit,
@@ -640,6 +642,119 @@ pub fn get_prepare_call_hierachy_response(response_num: u32) -> Option<Vec<CallH
         1 => Some(vec![item1]),
         2 => Some(vec![item2]),
         3 => Some(vec![item1, item2]),
+        _ => None,
+    }
+}
+
+/// For use with `test_diagnostic`.
+#[must_use]
+#[allow(clippy::missing_panics_doc, clippy::too_many_lines)]
+pub fn get_diagnostic_response(response_num: u32, uri: &Uri) -> Option<DocumentDiagnosticReport> {
+    let item1 = Diagnostic {
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        severity: Some(lsp_types::DiagnosticSeverity::ERROR),
+        code: None,
+        code_description: Some(CodeDescription {
+            href: Uri::from_str(&get_dummy_source_path()).unwrap(),
+        }),
+        source: None,
+        message: "message".to_string(),
+        tags: None,
+        related_information: Some(vec![DiagnosticRelatedInformation {
+            location: Location {
+                uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
+                range: Range {
+                    start: Position::new(5, 6),
+                    end: Position::new(7, 8),
+                },
+            },
+            message: "related message".to_string(),
+        }]),
+        data: None,
+    };
+    let item2 = Diagnostic {
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        severity: Some(lsp_types::DiagnosticSeverity::ERROR),
+        code: None,
+        code_description: Some(CodeDescription {
+            href: Uri::from_str(&get_dummy_source_path()).unwrap(),
+        }),
+        source: None,
+        message: "message".to_string(),
+        tags: None,
+        related_information: Some(vec![DiagnosticRelatedInformation {
+            location: Location {
+                uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
+                range: Range {
+                    start: Position::new(5, 6),
+                    end: Position::new(7, 8),
+                },
+            },
+            message: "related message".to_string(),
+        }]),
+        data: None,
+    };
+    let mut related_documents = HashMap::new();
+    related_documents.insert(
+        uri.clone(),
+        DocumentDiagnosticReportKind::Full(FullDocumentDiagnosticReport {
+            result_id: None,
+            items: vec![item1.clone()],
+        }),
+    );
+
+    match response_num {
+        0 => Some(DocumentDiagnosticReport::Full(
+            RelatedFullDocumentDiagnosticReport {
+                related_documents: None,
+                full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                    result_id: None,
+                    items: vec![],
+                },
+            },
+        )),
+        1 => Some(DocumentDiagnosticReport::Full(
+            RelatedFullDocumentDiagnosticReport {
+                related_documents: Some(related_documents.clone()),
+                full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                    result_id: None,
+                    items: vec![],
+                },
+            },
+        )),
+        2 => Some(DocumentDiagnosticReport::Full(
+            RelatedFullDocumentDiagnosticReport {
+                related_documents: None,
+                full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                    result_id: None,
+                    items: vec![item1],
+                },
+            },
+        )),
+        3 => Some(DocumentDiagnosticReport::Full(
+            RelatedFullDocumentDiagnosticReport {
+                related_documents: None,
+                full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                    result_id: None,
+                    items: vec![item2],
+                },
+            },
+        )),
+        4 => Some(DocumentDiagnosticReport::Full(
+            RelatedFullDocumentDiagnosticReport {
+                related_documents: None,
+                full_document_diagnostic_report: FullDocumentDiagnosticReport {
+                    result_id: None,
+                    items: vec![item1, item2],
+                },
+            },
+        )),
         _ => None,
     }
 }
