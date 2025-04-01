@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["lspresso-shot", "test-server", "test-suite"]
+members = ["lspresso-shot", "test-server", "test-suite", "lsp-types"]
 default-members = ["lspresso-shot", "test-suite"]
 
 [workspace.package]
@@ -18,7 +18,7 @@ license = "MIT"
 
 [workspace.dependencies]
 anstyle = "1.0.10"
-lsp-types = "0.97.0"
+# lsp-types = "0.97.0"
 rand = "0.9.0"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"

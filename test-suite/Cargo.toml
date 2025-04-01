@@ -15,7 +15,8 @@ lspresso-shot = { path = "../lspresso-shot" }
 
 [dev-dependencies]
 test-server = { path = "../test-server" }
-lsp-types.workspace = true
+# lsp-types.workspace = true
+lsp-types = { path = "../lsp-types" }
 serde_json.workspace = true
 rstest = "0.25.0"
 

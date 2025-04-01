@@ -17,6 +17,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: init submodules
+      run: git submodule update --init --recursive
+
     - name: Install Neovim
       run: |
         # TODO: Pin to 11.0 once it's released
