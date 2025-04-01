@@ -26,7 +26,7 @@ impl CleanResponse for GotoDefinitionResponse {
     }
 }
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct DefinitionMismatchError {
     pub test_id: String,
     pub expected: GotoDefinitionResponse,

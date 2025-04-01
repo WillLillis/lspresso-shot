@@ -26,7 +26,7 @@ impl CleanResponse for DocumentSymbolResponse {
     }
 }
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct DocumentSymbolMismatchError {
     pub test_id: String,
     pub expected: DocumentSymbolResponse,

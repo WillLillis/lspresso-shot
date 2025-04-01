@@ -79,7 +79,7 @@ impl std::fmt::Display for PublishDiagnosticsMismatchError {
     }
 }
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct DiagnosticMismatchError {
     pub test_id: String,
     pub expected: DocumentDiagnosticReport,

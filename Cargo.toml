@@ -38,3 +38,5 @@ redundant_closure_for_method_calls = "allow"
 module_name_repetitions = "allow"
 # Using the URI type as a key is unavoidable because of lsp-types, tell clippy everything's gonna be ok
 mutable_key_type = "allow"
+too_long_first_doc_paragraph = "allow"
+cargo_common_metadata = "allow"

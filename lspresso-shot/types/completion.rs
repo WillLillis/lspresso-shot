@@ -16,7 +16,7 @@ impl Empty for CompletionItem {}
 impl CleanResponse for CompletionResponse {}
 impl CleanResponse for CompletionItem {}
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct CompletionResolveMismatchError {
     pub test_id: String,
     pub expected: CompletionItem,
@@ -41,7 +41,7 @@ impl std::fmt::Display for CompletionResolveMismatchError {
 // pain for library consumers. I'd like to experiment with the different ways we
 // can handle this, but for now we'll just allow for exact matching, and a simple
 // "contains" check.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CompletionResult {
     /// Expect this exact set of completion items in the provided order
     Exact(CompletionResponse),
@@ -101,7 +101,7 @@ impl CompletionResult {
     }
 }
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct CompletionMismatchError {
     pub test_id: String,
     pub expected: CompletionResult,

@@ -603,7 +603,7 @@ impl From<std::io::Error> for TestSetupError {
 pub type TestResult<T> = Result<T, TestError>;
 
 // NOTE: Certain variants' inner types are `Box`ed because they are large
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub enum TestError {
     #[error("Test {0}: Expected `None`, got:\n{1}")]
     ExpectedNone(String, String),
