@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use super::compare::Compare as _;
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct DeclarationMismatchError {
     pub test_id: String,
     pub expected: GotoDeclarationResponse,

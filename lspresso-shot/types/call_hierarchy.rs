@@ -35,7 +35,7 @@ impl CleanResponse for Vec<CallHierarchyOutgoingCall> {
     }
 }
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct IncomingCallsMismatchError {
     pub test_id: String,
     pub expected: Vec<CallHierarchyIncomingCall>,
@@ -53,7 +53,7 @@ impl std::fmt::Display for IncomingCallsMismatchError {
     }
 }
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct OutgoingCallsMismatchError {
     pub test_id: String,
     pub expected: Vec<CallHierarchyOutgoingCall>,
@@ -71,7 +71,7 @@ impl std::fmt::Display for OutgoingCallsMismatchError {
     }
 }
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct PrepareCallHierachyMismatchError {
     pub test_id: String,
     pub expected: Vec<CallHierarchyItem>,

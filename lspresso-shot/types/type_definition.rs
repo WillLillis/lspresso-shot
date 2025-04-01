@@ -3,7 +3,7 @@ use thiserror::Error;
 
 use super::compare::{cmp_fallback, Compare};
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct TypeDefinitionMismatchError {
     pub test_id: String,
     pub expected: GotoTypeDefinitionResponse,

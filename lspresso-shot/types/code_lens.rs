@@ -9,7 +9,7 @@ impl Empty for Vec<CodeLens> {}
 impl CleanResponse for CodeLens {}
 impl CleanResponse for Vec<CodeLens> {}
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct CodeLensMismatchError {
     pub test_id: String,
     pub expected: Vec<CodeLens>,
@@ -23,7 +23,7 @@ impl std::fmt::Display for CodeLensMismatchError {
     }
 }
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Eq)]
 pub struct CodeLensResolveMismatchError {
     pub test_id: String,
     pub expected: CodeLens,
