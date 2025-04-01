@@ -1,0 +1,4 @@
+[submodule "lsp-types"]
+	path = lsp-types
+	url = https://github.com/WillLillis/lsp-types
+	branch = lspresso-master

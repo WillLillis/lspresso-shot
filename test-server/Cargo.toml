@@ -11,7 +11,8 @@ license.workspace = true
 edition.workspace = true
 
 [dependencies]
-lsp-types.workspace = true
+# lsp-types.workspace = true
+lsp-types = { path = "../lsp-types" }
 serde.workspace = true
 serde_json.workspace = true
 flexi_logger = "0.29.8"
