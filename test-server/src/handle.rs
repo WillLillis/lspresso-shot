@@ -13,7 +13,7 @@ use lsp_types::{
         GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
         HoverRequest, MonikerRequest, References, Rename, Request as _, ResolveCompletionItem,
         SelectionRangeRequest, SemanticTokensFullDeltaRequest, SemanticTokensFullRequest,
-        SemanticTokensRangeRequest,
+        SemanticTokensRangeRequest, WorkspaceDiagnosticRequest,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeLens, CodeLensParams, CompletionItem, CompletionParams, DocumentDiagnosticParams,
@@ -21,6 +21,7 @@ use lsp_types::{
     DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams, HoverParams, MonikerParams,
     ReferenceParams, RenameParams, SelectionRangeParams, SemanticTokensDeltaParams,
     SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities, Uri,
+    WorkspaceDiagnosticParams,
 };
 
 use crate::{
@@ -36,7 +37,7 @@ use crate::{
         get_publish_diagnostics_response, get_references_response, get_rename_response,
         get_selection_range_response, get_semantic_tokens_full_delta_response,
         get_semantic_tokens_full_response, get_semantic_tokens_range_response,
-        get_type_definition_response,
+        get_type_definition_response, get_workspace_diagnostics_response,
     },
 };
 
@@ -443,6 +444,18 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: SemanticTokensRangeParams| -> Uri { params.text_document.uri }
+            )?;
+        }
+        WorkspaceDiagnosticRequest::METHOD => {
+            handle_request!(
+                WorkspaceDiagnosticRequest,
+                get_workspace_diagnostics_response,
+                req,
+                conn,
+                |params: WorkspaceDiagnosticParams| -> Uri {
+                    let raw_uri = params.identifier.unwrap();
+                    Uri::from_str(&raw_uri).unwrap()
+                }
             )?;
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),

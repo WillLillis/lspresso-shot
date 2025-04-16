@@ -13,8 +13,10 @@ use lsp_types::{
     RelatedFullDocumentDiagnosticReport, SelectionRange, SemanticToken, SemanticTokens,
     SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
     SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult,
-    SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit, UniquenessLevel, Uri,
-    WorkspaceEdit,
+    SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit,
+    UnchangedDocumentDiagnosticReport, UniquenessLevel, Uri, WorkspaceDiagnosticReport,
+    WorkspaceDocumentDiagnosticReport, WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceUnchangedDocumentDiagnosticReport,
 };
 
 use crate::get_dummy_source_path;
@@ -786,6 +788,65 @@ pub fn get_diagnostic_response(response_num: u32, uri: &Uri) -> Option<DocumentD
                 },
             },
         )),
+        _ => None,
+    }
+}
+
+/// For use with `test_publish_diagnostics`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_workspace_diagnostics_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<WorkspaceDiagnosticReport> {
+    let subitem = Diagnostic {
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        severity: Some(lsp_types::DiagnosticSeverity::ERROR),
+        code: None,
+        code_description: Some(CodeDescription {
+            href: Uri::from_str(&get_dummy_source_path()).unwrap(),
+        }),
+        source: None,
+        message: "message".to_string(),
+        tags: None,
+        related_information: Some(vec![DiagnosticRelatedInformation {
+            location: Location {
+                uri: uri.clone(),
+                range: Range {
+                    start: Position::new(5, 6),
+                    end: Position::new(7, 8),
+                },
+            },
+            message: "related message".to_string(),
+        }]),
+        data: None,
+    };
+    let item1 = WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
+        uri: uri.clone(),
+        version: Some(0),
+        full_document_diagnostic_report: FullDocumentDiagnosticReport {
+            result_id: None,
+            items: vec![subitem],
+        },
+    });
+    let item2 =
+        WorkspaceDocumentDiagnosticReport::Unchanged(WorkspaceUnchangedDocumentDiagnosticReport {
+            uri: uri.clone(),
+            version: Some(0),
+            unchanged_document_diagnostic_report: UnchangedDocumentDiagnosticReport {
+                result_id: "result_id".to_string(),
+            },
+        });
+    match response_num {
+        0 => Some(WorkspaceDiagnosticReport { items: vec![] }),
+        1 => Some(WorkspaceDiagnosticReport { items: vec![item1] }),
+        2 => Some(WorkspaceDiagnosticReport { items: vec![item2] }),
+        3 => Some(WorkspaceDiagnosticReport {
+            items: vec![item1, item2],
+        }),
         _ => None,
     }
 }

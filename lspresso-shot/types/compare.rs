@@ -260,6 +260,21 @@ impl Compare for i32 {
     }
 }
 
+impl Compare for i64 {
+    type Nested1 = ();
+    type Nested2 = ();
+    fn compare(
+        f: &mut std::fmt::Formatter<'_>,
+        name: Option<&str>,
+        expected: &Self,
+        actual: &Self,
+        depth: usize,
+        override_color: Option<anstyle::Color>,
+    ) -> std::fmt::Result {
+        cmp_fallback(f, expected, actual, depth, name, override_color)
+    }
+}
+
 impl Compare for Range {
     type Nested1 = ();
     type Nested2 = ();

@@ -5,6 +5,8 @@ use lsp_types::{
     DocumentDiagnosticReport, DocumentDiagnosticReportKind, FullDocumentDiagnosticReport, Location,
     NumberOrString, Range, RelatedFullDocumentDiagnosticReport,
     RelatedUnchangedDocumentDiagnosticReport, UnchangedDocumentDiagnosticReport, Uri,
+    WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
+    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
 };
 use thiserror::Error;
 
@@ -16,6 +18,7 @@ use super::{
 
 impl Empty for Vec<Diagnostic> {}
 impl Empty for DocumentDiagnosticReport {}
+impl Empty for WorkspaceDiagnosticReport {}
 
 impl CleanResponse for Vec<Diagnostic> {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
@@ -61,6 +64,23 @@ impl CleanResponse for DocumentDiagnosticReport {
     }
 }
 
+impl CleanResponse for WorkspaceDiagnosticReport {
+    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+        for report in &mut self.items {
+            match report {
+                WorkspaceDocumentDiagnosticReport::Full(report) => {
+                    report.uri = clean_uri(&report.uri, test_case)?;
+                }
+                WorkspaceDocumentDiagnosticReport::Unchanged(report) => {
+                    report.uri = clean_uri(&report.uri, test_case)?;
+                }
+            }
+        }
+
+        Ok(self)
+    }
+}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub struct PublishDiagnosticsMismatchError {
     pub test_id: String,
@@ -90,6 +110,185 @@ impl std::fmt::Display for DiagnosticMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Test {}: Incorrect Diagnostic response:", self.test_id)?;
         DocumentDiagnosticReport::compare(f, None, &self.expected, &self.actual, 0, None)
+    }
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct WorkspaceDiagnosticMismatchError {
+    pub test_id: String,
+    pub expected: WorkspaceDiagnosticReport,
+    pub actual: WorkspaceDiagnosticReport,
+}
+
+impl std::fmt::Display for WorkspaceDiagnosticMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Workspace Diagnostic response:",
+            self.test_id
+        )?;
+        WorkspaceDiagnosticReport::compare(f, None, &self.expected, &self.actual, 0, None)
+    }
+}
+
+impl Compare for WorkspaceDiagnosticReport {
+    type Nested1 = ();
+    type Nested2 = ();
+    fn compare(
+        f: &mut std::fmt::Formatter<'_>,
+        name: Option<&str>,
+        expected: &Self,
+        actual: &Self,
+        depth: usize,
+        override_color: Option<anstyle::Color>,
+    ) -> std::fmt::Result {
+        let padding = "  ".repeat(depth);
+        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
+        writeln!(f, "{padding}{name_str}WorkspaceDiagnosticReport {{")?;
+        <Vec<WorkspaceDocumentDiagnosticReport>>::compare(
+            f,
+            name,
+            &expected.items,
+            &actual.items,
+            depth,
+            override_color,
+        )?;
+        writeln!(f, "{padding}}}")?;
+
+        Ok(())
+    }
+}
+
+impl Compare for WorkspaceDocumentDiagnosticReport {
+    type Nested1 = ();
+    type Nested2 = ();
+    fn compare(
+        f: &mut std::fmt::Formatter<'_>,
+        name: Option<&str>,
+        expected: &Self,
+        actual: &Self,
+        depth: usize,
+        override_color: Option<anstyle::Color>,
+    ) -> std::fmt::Result {
+        match (expected, actual) {
+            (Self::Full(expected_full), Self::Full(actual_full)) => {
+                WorkspaceFullDocumentDiagnosticReport::compare(
+                    f,
+                    name,
+                    expected_full,
+                    actual_full,
+                    depth,
+                    override_color,
+                )?;
+            }
+            (Self::Unchanged(expected_unchanged), Self::Unchanged(actual_unchanged)) => {
+                WorkspaceUnchangedDocumentDiagnosticReport::compare(
+                    f,
+                    name,
+                    expected_unchanged,
+                    actual_unchanged,
+                    depth,
+                    override_color,
+                )?;
+            }
+            _ => cmp_fallback(f, expected, actual, depth, name, override_color)?,
+        }
+
+        Ok(())
+    }
+}
+
+impl Compare for WorkspaceFullDocumentDiagnosticReport {
+    type Nested1 = ();
+    type Nested2 = ();
+    fn compare(
+        f: &mut std::fmt::Formatter<'_>,
+        name: Option<&str>,
+        expected: &Self,
+        actual: &Self,
+        depth: usize,
+        override_color: Option<anstyle::Color>,
+    ) -> std::fmt::Result {
+        let padding = "  ".repeat(depth);
+        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
+        writeln!(
+            f,
+            "{padding}{name_str}WorkspaceFullDocumentDiagnosticReport {{"
+        )?;
+        Uri::compare(
+            f,
+            Some("uri"),
+            &expected.uri,
+            &actual.uri,
+            depth + 1,
+            override_color,
+        )?;
+        <Option<i64>>::compare(
+            f,
+            Some("version"),
+            &expected.version,
+            &actual.version,
+            depth + 1,
+            override_color,
+        )?;
+        FullDocumentDiagnosticReport::compare(
+            f,
+            Some("full_document_diagnostic_report"),
+            &expected.full_document_diagnostic_report,
+            &actual.full_document_diagnostic_report,
+            depth + 1,
+            override_color,
+        )?;
+        writeln!(f, "{padding}}}")?;
+
+        Ok(())
+    }
+}
+
+impl Compare for WorkspaceUnchangedDocumentDiagnosticReport {
+    type Nested1 = ();
+    type Nested2 = ();
+    fn compare(
+        f: &mut std::fmt::Formatter<'_>,
+        name: Option<&str>,
+        expected: &Self,
+        actual: &Self,
+        depth: usize,
+        override_color: Option<anstyle::Color>,
+    ) -> std::fmt::Result {
+        let padding = "  ".repeat(depth);
+        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
+        writeln!(
+            f,
+            "{padding}{name_str}WorkspaceUnchangedDocumentDiagnosticReport {{"
+        )?;
+        Uri::compare(
+            f,
+            Some("uri"),
+            &expected.uri,
+            &actual.uri,
+            depth + 1,
+            override_color,
+        )?;
+        <Option<i64>>::compare(
+            f,
+            Some("version"),
+            &expected.version,
+            &actual.version,
+            depth + 1,
+            override_color,
+        )?;
+        UnchangedDocumentDiagnosticReport::compare(
+            f,
+            Some("unchanged_document_diagnostic_report"),
+            &expected.unchanged_document_diagnostic_report,
+            &actual.unchanged_document_diagnostic_report,
+            depth + 1,
+            override_color,
+        )?;
+        writeln!(f, "{padding}}}")?;
+
+        Ok(())
     }
 }
 
