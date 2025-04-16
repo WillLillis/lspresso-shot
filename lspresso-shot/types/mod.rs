@@ -28,7 +28,9 @@ use crate::types::{
     completion::CompletionMismatchError,
     declaration::DeclarationMismatchError,
     definition::DefinitionMismatchError,
-    diagnostic::PublishDiagnosticsMismatchError,
+    diagnostic::{
+        DiagnosticMismatchError, PublishDiagnosticsMismatchError, WorkspaceDiagnosticMismatchError,
+    },
     document_highlight::DocumentHighlightMismatchError,
     document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
     document_symbol::DocumentSymbolMismatchError,
@@ -56,7 +58,6 @@ use std::{
 };
 
 use completion::CompletionResolveMismatchError;
-use diagnostic::DiagnosticMismatchError;
 use lsp_types::{Position, Uri};
 use moniker::MonikerMismatchError;
 use rand::distr::Distribution as _;
@@ -120,6 +121,8 @@ pub enum TestType {
     SemanticTokensRange,
     /// Test `textDocument/typeDefinition` requests
     TypeDefinition,
+    /// Test `workspace/diagnostic` requests
+    WorkspaceDiagnostic,
 }
 
 impl std::fmt::Display for TestType {
@@ -155,6 +158,7 @@ impl std::fmt::Display for TestType {
                 Self::SemanticTokensFullDelta => "textDocument/semanticTokens/full/delta",
                 Self::SemanticTokensRange => "textDocument/semanticTokens/range",
                 Self::TypeDefinition => "textDocument/typeDefinition",
+                Self::WorkspaceDiagnostic => "workspace/diagnostic",
             }
         )?;
         Ok(())
@@ -663,6 +667,8 @@ pub enum TestError {
     SemanticTokensRangeMismatch(#[from] SemanticTokensRangeMismatchError),
     #[error(transparent)]
     TypeDefinitionMismatch(#[from] Box<TypeDefinitionMismatchError>),
+    #[error(transparent)]
+    WorkspaceDiagnosticMismatch(#[from] Box<WorkspaceDiagnosticMismatchError>),
     #[error("Test {0}: No results were written")]
     NoResults(String),
     #[error(transparent)]
