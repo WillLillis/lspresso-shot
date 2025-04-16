@@ -4,7 +4,7 @@ mod tests {
 
     use crate::test_helpers::cargo_dot_toml;
     use lspresso_shot::{
-        lspresso_shot, test_diagnostic, test_publish_diagnostics,
+        lspresso_shot, test_diagnostic, test_publish_diagnostics, test_workspace_diagnostic,
         types::{ServerStartType, TestCase, TestFile},
     };
     use test_server::{
@@ -32,6 +32,20 @@ mod tests {
                 },
             })),
             text_document_sync: Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)),
+            ..Default::default()
+        }
+    }
+
+    fn workspace_diagnostic_capabilities_simple() -> ServerCapabilities {
+        ServerCapabilities {
+            diagnostic_provider: Some(DiagnosticServerCapabilities::Options(DiagnosticOptions {
+                identifier: Some("test-server".to_string()),
+                inter_file_dependencies: false,
+                workspace_diagnostics: true,
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+            })),
             ..Default::default()
         }
     }
@@ -74,6 +88,37 @@ mod tests {
         lspresso_shot!(test_publish_diagnostics(test_case, &resp.diagnostics));
     }
 
+    #[rstest]
+    fn test_server_workspace_diagnostic_simple_expect_some_got_some(
+        #[values(0, 1, 2, 3)] response_num: u32,
+    ) {
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case root directory");
+        let uri = Uri::from_str(&get_dummy_source_path()).unwrap();
+        let resp =
+            test_server::responses::get_workspace_diagnostics_response(response_num, &uri).unwrap();
+        send_response_num(response_num, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&workspace_diagnostic_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+        // Use `identifier` param as a means to pass the uri to the test server
+        let path = test_case_root
+            .join("src")
+            .join(uri.as_str())
+            .to_str()
+            .unwrap()
+            .to_string();
+
+        lspresso_shot!(test_workspace_diagnostic(
+            test_case,
+            Some(path),
+            &Vec::new(),
+            &resp
+        ));
+    }
+
     #[test]
     fn rust_analyzer_diagnostic() {
         let source_file = TestFile::new(
@@ -90,11 +135,6 @@ mod tests {
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
 
-        let mut data_map = Map::new();
-        data_map.insert(
-            "rendered".to_string(),
-            serde_json::Value::String("warning: unused variable: `bar`\n --> src/main.rs:2:9\n  |\n2 |     let bar = 1;\n  |         ^^^ help: if this is intentional, prefix it with an underscore: `_bar`\n  |\n  = note: `#[warn(unused_variables)]` on by default\n\n".to_string()),
-        );
         lspresso_shot!(test_diagnostic(
             diagnostic_test_case,
             None,

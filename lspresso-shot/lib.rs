@@ -6,9 +6,10 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeLens,
     CompletionItem, Diagnostic, DocumentDiagnosticReport, DocumentHighlight, DocumentLink,
     DocumentSymbolResponse, FoldingRange, FormattingOptions, GotoDefinitionResponse, Hover,
-    Location, Moniker, Position, Range, SelectionRange, SemanticTokens, SemanticTokensDelta,
-    SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
-    SemanticTokensResult, TextEdit, WorkspaceEdit,
+    Location, Moniker, Position, PreviousResultId, Range, SelectionRange, SemanticTokens,
+    SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensPartialResult,
+    SemanticTokensRangeResult, SemanticTokensResult, TextEdit, WorkspaceDiagnosticReport,
+    WorkspaceEdit,
 };
 
 use std::{
@@ -27,7 +28,9 @@ use types::{
     completion::{CompletionMismatchError, CompletionResolveMismatchError, CompletionResult},
     declaration::DeclarationMismatchError,
     definition::DefinitionMismatchError,
-    diagnostic::{DiagnosticMismatchError, PublishDiagnosticsMismatchError},
+    diagnostic::{
+        DiagnosticMismatchError, PublishDiagnosticsMismatchError, WorkspaceDiagnosticMismatchError,
+    },
     document_highlight::DocumentHighlightMismatchError,
     document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
     document_symbol::DocumentSymbolMismatchError,
@@ -1444,6 +1447,49 @@ pub fn test_type_definition(
 
             if *expected != *actual {
                 Err(Box::new(TypeDefinitionMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                }))?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Tests the server's response to a 'workspace/diagnostic' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `identifier` or `previous_result_id` fails
+pub fn test_workspace_diagnostic(
+    mut test_case: TestCase,
+    identifier: Option<String>,
+    previous_result_ids: &Vec<PreviousResultId>,
+    expected: &WorkspaceDiagnosticReport,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::WorkspaceDiagnostic);
+    let identifier = identifier.map_or_else(
+        || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
+        |id| serde_json::to_string_pretty(&id).expect("JSON deserialzation of identifier failed"),
+    );
+    let previous_result_ids = serde_json::to_string_pretty(previous_result_ids)
+        .expect("JSON deserialzation of previous result id failed");
+    collect_results(
+        &test_case,
+        Some(&vec![
+            ("IDENTIFIER", identifier),
+            ("PREVIOUS_RESULT_ID", previous_result_ids),
+        ]),
+        Some(expected),
+        |expected: &WorkspaceDiagnosticReport, actual: &WorkspaceDiagnosticReport| {
+            if expected != actual {
+                Err(Box::new(WorkspaceDiagnosticMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),
