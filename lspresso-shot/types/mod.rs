@@ -576,7 +576,7 @@ pub enum ServerStartType {
     /// server is ready to respond to a particular request.
     ///
     /// The inner `String` type contains the text of the relevant progress token
-    /// (i.e. "rustAnalyzer/indexing").
+    /// (i.e. "rustAnalyzer/cachePriming").
     Progress(NonZeroU32, String),
 }
 

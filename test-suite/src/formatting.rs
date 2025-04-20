@@ -109,7 +109,7 @@ let foo = 5;
         let test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
                 NonZeroU32::new(1).unwrap(),
-                "rustAnalyzer/Indexing".to_string(),
+                "rustAnalyzer/cachePriming".to_string(),
             ))
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
@@ -138,7 +138,7 @@ let foo = 5;
         let test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
                 NonZeroU32::new(1).unwrap(),
-                "rustAnalyzer/Indexing".to_string(),
+                "rustAnalyzer/cachePriming".to_string(),
             ))
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
