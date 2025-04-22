@@ -9,11 +9,11 @@ use lsp_types::{
     DocumentHighlightKind, DocumentLink, DocumentSymbol, DocumentSymbolResponse, Documentation,
     FoldingRange, FoldingRangeKind, FullDocumentDiagnosticReport, GotoDefinitionResponse, Hover,
     HoverContents, LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind,
-    Moniker, MonikerKind, Position, PublishDiagnosticsParams, Range,
-    RelatedFullDocumentDiagnosticReport, SelectionRange, SemanticToken, SemanticTokens,
+    Moniker, MonikerKind, ParameterInformation, ParameterLabel, Position, PublishDiagnosticsParams,
+    Range, RelatedFullDocumentDiagnosticReport, SelectionRange, SemanticToken, SemanticTokens,
     SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
-    SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult,
-    SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit,
+    SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
+    SignatureInformation, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit,
     UnchangedDocumentDiagnosticReport, UniquenessLevel, Uri, WorkspaceDiagnosticReport,
     WorkspaceDocumentDiagnosticReport, WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport,
     WorkspaceUnchangedDocumentDiagnosticReport,
@@ -1416,6 +1416,56 @@ pub fn get_semantic_tokens_full_delta_response(
         // This is getting ridiculous...
         119 => Some(SemanticTokensFullDeltaResult::PartialTokensDelta {
             edits: vec![edits1, edits2, edits3, edits4, edits5],
+        }),
+        _ => None,
+    }
+}
+
+/// For use with `test_semantic_tokens_range`.
+#[must_use]
+pub fn get_signature_help_response(response_num: u32, uri: &Uri) -> Option<SignatureHelp> {
+    _ = uri;
+    match response_num {
+        0 => Some(SignatureHelp {
+            signatures: vec![],
+            active_signature: None,
+            active_parameter: None,
+        }),
+        1 => Some(SignatureHelp {
+            signatures: vec![SignatureInformation {
+                label: "label1".to_string(),
+                documentation: None,
+                parameters: None,
+                active_parameter: None,
+            }],
+            active_signature: None,
+            active_parameter: None,
+        }),
+        2 => Some(SignatureHelp {
+            signatures: vec![SignatureInformation {
+                label: "label2".to_string(),
+                documentation: Some(Documentation::String("string documentation".to_string())),
+                parameters: Some(vec![]),
+                active_parameter: Some(0),
+            }],
+            active_signature: None,
+            active_parameter: None,
+        }),
+        3 => Some(SignatureHelp {
+            signatures: vec![SignatureInformation {
+                label: "label3".to_string(),
+                documentation: Some(Documentation::MarkupContent(MarkupContent {
+                    kind: MarkupKind::Markdown,
+                    value: "markdown documentation".to_string(),
+                })),
+                parameters: Some(vec![ParameterInformation {
+                    label: ParameterLabel::Simple("label".to_string()),
+                    documentation: Some(Documentation::String("string documentation".to_string())),
+                }]),
+                active_parameter: Some(0),
+            }],
+            active_signature: None,
+            active_parameter: None,
         }),
         _ => None,
     }

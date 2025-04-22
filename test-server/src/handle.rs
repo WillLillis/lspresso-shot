@@ -13,14 +13,14 @@ use lsp_types::{
         GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
         HoverRequest, MonikerRequest, References, Rename, Request as _, ResolveCompletionItem,
         SelectionRangeRequest, SemanticTokensFullDeltaRequest, SemanticTokensFullRequest,
-        SemanticTokensRangeRequest, WorkspaceDiagnosticRequest,
+        SemanticTokensRangeRequest, SignatureHelpRequest, WorkspaceDiagnosticRequest,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeLens, CodeLensParams, CompletionItem, CompletionParams, DocumentDiagnosticParams,
     DocumentFormattingParams, DocumentHighlightParams, DocumentLink, DocumentLinkParams,
     DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams, HoverParams, MonikerParams,
     ReferenceParams, RenameParams, SelectionRangeParams, SemanticTokensDeltaParams,
-    SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities, Uri,
+    SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams, Uri,
     WorkspaceDiagnosticParams,
 };
 
@@ -37,7 +37,8 @@ use crate::{
         get_publish_diagnostics_response, get_references_response, get_rename_response,
         get_selection_range_response, get_semantic_tokens_full_delta_response,
         get_semantic_tokens_full_response, get_semantic_tokens_range_response,
-        get_type_definition_response, get_workspace_diagnostics_response,
+        get_signature_help_response, get_type_definition_response,
+        get_workspace_diagnostics_response,
     },
 };
 
@@ -444,6 +445,17 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: SemanticTokensRangeParams| -> Uri { params.text_document.uri }
+            )?;
+        }
+        SignatureHelpRequest::METHOD => {
+            handle_request!(
+                SignatureHelpRequest,
+                get_signature_help_response,
+                req,
+                conn,
+                |params: SignatureHelpParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
             )?;
         }
         WorkspaceDiagnosticRequest::METHOD => {

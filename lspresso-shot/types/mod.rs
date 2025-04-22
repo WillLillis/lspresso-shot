@@ -17,6 +17,7 @@ pub mod references;
 pub mod rename;
 pub mod selection_range;
 pub mod semantic_tokens;
+pub mod signature_help;
 pub mod type_definition;
 
 use crate::init_dot_lua::get_init_dot_lua;
@@ -62,6 +63,7 @@ use lsp_types::{Position, Uri};
 use moniker::MonikerMismatchError;
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
+use signature_help::SignatureHelpMismatchError;
 use thiserror::Error;
 
 /// Specifies the type of test to run
@@ -119,6 +121,8 @@ pub enum TestType {
     SemanticTokensFullDelta,
     /// Test `textDocument/semanticTokens/range` requests
     SemanticTokensRange,
+    /// Test `textDocument/signatureHelp` requests
+    SignatureHelp,
     /// Test `textDocument/typeDefinition` requests
     TypeDefinition,
     /// Test `workspace/diagnostic` requests
@@ -157,6 +161,7 @@ impl std::fmt::Display for TestType {
                 Self::SemanticTokensFull => "textDocument/semanticTokens/full",
                 Self::SemanticTokensFullDelta => "textDocument/semanticTokens/full/delta",
                 Self::SemanticTokensRange => "textDocument/semanticTokens/range",
+                Self::SignatureHelp => "textDocument/signatureHelp",
                 Self::TypeDefinition => "textDocument/typeDefinition",
                 Self::WorkspaceDiagnostic => "workspace/diagnostic",
             }
@@ -665,6 +670,8 @@ pub enum TestError {
     SematicTokensFullDeltaMismatch(#[from] Box<SemanticTokensFullDeltaMismatchError>),
     #[error(transparent)]
     SemanticTokensRangeMismatch(#[from] SemanticTokensRangeMismatchError),
+    #[error(transparent)]
+    SignatureHelpMismatch(#[from] SignatureHelpMismatchError),
     #[error(transparent)]
     TypeDefinitionMismatch(#[from] Box<TypeDefinitionMismatchError>),
     #[error(transparent)]

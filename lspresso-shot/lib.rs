@@ -8,8 +8,8 @@ use lsp_types::{
     DocumentSymbolResponse, FoldingRange, FormattingOptions, GotoDefinitionResponse, Hover,
     Location, Moniker, Position, PreviousResultId, Range, SelectionRange, SemanticTokens,
     SemanticTokensDelta, SemanticTokensFullDeltaResult, SemanticTokensPartialResult,
-    SemanticTokensRangeResult, SemanticTokensResult, TextEdit, WorkspaceDiagnosticReport,
-    WorkspaceEdit,
+    SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, SignatureHelpContext, TextEdit,
+    WorkspaceDiagnosticReport, WorkspaceEdit,
 };
 
 use std::{
@@ -46,6 +46,7 @@ use types::{
         SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError,
         SemanticTokensRangeMismatchError,
     },
+    signature_help::SignatureHelpMismatchError,
     type_definition::TypeDefinitionMismatchError,
     CleanResponse, Empty, EmptyResult, TestCase, TestError, TestResult, TestType, TimeoutError,
 };
@@ -1400,6 +1401,49 @@ pub fn test_semantic_tokens_range(
 
             if expected != actual {
                 Err(SemanticTokensRangeMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Tests the server's response to a 'textDocument/signatureHelp' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `context` fails
+pub fn test_signature_help(
+    mut test_case: TestCase,
+    cursor_pos: &Position,
+    context: Option<&SignatureHelpContext>,
+    expected: Option<&SignatureHelp>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::SignatureHelp);
+    let context = context.map_or_else(
+        || "null".to_string(),
+        |ctx| {
+            serde_json::to_string_pretty(ctx)
+                .expect("JSON deserialzation of signature help context failed")
+        },
+    );
+    collect_results(
+        &test_case,
+        Some(&vec![
+            get_cursor_replacement(cursor_pos),
+            ("SIGNATURE_CONTEXT", context),
+        ]),
+        expected,
+        |expected, actual| {
+            if expected != actual {
+                Err(SignatureHelpMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),

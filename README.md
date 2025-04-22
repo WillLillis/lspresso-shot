@@ -115,7 +115,9 @@ So far, we have:
 - [x] `textDocument/semanticTokens/full`
 - [x] `textDocument/semanticTokens/full/delta` -- Could use some work
 - [x] `textDocument/semanticTokens/range`
+- [x] `textDocument/signatureHelp`
 - [x] `textDocument/typeDefinition`
+- [x] `workspace/diagnostic`
 
 ## Gotchas/Known Issues
 

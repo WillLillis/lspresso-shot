@@ -25,4 +25,5 @@ mod selection_range;
 mod semantic_tokens_full;
 mod semantic_tokens_full_delta;
 mod semantic_tokens_range;
+mod signature_help;
 mod type_definition;

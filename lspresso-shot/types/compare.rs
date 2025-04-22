@@ -275,6 +275,52 @@ impl Compare for i64 {
     }
 }
 
+impl Compare for [u32; 2] {
+    type Nested1 = ();
+    type Nested2 = ();
+    fn compare(
+        f: &mut std::fmt::Formatter<'_>,
+        name: Option<&str>,
+        expected: &Self,
+        actual: &Self,
+        depth: usize,
+        override_color: Option<anstyle::Color>,
+    ) -> std::fmt::Result {
+        let padding = "  ".repeat(depth);
+        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
+        if expected == actual {
+            writeln!(
+                f,
+                "{padding}{name_str}{}",
+                paint(
+                    override_color.unwrap_or(GREEN.unwrap()).into(),
+                    &format!("{expected:?}")
+                )
+            )?;
+        } else {
+            writeln!(f, "{padding}{name_str}[")?;
+            u32::compare(
+                f,
+                Some("[0]"),
+                &expected[0],
+                &actual[0],
+                depth + 1,
+                override_color,
+            )?;
+            u32::compare(
+                f,
+                Some("[1]"),
+                &expected[1],
+                &actual[1],
+                depth + 1,
+                override_color,
+            )?;
+            writeln!(f, "{padding}]")?;
+        }
+        Ok(())
+    }
+}
+
 impl Compare for Range {
     type Nested1 = ();
     type Nested2 = ();
