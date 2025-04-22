@@ -136,7 +136,6 @@ impl Compare for GotoTypeDefinitionResponse {
             }
             _ => cmp_fallback(f, expected, actual, depth, name, override_color)?,
         }
-        writeln!(f, "{padding})")?;
 
         Ok(())
     }
