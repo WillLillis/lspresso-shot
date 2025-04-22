@@ -337,7 +337,7 @@ pub type CodeLensResolveComparator = fn(&CodeLens, &CodeLens, &TestCase) -> bool
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `code_lens` fails
+/// Panics if JSON serialization of `code_lens` fails
 pub fn test_code_lens_resolve(
     mut test_case: TestCase,
     commands: Option<&Vec<String>>,
@@ -415,7 +415,7 @@ pub fn test_completion(
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `completion_item` fails
+/// Panics if JSON serialization of `completion_item` fails
 pub fn test_completion_resolve(
     mut test_case: TestCase,
     completion_item: &CompletionItem,
@@ -545,7 +545,7 @@ pub fn test_definition(
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `identifier` or `previous_result_id` fails
+/// Panics if JSON serialization of `identifier` or `previous_result_id` fails
 pub fn test_diagnostic(
     mut test_case: TestCase,
     identifier: Option<&str>,
@@ -650,7 +650,7 @@ pub fn test_document_link(
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `link` fails
+/// Panics if JSON serialization of `link` fails
 pub fn test_document_link_resolve(
     mut test_case: TestCase,
     link: &DocumentLink,
@@ -766,7 +766,7 @@ pub fn test_folding_range(
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `options` fails
+/// Panics if JSON serialization of `options` fails
 pub fn test_formatting(
     mut test_case: TestCase,
     options: Option<FormattingOptions>,
@@ -927,7 +927,7 @@ pub fn test_implementation(
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `call_item` fails
+/// Panics if JSON serialization of `call_item` fails
 pub fn test_incoming_calls(
     mut test_case: TestCase,
     call_item: &CallHierarchyItem,
@@ -964,7 +964,7 @@ pub fn test_incoming_calls(
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `call_item` fails
+/// Panics if JSON serialization of `call_item` fails
 pub fn test_moniker(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -997,7 +997,7 @@ pub fn test_moniker(
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `call_item` fails
+/// Panics if JSON serialization of `call_item` fails
 pub fn test_outgoing_calls(
     mut test_case: TestCase,
     call_item: &CallHierarchyItem,
@@ -1170,7 +1170,7 @@ pub fn test_rename(
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `positions` fails
+/// Panics if JSON serialization of `positions` fails
 pub fn test_selection_range(
     mut test_case: TestCase,
     positions: &Vec<Position>,
@@ -1353,7 +1353,7 @@ pub fn test_semantic_tokens_full_delta(
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `range` fails
+/// Panics if JSON serialization of `range` fails
 pub fn test_semantic_tokens_range(
     mut test_case: TestCase,
     range: &Range,
@@ -1419,7 +1419,7 @@ pub fn test_semantic_tokens_range(
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `context` fails
+/// Panics if JSON serialization of `context` fails
 pub fn test_signature_help(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -1510,7 +1510,7 @@ pub fn test_type_definition(
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `identifier` or `previous_result_id` fails
+/// Panics if JSON serialization of `identifier` or `previous_result_id` fails
 pub fn test_workspace_diagnostic(
     mut test_case: TestCase,
     identifier: Option<String>,
