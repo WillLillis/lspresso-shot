@@ -3,8 +3,9 @@ use std::{collections::HashMap, str::FromStr};
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, ChangeAnnotation,
-    CodeDescription, CodeLens, CompletionItem, CompletionItemKind, CompletionItemLabelDetails,
-    CompletionList, CompletionResponse, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
+    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionResponse, CodeDescription, CodeLens,
+    Command, CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
+    CompletionResponse, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
     DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentHighlight,
     DocumentHighlightKind, DocumentLink, DocumentSymbol, DocumentSymbolResponse, Documentation,
     FoldingRange, FoldingRangeKind, FullDocumentDiagnosticReport, GotoDefinitionResponse, Hover,
@@ -20,6 +21,34 @@ use lsp_types::{
 };
 
 use crate::get_dummy_source_path;
+
+/// For use with `test_document_highlight`.
+pub fn get_code_action_response(response_num: u32, uri: &Uri) -> Option<CodeActionResponse> {
+    _ = uri;
+    let cmd = CodeActionOrCommand::Command(Command {
+        title: "command title".to_string(),
+        command: "command command".to_string(),
+        arguments: None,
+    });
+    let action = CodeActionOrCommand::CodeAction(CodeAction {
+        title: "action title".to_string(),
+        kind: Some(CodeActionKind::QUICKFIX),
+        diagnostics: None,
+        edit: None,
+        command: None,
+        is_preferred: None,
+        disabled: None,
+        data: None,
+    });
+    // TODO: More test cases later...
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![cmd]),
+        2 => Some(vec![action]),
+        3 => Some(vec![cmd, action]),
+        _ => None,
+    }
+}
 
 /// For use with `test_document_highlight`.
 #[must_use]

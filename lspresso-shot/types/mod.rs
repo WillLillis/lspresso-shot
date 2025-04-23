@@ -1,4 +1,5 @@
 pub mod call_hierarchy;
+pub mod code_action;
 pub mod code_lens;
 pub(crate) mod compare;
 pub mod completion;
@@ -58,6 +59,7 @@ use std::{
     time::Duration,
 };
 
+use code_action::CodeActionMismatchError;
 use completion::CompletionResolveMismatchError;
 use lsp_types::{Position, Uri};
 use moniker::MonikerMismatchError;
@@ -69,6 +71,8 @@ use thiserror::Error;
 /// Specifies the type of test to run
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TestType {
+    /// Test `textDocument/codeAction` requests
+    CodeAction,
     /// Test `textDocument/codeLens` requests
     CodeLens,
     /// Test `codeLens/resolve` requests
@@ -135,6 +139,7 @@ impl std::fmt::Display for TestType {
             f,
             "{}",
             match self {
+                Self::CodeAction => "textDocument/codeAction",
                 Self::CodeLens => "textDocument/codeLens",
                 Self::CodeLensResolve => "codeLens/resolve",
                 Self::Completion => "textDocument/completion",
@@ -618,6 +623,8 @@ pub enum TestError {
     ExpectedNone(String, String),
     #[error("Test {0}: Expected valid results, got `None`")]
     ExpectedSome(String),
+    #[error(transparent)]
+    CodeActionMismatch(#[from] CodeActionMismatchError),
     #[error(transparent)]
     CodeLensMismatch(#[from] CodeLensMismatchError),
     #[error(transparent)]

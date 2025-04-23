@@ -39,7 +39,8 @@ pub fn get_init_dot_lua(
     );
     // This is how we actually invoke the action to be tested
     match test_type {
-        TestType::CodeLens
+        TestType::CodeAction
+        | TestType::CodeLens
         | TestType::CodeLensResolve
         | TestType::Completion
         | TestType::CompletionResolve
@@ -119,6 +120,7 @@ fn progress_threshold(start_type: &ServerStartType) -> String {
 
 fn get_attach_action(test_type: TestType) -> String {
     match test_type {
+        TestType::CodeAction => include_str!("lua_templates/code_action_action.lua"),
         TestType::CodeLens => include_str!("lua_templates/code_lens_action.lua"),
         TestType::CodeLensResolve => include_str!("lua_templates/code_lens_resolve_action.lua"),
         TestType::Completion => include_str!("lua_templates/completion_action.lua"),

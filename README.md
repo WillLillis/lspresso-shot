@@ -94,6 +94,7 @@ So far, we have:
 - [x] `codeLens/resolve`
 - [x] `completionItem/resolve`
 - [x] `documentLink/resolve`
+- [x] `textDocument/codeAction`
 - [x] `textDocument/codeLens`
 - [x] `textDocument/completion`
 - [x] `textDocument/declaration`
