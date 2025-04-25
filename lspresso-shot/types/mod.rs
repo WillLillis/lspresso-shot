@@ -21,33 +21,40 @@ pub mod semantic_tokens;
 pub mod signature_help;
 pub mod type_definition;
 
-use crate::init_dot_lua::get_init_dot_lua;
-use crate::types::{
-    call_hierarchy::{
-        IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
+use crate::{
+    init_dot_lua::get_init_dot_lua,
+    types::{
+        call_hierarchy::{
+            IncomingCallsMismatchError, OutgoingCallsMismatchError,
+            PrepareCallHierachyMismatchError,
+        },
+        code_action::CodeActionMismatchError,
+        code_lens::{CodeLensMismatchError, CodeLensResolveMismatchError},
+        completion::{CompletionMismatchError, CompletionResolveMismatchError},
+        declaration::DeclarationMismatchError,
+        definition::DefinitionMismatchError,
+        diagnostic::{
+            DiagnosticMismatchError, PublishDiagnosticsMismatchError,
+            WorkspaceDiagnosticMismatchError,
+        },
+        document_highlight::DocumentHighlightMismatchError,
+        document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
+        document_symbol::DocumentSymbolMismatchError,
+        folding_range::FoldingRangeMismatchError,
+        formatting::FormattingMismatchError,
+        hover::HoverMismatchError,
+        implementation::ImplementationMismatchError,
+        moniker::MonikerMismatchError,
+        references::ReferencesMismatchError,
+        rename::RenameMismatchError,
+        selection_range::SelectionRangeMismatchError,
+        semantic_tokens::{
+            SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError,
+            SemanticTokensRangeMismatchError,
+        },
+        signature_help::SignatureHelpMismatchError,
+        type_definition::TypeDefinitionMismatchError,
     },
-    code_lens::{CodeLensMismatchError, CodeLensResolveMismatchError},
-    completion::CompletionMismatchError,
-    declaration::DeclarationMismatchError,
-    definition::DefinitionMismatchError,
-    diagnostic::{
-        DiagnosticMismatchError, PublishDiagnosticsMismatchError, WorkspaceDiagnosticMismatchError,
-    },
-    document_highlight::DocumentHighlightMismatchError,
-    document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
-    document_symbol::DocumentSymbolMismatchError,
-    folding_range::FoldingRangeMismatchError,
-    formatting::FormattingMismatchError,
-    hover::HoverMismatchError,
-    implementation::ImplementationMismatchError,
-    references::ReferencesMismatchError,
-    rename::RenameMismatchError,
-    selection_range::SelectionRangeMismatchError,
-    semantic_tokens::{
-        SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError,
-        SemanticTokensRangeMismatchError,
-    },
-    type_definition::TypeDefinitionMismatchError,
 };
 
 use std::{
@@ -59,13 +66,9 @@ use std::{
     time::Duration,
 };
 
-use code_action::CodeActionMismatchError;
-use completion::CompletionResolveMismatchError;
 use lsp_types::{Position, Uri};
-use moniker::MonikerMismatchError;
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
-use signature_help::SignatureHelpMismatchError;
 use thiserror::Error;
 
 /// Specifies the type of test to run

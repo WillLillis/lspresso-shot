@@ -19,8 +19,7 @@ impl CleanResponse for CodeActionResponse {
                 CodeActionOrCommand::Command(_) => {}
                 CodeActionOrCommand::CodeAction(action) => {
                     if let Some(ref mut edit) = action.edit {
-                        let cleaned_edit = edit.clone().clean_response(test_case)?;
-                        *edit = cleaned_edit;
+                        *edit = edit.clone().clean_response(test_case)?;
                     }
                 }
             }
