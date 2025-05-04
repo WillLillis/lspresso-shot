@@ -1,7 +1,9 @@
-use lsp_types::{DocumentLink, Range, Uri};
+use lsp_types::DocumentLink;
 use thiserror::Error;
 
-use super::{clean_uri, compare::Compare, CleanResponse, Empty, TestCase, TestResult};
+use super::{
+    clean_uri, compare::write_fields_comparison, CleanResponse, Empty, TestCase, TestResult,
+};
 
 impl Empty for DocumentLink {}
 impl Empty for Vec<DocumentLink> {}
@@ -40,7 +42,7 @@ impl std::fmt::Display for DocumentLinkMismatchError {
             "Test {}: Incorrect Document Link response:",
             self.test_id
         )?;
-        <Vec<DocumentLink>>::compare(f, None, &self.expected, &self.actual, 0, None)
+        write_fields_comparison(f, "Vec<DocumentLink>", &self.expected, &self.actual, 0)
     }
 }
 
@@ -58,58 +60,6 @@ impl std::fmt::Display for DocumentLinkResolveMismatchError {
             "Test {}: Incorrect Document Link Resolve response:",
             self.test_id
         )?;
-        DocumentLink::compare(f, None, &self.expected, &self.actual, 0, None)
-    }
-}
-
-impl Compare for DocumentLink {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        writeln!(f, "{padding}{name_str}DocumentLink {{")?;
-        Range::compare(
-            f,
-            Some("range"),
-            &expected.range,
-            &actual.range,
-            depth + 1,
-            override_color,
-        )?;
-        <Option<Uri>>::compare(
-            f,
-            Some("target"),
-            &expected.target,
-            &actual.target,
-            depth + 1,
-            override_color,
-        )?;
-        <Option<String>>::compare(
-            f,
-            Some("tooltip"),
-            &expected.tooltip,
-            &actual.tooltip,
-            depth + 1,
-            override_color,
-        )?;
-        <Option<serde_json::Value>>::compare(
-            f,
-            Some("data"),
-            &expected.data,
-            &actual.data,
-            depth + 1,
-            override_color,
-        )?;
-        writeln!(f, "{padding}}}")?;
-
-        Ok(())
+        write_fields_comparison(f, "DocumentLink", &self.expected, &self.actual, 0)
     }
 }

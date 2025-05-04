@@ -1,535 +1,146 @@
-use std::collections::HashMap;
+use std::collections::HashSet;
 
 use anstyle::{AnsiColor, Color, Style};
-use lsp_types::{Position, Range, Uri};
 use serde::Serialize;
 
 pub const GREEN: Option<Color> = Some(anstyle::Color::Ansi(AnsiColor::Green));
 pub const RED: Option<Color> = Some(anstyle::Color::Ansi(AnsiColor::Red));
 
-pub fn paint(color: Option<impl Into<Color>>, text: &str) -> String {
-    let style = Style::new().fg_color(color.map(Into::into));
-    format!("{style}{text}{style:#}")
-}
+// TODO: Our rendering logic could probably use some cleanup/fxes
 
-// Delete this?
-#[macro_export]
-macro_rules! type_name {
-    ($t:ty) => {{
-        let full_name = type_name::<$t>();
-        full_name.rsplit("::").next().unwrap_or(full_name)
-    }};
-}
-
-pub fn cmp_fallback<T: std::fmt::Debug + PartialEq>(
+fn compare_fields(
     f: &mut std::fmt::Formatter<'_>,
-    expected: &T,
-    actual: &T,
-    depth: usize,
-    name: Option<&str>,
-    override_color: Option<anstyle::Color>,
+    indent: usize,
+    key: &str,
+    expected: &serde_json::Value,
+    actual: &serde_json::Value,
 ) -> std::fmt::Result {
-    let padding = "  ".repeat(depth);
-    let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
+    let padding = "  ".repeat(indent);
+    let key_render = format!("{key}: ");
+
     if expected == actual {
         writeln!(
             f,
-            "{padding}{name_str}{}",
-            paint(
-                override_color.unwrap_or(GREEN.unwrap()).into(),
-                &format!("{expected:?}")
-            )
+            "{}",
+            paint(GREEN, &format!("{padding}{key_render}{expected}"))
         )?;
     } else {
+        // TODO: Pull in some sort of diffing library to make this more readable,
+        // as it can be very difficult to spot what's off when comparing long strings
+        let expected_render = if expected.is_string() {
+            format!("\n{padding}    {expected}")
+        } else {
+            format!(" {expected}")
+        };
+        let actual_render = if actual.is_string() {
+            format!("\n{padding}    {actual}")
+        } else {
+            format!(" {actual}")
+        };
         writeln!(
-            f,
-            "{padding}{name_str}\n{}",
-            paint(
-                override_color.unwrap_or(RED.unwrap()).into(),
-                &format!("{padding}  Expected: {expected:?}\n{padding}  Actual: {actual:?}")
-            )
-        )?;
+                f,
+                "{}",
+                paint(
+                    RED,
+                    &format!("{padding}{key_render}\n{padding}  Expected:{expected_render}\n{padding}  Actual:{actual_render}")
+                )
+            )?;
+    }
+
+    std::fmt::Result::Ok(())
+}
+
+pub fn write_fields_comparison<T: Serialize>(
+    f: &mut std::fmt::Formatter<'_>,
+    name: &str,
+    expected: &T,
+    actual: &T,
+    indent: usize,
+) -> std::fmt::Result {
+    let mut expected_value = serde_json::to_value(expected).unwrap();
+    let mut actual_value = serde_json::to_value(actual).unwrap();
+    let padding = "  ".repeat(indent);
+    let key_render = if indent == 0 {
+        String::new()
+    } else {
+        format!("{name}: ")
+    };
+
+    match expected_value {
+        serde_json::Value::Object(ref mut map) => {
+            let expected_keys: HashSet<_> = map.keys().map(|k| k.to_owned()).collect();
+            map.sort_keys(); // ensure a deterministic ordering
+            writeln!(f, "{padding}{key_render}{{",)?;
+            for (expected_key, expected_val) in &map.clone() {
+                let actual_val = actual_value
+                    .get(expected_key)
+                    .unwrap_or(&serde_json::Value::Null)
+                    .to_owned();
+                match expected_val {
+                    serde_json::Value::Object(_) | serde_json::Value::Array(_) => {
+                        write_fields_comparison(
+                            f,
+                            expected_key,
+                            expected_val,
+                            &actual_val,
+                            indent + 1,
+                        )?;
+                    }
+                    _ => {
+                        compare_fields(f, indent + 1, expected_key, expected_val, &actual_val)?;
+                    }
+                }
+            }
+            // Display entries present in the `actual` map but not in the `expected` map
+            if let Some(ref mut actual_map) = actual_value.as_object_mut() {
+                actual_map.sort_keys(); // ensure a deterministic ordering
+                for (actual_key, actual_val) in actual_map
+                    .iter()
+                    .filter(|(k, _)| !expected_keys.contains(k.as_str()))
+                {
+                    compare_fields(
+                        f,
+                        indent + 1,
+                        actual_key,
+                        &serde_json::Value::Null,
+                        actual_val,
+                    )?;
+                }
+            }
+            writeln!(f, "{padding}}},")?;
+        }
+        serde_json::Value::Array(ref array) => {
+            writeln!(f, "{padding}{key_render}[")?;
+            for (i, expected_val) in array.iter().enumerate() {
+                let actual_val = actual_value
+                    .get(i)
+                    .unwrap_or(&serde_json::Value::Null)
+                    .to_owned();
+                write_fields_comparison(f, name, expected_val, &actual_val, indent + 1)?;
+            }
+            // Display entries present in the `actual` array but not in the `expected` array
+            for i in array.len()..actual_value.as_array().map_or(0, |a| a.len()) {
+                let actual_val = actual_value
+                    .get(i)
+                    .unwrap_or(&serde_json::Value::Null)
+                    .to_owned();
+                write_fields_comparison(
+                    f,
+                    name,
+                    &serde_json::Value::Null,
+                    &actual_val,
+                    indent + 1,
+                )?;
+            }
+            writeln!(f, "{padding}],")?;
+        }
+        _ => compare_fields(f, indent + 1, name, &expected_value, &actual_value)?,
     }
 
     Ok(())
 }
 
-pub trait Compare {
-    // TODO: Add `=()` once default associated types are stabilized
-    type Nested1: Compare;
-    type Nested2: Compare;
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result
-    where
-        Self: std::fmt::Debug + PartialEq,
-    {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        if expected == actual {
-            writeln!(
-                f,
-                "{padding}{name_str}:{}",
-                paint(
-                    override_color.unwrap_or(GREEN.unwrap()).into(),
-                    &format!("{expected:?}")
-                )
-            )?;
-        } else {
-            writeln!(
-                f,
-                "{padding}{name_str}\n{}",
-                paint(
-                    override_color.unwrap_or(RED.unwrap()).into(),
-                    &format!("{padding}  Expected: {expected:?}\n{padding}  Actual: {actual:?}")
-                )
-            )?;
-        }
-        Ok(())
-    }
-}
-
-impl Compare for () {
-    type Nested1 = ();
-    type Nested2 = ();
-}
-
-impl Compare for bool {
-    type Nested1 = ();
-    type Nested2 = ();
-}
-
-impl Compare for serde_json::Number {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        cmp_fallback(f, expected, actual, depth, name, override_color)
-    }
-}
-
-impl Compare for serde_json::Value {
-    type Nested1 = ();
-    type Nested2 = ();
-    #[allow(clippy::too_many_lines)]
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        match (expected, actual) {
-            (Self::Null, Self::Null) => {
-                writeln!(
-                    f,
-                    "{padding}{name_str}{}",
-                    paint(override_color.unwrap_or(GREEN.unwrap()).into(), "null")
-                )?;
-            }
-            (Self::Bool(expected_b), Self::Bool(actual_b)) => {
-                writeln!(f, "{padding}{name_str}Value::Bool (")?;
-                bool::compare(f, None, expected_b, actual_b, depth + 1, override_color)?;
-                writeln!(f, "{padding})")?;
-            }
-            (Self::Number(expected_num), Self::Number(actual_num)) => {
-                writeln!(f, "{padding}{name_str}Value::Number (")?;
-                serde_json::Number::compare(
-                    f,
-                    None,
-                    expected_num,
-                    actual_num,
-                    depth + 1,
-                    override_color,
-                )?;
-                writeln!(f, "{padding})")?;
-            }
-            (Self::String(expected_str), Self::String(actual_str)) => {
-                writeln!(f, "{padding}{name_str}Value::String (")?;
-                String::compare(f, name, expected_str, actual_str, depth, override_color)?;
-                writeln!(f, "{padding})")?;
-            }
-            (Self::Array(expected_vec), Self::Array(actual_vec)) => {
-                writeln!(f, "{padding}{name_str}Value::Array (")?;
-                <Vec<Self>>::compare(f, name, expected_vec, actual_vec, depth, override_color)?;
-                writeln!(f, "{padding})")?;
-            }
-            (Self::Object(expected_map), Self::Object(actual_map)) => {
-                writeln!(f, "{padding}{name_str}Value::Object (")?;
-                <serde_json::Map<_, _>>::compare(
-                    f,
-                    name,
-                    expected_map,
-                    actual_map,
-                    depth,
-                    override_color,
-                )?;
-                writeln!(f, "{padding})")?;
-            }
-            _ => cmp_fallback(f, expected, actual, depth, name, override_color)?,
-        }
-
-        Ok(())
-    }
-}
-
-impl Compare for String {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        cmp_fallback(f, expected, actual, depth, name, override_color)
-    }
-}
-
-impl Compare for Position {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        writeln!(f, "{padding}{name_str}Position {{")?;
-        u32::compare(f, name, &expected.line, &actual.line, depth, override_color)?;
-        u32::compare(
-            f,
-            name,
-            &expected.character,
-            &actual.character,
-            depth,
-            override_color,
-        )?;
-        writeln!(f, "{padding}}}")?;
-        Ok(())
-    }
-}
-
-impl Compare for u32 {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        cmp_fallback(f, expected, actual, depth, name, override_color)
-    }
-}
-
-impl Compare for i32 {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        cmp_fallback(f, expected, actual, depth, name, override_color)
-    }
-}
-
-impl Compare for i64 {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        cmp_fallback(f, expected, actual, depth, name, override_color)
-    }
-}
-
-impl Compare for [u32; 2] {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        if expected == actual {
-            writeln!(
-                f,
-                "{padding}{name_str}{}",
-                paint(
-                    override_color.unwrap_or(GREEN.unwrap()).into(),
-                    &format!("{expected:?}")
-                )
-            )?;
-        } else {
-            writeln!(f, "{padding}{name_str}[")?;
-            u32::compare(
-                f,
-                Some("[0]"),
-                &expected[0],
-                &actual[0],
-                depth + 1,
-                override_color,
-            )?;
-            u32::compare(
-                f,
-                Some("[1]"),
-                &expected[1],
-                &actual[1],
-                depth + 1,
-                override_color,
-            )?;
-            writeln!(f, "{padding}]")?;
-        }
-        Ok(())
-    }
-}
-
-impl Compare for Range {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}:"));
-        writeln!(f, "{padding}{name_str} Range {{")?;
-        Position::compare(
-            f,
-            Some("start"),
-            &expected.start,
-            &actual.start,
-            depth + 1,
-            override_color,
-        )?;
-        Position::compare(
-            f,
-            Some("end"),
-            &expected.end,
-            &actual.end,
-            depth + 1,
-            override_color,
-        )?;
-        writeln!(f, "{padding}}}")?;
-        Ok(())
-    }
-}
-
-impl<T> Compare for Option<T>
-where
-    T: std::fmt::Debug + PartialEq + Compare,
-{
-    type Nested1 = T;
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        match (expected, actual) {
-            (Some(expected), Some(actual)) => {
-                T::compare(f, name, expected, actual, depth, override_color)?;
-            }
-            (None, None) => {
-                writeln!(
-                    f,
-                    "{padding}{name_str}{}",
-                    paint(override_color.unwrap_or(GREEN.unwrap()).into(), "None")
-                )?;
-            }
-            _ => cmp_fallback(f, expected, actual, depth, name, override_color)?,
-        }
-        Ok(())
-    }
-}
-
-impl<T> Compare for Vec<T>
-where
-    T: Clone + std::fmt::Debug + PartialEq + Compare,
-{
-    type Nested1 = T;
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        if expected == actual {
-            writeln!(
-                f,
-                "{padding}{name_str}{}",
-                paint(
-                    override_color.unwrap_or(GREEN.unwrap()).into(),
-                    &format!("{expected:?}")
-                )
-            )?;
-        } else {
-            writeln!(f, "{padding}{name_str}[")?;
-            let expected_len = expected.len();
-            let actual_len = actual.len();
-            for (i, (exp, act)) in expected.iter().zip(actual.iter()).enumerate() {
-                T::compare(
-                    f,
-                    Some(&format!("[{i}]")),
-                    exp,
-                    act,
-                    depth + 1,
-                    override_color,
-                )?;
-            }
-            match expected_len.cmp(&actual_len) {
-                std::cmp::Ordering::Less => {
-                    writeln!(f, "{padding}  Additional actual items:")?;
-                    for (i, act) in actual.iter().enumerate().skip(expected_len) {
-                        T::compare(
-                            f,
-                            Some(&format!("[{i}]")),
-                            &act.clone(),
-                            &act.clone(),
-                            depth + 1,
-                            override_color.unwrap_or(RED.unwrap()).into(),
-                        )?;
-                    }
-                }
-                std::cmp::Ordering::Equal => {}
-                std::cmp::Ordering::Greater => {
-                    writeln!(f, "{padding}  Additional expected items:")?;
-                    for (i, exp) in expected.iter().enumerate().skip(actual_len) {
-                        T::compare(
-                            f,
-                            Some(&format!("[{i}]")),
-                            &exp.clone(),
-                            &exp.clone(),
-                            depth + 1,
-                            override_color.unwrap_or(RED.unwrap()).into(),
-                        )?;
-                    }
-                }
-            }
-            writeln!(f, "{padding}]")?;
-        }
-        Ok(())
-    }
-}
-
-impl<T, U> Compare for serde_json::Map<T, U>
-where
-    T: serde::Serialize,
-    U: serde::Serialize,
-    Self: PartialEq + Serialize,
-{
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        let expected_str = serde_json::to_string(expected).unwrap();
-        if expected == actual {
-            writeln!(
-                f,
-                "{padding}{name_str}{}",
-                paint(
-                    override_color.unwrap_or(GREEN.unwrap()).into(),
-                    &expected_str
-                )
-            )?;
-        } else {
-            let actual_str = serde_json::to_string(actual).unwrap();
-            cmp_fallback(f, &expected_str, &actual_str, depth, name, override_color)?;
-        }
-
-        Ok(())
-    }
-}
-
-impl<T, U> Compare for HashMap<T, U>
-where
-    T: Compare + std::cmp::Eq + std::hash::Hash + std::fmt::Debug,
-    U: Compare + std::cmp::PartialEq + std::fmt::Debug,
-{
-    type Nested1 = T;
-    type Nested2 = U;
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        cmp_fallback(f, expected, actual, depth, name, override_color)
-    }
-}
-
-impl Compare for Uri {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        cmp_fallback(f, expected, actual, depth, name, override_color)
-    }
+pub fn paint(color: Option<impl Into<Color>>, text: &str) -> String {
+    let style = Style::new().fg_color(color.map(Into::into));
+    format!("{style}{text}{style:#}")
 }

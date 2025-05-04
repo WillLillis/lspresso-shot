@@ -1,7 +1,7 @@
 use lsp_types::request::GotoDeclarationResponse;
 use thiserror::Error;
 
-use super::compare::Compare as _;
+use super::compare::write_fields_comparison;
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub struct DeclarationMismatchError {
@@ -17,6 +17,12 @@ impl std::fmt::Display for DeclarationMismatchError {
             "Test {}: Incorrect GotoDeclaration response:",
             self.test_id
         )?;
-        GotoDeclarationResponse::compare(f, None, &self.expected, &self.actual, 0, None)
+        write_fields_comparison(
+            f,
+            "GotoDeclarationResponse",
+            &self.expected,
+            &self.actual,
+            0,
+        )
     }
 }

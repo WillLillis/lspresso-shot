@@ -1,12 +1,8 @@
-use lsp_types::{
-    Command, CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionItemTag,
-    CompletionList, CompletionResponse, CompletionTextEdit, Documentation, InsertReplaceEdit,
-    InsertTextFormat, InsertTextMode, MarkupContent, Range, TextEdit,
-};
+use lsp_types::{CompletionItem, CompletionList, CompletionResponse};
 use thiserror::Error;
 
 use super::{
-    compare::{cmp_fallback, paint, Compare, RED},
+    compare::{paint, write_fields_comparison, RED},
     CleanResponse, Empty,
 };
 
@@ -30,7 +26,7 @@ impl std::fmt::Display for CompletionResolveMismatchError {
             "Test {}: Incorrect CompletionResolve response:",
             self.test_id
         )?;
-        CompletionItem::compare(f, None, &self.expected, &self.actual, 0, None)
+        write_fields_comparison(f, "CompletionResolve", &self.expected, &self.actual, 0)
     }
 }
 
@@ -158,13 +154,12 @@ impl std::fmt::Display for CompletionMismatchError {
             CompletionResult::Exact(expected_results) => match (expected_results, &self.actual) {
                 (CompletionResponse::Array(_), CompletionResponse::Array(_))
                 | (CompletionResponse::List(_), CompletionResponse::List(_)) => {
-                    <CompletionResponse>::compare(
+                    write_fields_comparison(
                         f,
-                        None,
+                        "CompletionResponse",
                         expected_results,
                         &self.actual,
                         0,
-                        None,
                     )?;
                 }
                 // Different completion types, indicate so and compare the inner items
@@ -179,13 +174,12 @@ impl std::fmt::Display for CompletionMismatchError {
                         f,
                         "Expected `CompletionResponse::Array`, got `CompletionResponse::List`"
                     )?;
-                    <Vec<CompletionItem>>::compare(
+                    write_fields_comparison(
                         f,
-                        Some("CompletionResponse"),
+                        "CompletionResponse",
                         expected_items,
                         actual_items,
                         0,
-                        None,
                     )?;
                 }
                 (
@@ -199,510 +193,17 @@ impl std::fmt::Display for CompletionMismatchError {
                         f,
                         "Expected `CompletionResponse::List`, got `CompletionResponse::Array`"
                     )?;
-                    <Vec<CompletionItem>>::compare(
+                    write_fields_comparison(
                         f,
-                        Some("CompletionResponse"),
+                        "CompletionResponse",
                         expected_items,
                         actual_items,
                         0,
-                        None,
                     )?;
                 }
             },
         }
 
         Ok(())
-    }
-}
-
-impl Compare for CompletionResponse {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        match (expected, actual) {
-            (Self::Array(expected), Self::Array(actual)) => {
-                writeln!(f, "{padding}{name_str}CompletionResponse::Array (")?;
-                <Vec<CompletionItem>>::compare(
-                    f,
-                    None,
-                    expected,
-                    actual,
-                    depth + 1,
-                    override_color,
-                )?;
-                writeln!(f, "{padding})")?;
-            }
-            (
-                Self::List(CompletionList {
-                    is_incomplete: expected_is_incomplete,
-                    items: expected_items,
-                }),
-                Self::List(CompletionList {
-                    is_incomplete: actual_is_incomplete,
-                    items: actual_items,
-                }),
-            ) => {
-                writeln!(f, "{padding}{name_str}CompletionResponse::List (")?;
-                bool::compare(
-                    f,
-                    Some("is_incomplete"),
-                    expected_is_incomplete,
-                    actual_is_incomplete,
-                    depth + 1,
-                    override_color,
-                )?;
-                <Vec<CompletionItem>>::compare(
-                    f,
-                    Some("items"),
-                    expected_items,
-                    actual_items,
-                    depth + 1,
-                    override_color,
-                )?;
-                writeln!(f, "{padding})")?;
-            }
-            _ => {
-                cmp_fallback(f, expected, actual, depth, name, override_color)?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl Compare for CompletionItem {
-    type Nested1 = ();
-    type Nested2 = ();
-    #[allow(clippy::too_many_lines)]
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        writeln!(f, "{padding}{name_str}CompletionItem {{")?;
-        String::compare(
-            f,
-            Some("label"),
-            &expected.label,
-            &actual.label,
-            depth,
-            override_color,
-        )?;
-        <Option<CompletionItemLabelDetails>>::compare(
-            f,
-            Some("label_details"),
-            &expected.label_details,
-            &actual.label_details,
-            depth,
-            override_color,
-        )?;
-        <Option<CompletionItemKind>>::compare(
-            f,
-            Some("kind"),
-            &expected.kind,
-            &actual.kind,
-            depth,
-            override_color,
-        )?;
-        <Option<String>>::compare(
-            f,
-            Some("detail"),
-            &expected.detail,
-            &actual.detail,
-            depth,
-            override_color,
-        )?;
-        <Option<Documentation>>::compare(
-            f,
-            Some("documentation"),
-            &expected.documentation,
-            &actual.documentation,
-            depth,
-            override_color,
-        )?;
-        <Option<bool>>::compare(
-            f,
-            Some("deprecated"),
-            &expected.deprecated,
-            &actual.deprecated,
-            depth,
-            override_color,
-        )?;
-        <Option<bool>>::compare(
-            f,
-            Some("preselect"),
-            &expected.preselect,
-            &actual.preselect,
-            depth,
-            override_color,
-        )?;
-        <Option<String>>::compare(
-            f,
-            Some("sort_text"),
-            &expected.sort_text,
-            &actual.sort_text,
-            depth,
-            override_color,
-        )?;
-        <Option<String>>::compare(
-            f,
-            Some("filter_text"),
-            &expected.filter_text,
-            &actual.filter_text,
-            depth,
-            override_color,
-        )?;
-        <Option<String>>::compare(
-            f,
-            Some("insert_text"),
-            &expected.insert_text,
-            &actual.insert_text,
-            depth,
-            override_color,
-        )?;
-        <Option<InsertTextFormat>>::compare(
-            f,
-            Some("insert_text_format"),
-            &expected.insert_text_format,
-            &actual.insert_text_format,
-            depth,
-            override_color,
-        )?;
-        <Option<InsertTextMode>>::compare(
-            f,
-            Some("insert_text_mode"),
-            &expected.insert_text_mode,
-            &actual.insert_text_mode,
-            depth,
-            override_color,
-        )?;
-        <Option<CompletionTextEdit>>::compare(
-            f,
-            Some("text_edit"),
-            &expected.text_edit,
-            &actual.text_edit,
-            depth,
-            override_color,
-        )?;
-        <Option<Vec<TextEdit>>>::compare(
-            f,
-            Some("additional_text_edits"),
-            &expected.additional_text_edits,
-            &actual.additional_text_edits,
-            depth,
-            override_color,
-        )?;
-        <Option<Command>>::compare(
-            f,
-            Some("command"),
-            &expected.command,
-            &actual.command,
-            depth,
-            override_color,
-        )?;
-        <Option<Vec<String>>>::compare(
-            f,
-            Some("commit_characters"),
-            &expected.commit_characters,
-            &actual.commit_characters,
-            depth,
-            override_color,
-        )?;
-        <Option<serde_json::Value>>::compare(
-            f,
-            Some("data"),
-            &expected.data,
-            &actual.data,
-            depth,
-            override_color,
-        )?;
-        <Option<Vec<CompletionItemTag>>>::compare(
-            f,
-            Some("tags"),
-            &expected.tags,
-            &actual.tags,
-            depth,
-            override_color,
-        )?;
-        writeln!(f, "{padding}}}")?;
-
-        Ok(())
-    }
-}
-
-impl Compare for CompletionItemLabelDetails {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        writeln!(f, "{padding}{name_str}CompletionItemLabelDetails {{")?;
-        <Option<String>>::compare(
-            f,
-            Some("detail"),
-            &expected.detail,
-            &actual.detail,
-            depth + 1,
-            override_color,
-        )?;
-        <Option<String>>::compare(
-            f,
-            Some("description"),
-            &expected.description,
-            &actual.description,
-            depth + 1,
-            override_color,
-        )?;
-        writeln!(f, "{padding}}}")?;
-
-        Ok(())
-    }
-}
-
-impl Compare for CompletionItemKind {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        cmp_fallback(f, expected, actual, depth, name, override_color)
-    }
-}
-
-impl Compare for Documentation {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        match (expected, actual) {
-            (Self::String(expected), Self::String(actual)) => {
-                writeln!(f, "{padding}{name_str}Documentation::String (")?;
-                String::compare(f, None, expected, actual, depth + 1, override_color)?;
-                writeln!(f, "{padding})")?;
-            }
-            (Self::MarkupContent(expected), Self::MarkupContent(actual)) => {
-                writeln!(f, "{padding}{name_str}Documentation::MarkupContent (")?;
-                MarkupContent::compare(f, None, expected, actual, depth + 1, override_color)?;
-                writeln!(f, "{padding})")?;
-            }
-            _ => {
-                cmp_fallback(f, expected, actual, depth, name, override_color)?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl Compare for InsertTextFormat {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        cmp_fallback(f, expected, actual, depth, name, override_color)
-    }
-}
-
-impl Compare for InsertTextMode {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        cmp_fallback(f, expected, actual, depth, name, override_color)
-    }
-}
-
-impl Compare for CompletionTextEdit {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        match (expected, actual) {
-            (Self::Edit(expected_edit), Self::Edit(actual_edit)) => {
-                writeln!(f, "{padding}{name_str}CompletionTextEdit::Edit (")?;
-                TextEdit::compare(
-                    f,
-                    None,
-                    expected_edit,
-                    actual_edit,
-                    depth + 1,
-                    override_color,
-                )?;
-                writeln!(f, "{padding})")?;
-            }
-            (Self::InsertAndReplace(expected_text), Self::InsertAndReplace(actual_text)) => {
-                writeln!(f, "{padding}{name_str}CompletionTextEdit::InsertText (")?;
-                InsertReplaceEdit::compare(
-                    f,
-                    None,
-                    expected_text,
-                    actual_text,
-                    depth + 1,
-                    override_color,
-                )?;
-                writeln!(f, "{padding})")?;
-            }
-            _ => {
-                cmp_fallback(f, expected, actual, depth, name, override_color)?;
-            }
-        }
-
-        Ok(())
-    }
-}
-
-impl Compare for InsertReplaceEdit {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        writeln!(f, "{padding}{name_str}InsertReplaceEdit {{")?;
-        String::compare(
-            f,
-            Some("new_text"),
-            &expected.new_text,
-            &actual.new_text,
-            depth,
-            override_color,
-        )?;
-        Range::compare(
-            f,
-            Some("insert"),
-            &expected.insert,
-            &actual.insert,
-            depth,
-            override_color,
-        )?;
-        Range::compare(
-            f,
-            Some("replace"),
-            &expected.replace,
-            &actual.replace,
-            depth,
-            override_color,
-        )?;
-        writeln!(f, "{padding}}}")?;
-
-        Ok(())
-    }
-}
-
-impl Compare for Command {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        writeln!(f, "{padding}{name_str}Command {{")?;
-        String::compare(
-            f,
-            Some("title"),
-            &expected.title,
-            &actual.title,
-            depth,
-            override_color,
-        )?;
-        String::compare(
-            f,
-            Some("command"),
-            &expected.command,
-            &actual.command,
-            depth,
-            override_color,
-        )?;
-        <Option<Vec<serde_json::Value>>>::compare(
-            f,
-            Some("arguments"),
-            &expected.arguments,
-            &actual.arguments,
-            depth,
-            override_color,
-        )?;
-        writeln!(f, "{padding}}}")?;
-
-        Ok(())
-    }
-}
-
-impl Compare for CompletionItemTag {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        cmp_fallback(f, expected, actual, depth, name, override_color)
     }
 }
