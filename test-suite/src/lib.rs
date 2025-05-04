@@ -17,6 +17,7 @@ mod formatting;
 mod hover;
 mod implementation;
 mod incoming_calls;
+mod inlay_hint;
 mod moniker;
 mod outgoing_calls;
 mod prepare_call_hierarchy;

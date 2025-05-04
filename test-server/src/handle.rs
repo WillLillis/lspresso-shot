@@ -11,17 +11,19 @@ use lsp_types::{
         DocumentHighlightRequest, DocumentLinkRequest, DocumentLinkResolve, DocumentSymbolRequest,
         FoldingRangeRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
         GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
-        HoverRequest, MonikerRequest, References, Rename, Request as _, ResolveCompletionItem,
-        SelectionRangeRequest, SemanticTokensFullDeltaRequest, SemanticTokensFullRequest,
-        SemanticTokensRangeRequest, SignatureHelpRequest, WorkspaceDiagnosticRequest,
+        HoverRequest, InlayHintRequest, MonikerRequest, References, Rename, Request as _,
+        ResolveCompletionItem, SelectionRangeRequest, SemanticTokensFullDeltaRequest,
+        SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
+        WorkspaceDiagnosticRequest,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeActionParams, CodeLens, CodeLensParams, CompletionItem, CompletionParams,
     DocumentDiagnosticParams, DocumentFormattingParams, DocumentHighlightParams, DocumentLink,
     DocumentLinkParams, DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams,
-    HoverParams, MonikerParams, ReferenceParams, RenameParams, SelectionRangeParams,
-    SemanticTokensDeltaParams, SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities,
-    SignatureHelpParams, Uri, WorkspaceDiagnosticParams,
+    HoverParams, InlayHintParams, MonikerParams, ReferenceParams, RenameParams,
+    SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
+    SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams, Uri,
+    WorkspaceDiagnosticParams,
 };
 
 use crate::{
@@ -33,12 +35,12 @@ use crate::{
         get_document_link_resolve_response, get_document_link_response,
         get_document_symbol_response, get_folding_range_response, get_formatting_response,
         get_hover_response, get_implementation_response, get_incoming_calls_response,
-        get_moniker_response, get_outgoing_calls_response, get_prepare_call_hierachy_response,
-        get_publish_diagnostics_response, get_references_response, get_rename_response,
-        get_selection_range_response, get_semantic_tokens_full_delta_response,
-        get_semantic_tokens_full_response, get_semantic_tokens_range_response,
-        get_signature_help_response, get_type_definition_response,
-        get_workspace_diagnostics_response,
+        get_inlay_hint_response, get_moniker_response, get_outgoing_calls_response,
+        get_prepare_call_hierachy_response, get_publish_diagnostics_response,
+        get_references_response, get_rename_response, get_selection_range_response,
+        get_semantic_tokens_full_delta_response, get_semantic_tokens_full_response,
+        get_semantic_tokens_range_response, get_signature_help_response,
+        get_type_definition_response, get_workspace_diagnostics_response,
     },
 };
 
@@ -387,6 +389,15 @@ pub fn handle_request(
                 |params: HoverParams| -> Uri {
                     params.text_document_position_params.text_document.uri
                 }
+            )?;
+        }
+        InlayHintRequest::METHOD => {
+            handle_request!(
+                InlayHintRequest,
+                get_inlay_hint_response,
+                req,
+                conn,
+                |params: InlayHintParams| -> Uri { params.text_document.uri }
             )?;
         }
         MonikerRequest::METHOD => {

@@ -6,7 +6,7 @@ use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeActionContext,
     CodeActionResponse, CodeLens, CompletionItem, Diagnostic, DocumentDiagnosticReport,
     DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
-    GotoDefinitionResponse, Hover, Location, Moniker, Position, PreviousResultId, Range,
+    GotoDefinitionResponse, Hover, InlayHint, Location, Moniker, Position, PreviousResultId, Range,
     SelectionRange, SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
     SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
     SignatureHelpContext, TextEdit, WorkspaceDiagnosticReport, WorkspaceEdit,
@@ -39,6 +39,7 @@ use types::{
     formatting::{FormattingMismatchError, FormattingResult},
     hover::HoverMismatchError,
     implementation::ImplementationMismatchError,
+    inlay_hint::InlayHintMismatchError,
     moniker::MonikerMismatchError,
     references::ReferencesMismatchError,
     rename::RenameMismatchError,
@@ -996,6 +997,49 @@ pub fn test_incoming_calls(
         |expected, actual: &Vec<CallHierarchyIncomingCall>| {
             if expected != actual {
                 Err(IncomingCallsMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type InlayHintComparator = fn(&Vec<InlayHint>, &Vec<InlayHint>, &TestCase) -> bool;
+
+/// Tests the server's response to a 'textDocument/inlayHint' request
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON deserialization of `range` fails
+pub fn test_inlay_hint(
+    mut test_case: TestCase,
+    range: &Range,
+    cmp: Option<InlayHintComparator>,
+    expected: Option<&Vec<InlayHint>>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::InlayHint);
+    collect_results(
+        &test_case,
+        Some(&vec![(
+            "RANGE",
+            serde_json::to_string_pretty(range).expect("JSON serialzation of range failed"),
+        )]),
+        expected,
+        |expected, actual: &Vec<InlayHint>| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(InlayHintMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),
