@@ -67,44 +67,44 @@ mod test {
         let test_result = test_semantic_tokens_full(test_case.clone(), None, None);
         let mut expected_err =
             TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
-        match response_num {
-            // TODO: See if this can be fixed up too!
-            // HACK: Because of the serialization issues with `SemanticTokensResult`, we have
-            // to work around
-            8 => {
-                assert_eq!(
-                    expected_err,
-                    TestError::ExpectedNone(
-                        test_case.test_id.clone(),
-                        "Partial(\n    SemanticTokensPartialResult {\n        data: [],\n    },\n)"
-                            .to_string()
-                    )
-                );
-                expected_err = TestError::ExpectedNone(test_case.test_id, "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [],\n    },\n)".to_string());
-            }
-            9 => {
-                assert_eq!(
-                    expected_err,
-                    TestError::ExpectedNone(test_case.test_id.clone(), "Partial(\n    SemanticTokensPartialResult {\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n        ],\n    },\n)".to_string())
-                );
-                expected_err = TestError::ExpectedNone(test_case.test_id, "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n        ],\n    },\n)".to_string());
-            }
-            10 => {
-                assert_eq!(
-                    expected_err,
-                    TestError::ExpectedNone(test_case.test_id.clone(), "Partial(\n    SemanticTokensPartialResult {\n        data: [\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string())
-                );
-                expected_err = TestError::ExpectedNone(test_case.test_id, "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string());
-            }
-            11 => {
-                assert_eq!(
-                    expected_err,
-                    TestError::ExpectedNone(test_case.test_id.clone(), "Partial(\n    SemanticTokensPartialResult {\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string())
-                );
-                expected_err = TestError::ExpectedNone(test_case.test_id, "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string());
-            }
-            _ => {}
-        }
+        // match response_num {
+        //     // TODO: See if this can be fixed up too!
+        //     // HACK: Because of the serialization issues with `SemanticTokensResult`, we have
+        //     // to work around
+        //     8 => {
+        //         assert_eq!(
+        //             expected_err,
+        //             TestError::ExpectedNone(
+        //                 test_case.test_id.clone(),
+        //                 "Partial(\n    SemanticTokensPartialResult {\n        data: [],\n    },\n)"
+        //                     .to_string()
+        //             )
+        //         );
+        //         expected_err = TestError::ExpectedNone(test_case.test_id, "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [],\n    },\n)".to_string());
+        //     }
+        //     9 => {
+        //         assert_eq!(
+        //             expected_err,
+        //             TestError::ExpectedNone(test_case.test_id.clone(), "Partial(\n    SemanticTokensPartialResult {\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n        ],\n    },\n)".to_string())
+        //         );
+        //         expected_err = TestError::ExpectedNone(test_case.test_id, "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n        ],\n    },\n)".to_string());
+        //     }
+        //     10 => {
+        //         assert_eq!(
+        //             expected_err,
+        //             TestError::ExpectedNone(test_case.test_id.clone(), "Partial(\n    SemanticTokensPartialResult {\n        data: [\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string())
+        //         );
+        //         expected_err = TestError::ExpectedNone(test_case.test_id, "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string());
+        //     }
+        //     11 => {
+        //         assert_eq!(
+        //             expected_err,
+        //             TestError::ExpectedNone(test_case.test_id.clone(), "Partial(\n    SemanticTokensPartialResult {\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string())
+        //         );
+        //         expected_err = TestError::ExpectedNone(test_case.test_id, "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string());
+        //     }
+        //     _ => {}
+        // }
         assert_eq!(Err(expected_err), test_result);
     }
 

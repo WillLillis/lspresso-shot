@@ -1,0 +1,34 @@
+diff --git a/cmake.deps/deps.txt b/cmake.deps/deps.txt
+index 002f0d589b..3ab5cd1dbf 100644
+--- a/cmake.deps/deps.txt
++++ b/cmake.deps/deps.txt
+@@ -46,7 +46,7 @@ TREESITTER_QUERY_URL https://github.com/tree-sitter-grammars/tree-sitter-query/a
+ TREESITTER_QUERY_SHA256 fe8c712880a529d454347cd4c58336ac2db22243bae5055bdb5844fb3ea56192
+ TREESITTER_MARKDOWN_URL https://github.com/tree-sitter-grammars/tree-sitter-markdown/archive/v0.4.1.tar.gz
+ TREESITTER_MARKDOWN_SHA256 e0fdb2dca1eb3063940122e1475c9c2b069062a638c95939e374c5427eddee9f
+-TREESITTER_URL https://github.com/tree-sitter/tree-sitter/archive/v0.25.3.tar.gz
++TREESITTER_URL /home/lillis/projects/tree-sitter/
+ TREESITTER_SHA256 862fac52653bc7bc9d2cd0630483e6bdf3d02bcd23da956ca32663c4798a93e3
+ 
+ WASMTIME_URL https://github.com/bytecodealliance/wasmtime/archive/v29.0.1.tar.gz
+diff --git a/runtime/lua/vim/lsp/rpc.lua b/runtime/lua/vim/lsp/rpc.lua
+index 637cda84d3..77d979b3a6 100644
+--- a/runtime/lua/vim/lsp/rpc.lua
++++ b/runtime/lua/vim/lsp/rpc.lua
+@@ -322,12 +322,15 @@ end
+ --- @package
+ --- @param body string
+ function Client:handle_body(body)
+-  local ok, decoded = pcall(vim.json.decode, body, { luanil = { object = true } })
++  -- log.error('rpc.receive', body)
++  -- local ok, decoded = pcall(vim.json.decode, body, { luanil = { object = true } })
++  local ok, decoded = pcall(vim.json.decode, body)
+   if not ok then
+     self:on_error(M.client_errors.INVALID_SERVER_JSON, decoded)
+     return
+   end
+   log.debug('rpc.receive', decoded)
++  -- log.error('rpc.receive', vim.inspect(decoded))
+ 
+   if type(decoded) ~= 'table' then
+     self:on_error(M.client_errors.INVALID_SERVER_MESSAGE, decoded)
