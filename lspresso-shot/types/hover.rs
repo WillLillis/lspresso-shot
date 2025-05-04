@@ -78,26 +78,12 @@ impl Compare for HoverContents {
         match (expected, actual) {
             (Self::Scalar(expected), Self::Scalar(actual)) => {
                 writeln!(f, "{padding}{name_str}HoverContents::Scalar (")?;
-                MarkedString::compare(
-                    f,
-                    Some("value"), // TODO: Check this!!!
-                    expected,
-                    actual,
-                    depth + 1,
-                    override_color,
-                )?;
+                MarkedString::compare(f, None, expected, actual, depth + 1, override_color)?;
                 writeln!(f, "{padding})")?;
             }
             (Self::Array(expected), Self::Array(actual)) => {
                 writeln!(f, "{padding}{name_str}HoverContents::Array (")?;
-                <Vec<MarkedString>>::compare(
-                    f,
-                    Some("value"),
-                    expected,
-                    actual,
-                    depth + 1,
-                    override_color,
-                )?;
+                <Vec<MarkedString>>::compare(f, None, expected, actual, depth + 1, override_color)?;
                 writeln!(f, "{padding})")?;
             }
             (Self::Markup(expected), Self::Markup(actual)) => {
