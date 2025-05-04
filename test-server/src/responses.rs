@@ -9,9 +9,10 @@ use lsp_types::{
     DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentHighlight,
     DocumentHighlightKind, DocumentLink, DocumentSymbol, DocumentSymbolResponse, Documentation,
     FoldingRange, FoldingRangeKind, FullDocumentDiagnosticReport, GotoDefinitionResponse, Hover,
-    HoverContents, LanguageString, Location, LocationLink, MarkedString, MarkupContent, MarkupKind,
-    Moniker, MonikerKind, ParameterInformation, ParameterLabel, Position, PublishDiagnosticsParams,
-    Range, RelatedFullDocumentDiagnosticReport, SelectionRange, SemanticToken, SemanticTokens,
+    HoverContents, InlayHint, InlayHintKind, InlayHintLabel, InlayHintTooltip, LanguageString,
+    Location, LocationLink, MarkedString, MarkupContent, MarkupKind, Moniker, MonikerKind,
+    ParameterInformation, ParameterLabel, Position, PublishDiagnosticsParams, Range,
+    RelatedFullDocumentDiagnosticReport, SelectionRange, SemanticToken, SemanticTokens,
     SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
     SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
     SignatureInformation, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit,
@@ -22,7 +23,7 @@ use lsp_types::{
 
 use crate::get_dummy_source_path;
 
-/// For use with `test_document_highlight`.
+/// For use with `test_code_action`.
 pub fn get_code_action_response(response_num: u32, uri: &Uri) -> Option<CodeActionResponse> {
     _ = uri;
     let cmd = CodeActionOrCommand::Command(Command {
@@ -496,6 +497,42 @@ pub fn get_hover_response(response_num: u32, uri: &Uri) -> Option<Hover> {
                 end: Position::new(15, 16),
             }),
         }),
+        _ => None,
+    }
+}
+
+/// For use with `test_inlay_hint`.
+#[must_use]
+pub fn get_inlay_hint_response(response_num: u32, uri: &Uri) -> Option<Vec<InlayHint>> {
+    _ = uri;
+    let hint1 = InlayHint {
+        kind: Some(InlayHintKind::TYPE),
+        label: InlayHintLabel::String("label1".to_string()),
+        padding_left: Some(true),
+        padding_right: Some(false),
+        tooltip: Some(InlayHintTooltip::MarkupContent(MarkupContent {
+            kind: MarkupKind::Markdown,
+            value: "tooltip1".to_string(),
+        })),
+        position: Position::new(1, 2),
+        text_edits: None,
+        data: None,
+    };
+    let hint2 = InlayHint {
+        kind: None,
+        label: InlayHintLabel::String("label2".to_string()),
+        padding_left: None,
+        padding_right: Some(true),
+        tooltip: Some(InlayHintTooltip::String("tooltip2".to_string())),
+        position: Position::new(3, 4),
+        text_edits: None,
+        data: None,
+    };
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![hint1]),
+        2 => Some(vec![hint2]),
+        3 => Some(vec![hint1, hint2]),
         _ => None,
     }
 }

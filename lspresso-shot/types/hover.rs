@@ -80,7 +80,7 @@ impl Compare for HoverContents {
                 writeln!(f, "{padding}{name_str}HoverContents::Scalar (")?;
                 MarkedString::compare(
                     f,
-                    Some("value"),
+                    Some("value"), // TODO: Check this!!!
                     expected,
                     actual,
                     depth + 1,

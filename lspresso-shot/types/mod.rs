@@ -13,6 +13,7 @@ pub mod folding_range;
 pub mod formatting;
 pub mod hover;
 pub mod implementation;
+pub mod inlay_hint;
 pub mod moniker;
 pub mod references;
 pub mod rename;
@@ -66,6 +67,7 @@ use std::{
     time::Duration,
 };
 
+use inlay_hint::InlayHintMismatchError;
 use lsp_types::{Position, Uri};
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
@@ -108,6 +110,8 @@ pub enum TestType {
     Implementation,
     /// Test `callHierarchy/incomingCalls` requests
     IncomingCalls,
+    /// Test `textDocument/inlayHint` requests
+    InlayHint,
     /// Test `textDocument/moniker` requests
     Moniker,
     /// Test `callHierarchy/outgoingCalls` requests
@@ -159,6 +163,7 @@ impl std::fmt::Display for TestType {
                 Self::Hover => "textDocument/hover",
                 Self::Implementation => "textDocument/implementation",
                 Self::IncomingCalls => "callHierarchy/incomingCalls",
+                Self::InlayHint => "textDocument/inlayHint",
                 Self::Moniker => "textDocument/moniker",
                 Self::OutgoingCalls => "callHierarchy/outgoingCalls",
                 Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
@@ -660,6 +665,8 @@ pub enum TestError {
     HoverMismatch(#[from] Box<HoverMismatchError>),
     #[error(transparent)]
     ImplementationMismatch(#[from] Box<ImplementationMismatchError>),
+    #[error(transparent)]
+    InlayHintMismatch(#[from] InlayHintMismatchError),
     #[error(transparent)]
     IncomingCallsMismatch(#[from] IncomingCallsMismatchError),
     #[error(transparent)]

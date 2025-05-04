@@ -55,6 +55,7 @@ pub fn get_init_dot_lua(
         | TestType::Formatting
         | TestType::Hover
         | TestType::Implementation
+        | TestType::InlayHint
         | TestType::IncomingCalls
         | TestType::Moniker
         | TestType::OutgoingCalls
@@ -137,6 +138,7 @@ fn get_attach_action(test_type: TestType) -> String {
         TestType::Hover => include_str!("lua_templates/hover_action.lua"),
         TestType::Implementation => include_str!("lua_templates/implementation_action.lua"),
         TestType::IncomingCalls => include_str!("lua_templates/incoming_calls_action.lua"),
+        TestType::InlayHint => include_str!("lua_templates/inlay_hint_action.lua"),
         TestType::Moniker => include_str!("lua_templates/moniker_action.lua"),
         TestType::OutgoingCalls => include_str!("lua_templates/outgoing_calls_action.lua"),
         TestType::PrepareCallHierarchy => include_str!("lua_templates/prepare_call_hierarchy_action.lua"),
