@@ -22,7 +22,7 @@ mod test {
     }
 
     #[test]
-    fn test_server_code_lens_simple_expect_none_got_none() {
+    fn test_server_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
@@ -37,7 +37,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_code_lens_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
+    fn test_server_simple_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let resp = test_server::responses::get_code_lens_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
@@ -56,7 +56,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_code_lens_simple_expect_some_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
+    fn test_server_simple_expect_some_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let resp = test_server::responses::get_code_lens_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
@@ -75,7 +75,7 @@ mod test {
     // NOTE: It's difficult to test for equality with rust-analyzer here, as part
     // of the response contains arbitrary JSON values.
     #[test]
-    fn rust_analyzer_code_lens() {
+    fn rust_analyzer() {
         let source_file = TestFile::new(
             "src/main.rs",
             "pub fn main() {

@@ -23,7 +23,7 @@ mod test {
     }
 
     #[test]
-    fn test_server_document_symbol_simple_expect_none_got_none() {
+    fn test_server_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
@@ -37,9 +37,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_document_symbol_simple_expect_none_got_some(
-        #[values(0, 1, 2, 3)] response_num: u32,
-    ) {
+    fn test_server_simple_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let syms =
             test_server::responses::get_document_symbol_response(response_num, &uri).unwrap();
@@ -72,9 +70,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_document_symbol_simple_expect_some_got_some(
-        #[values(0, 1, 2, 3)] response_num: u32,
-    ) {
+    fn test_server_simple_expect_some_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let syms =
             test_server::responses::get_document_symbol_response(response_num, &uri).unwrap();
@@ -91,7 +87,7 @@ mod test {
     }
 
     #[test]
-    fn rust_analyzer_document_symbol() {
+    fn rust_analyzer() {
         let source_file = TestFile::new(
             "src/main.rs",
             "pub fn main() {

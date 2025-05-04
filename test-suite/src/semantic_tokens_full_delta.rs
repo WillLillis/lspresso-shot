@@ -33,7 +33,7 @@ mod test {
     }
 
     #[test]
-    fn test_server_semantic_tokens_full_delta_simple_expect_none_got_none() {
+    fn test_server_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
@@ -53,7 +53,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_semantic_tokens_full_delta_simple_expect_none_got_some(
+    fn test_server_simple_expect_none_got_some(
         #[values(
             100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, /*113, 114, 115*/
         )]
@@ -80,7 +80,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_semantic_tokens_full_delta_simple_expect_some_got_some(
+    fn test_server_simple_expect_some_got_some(
         #[values(
             100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 101, 112, /*113, 114, 115, 115,
             117, 118, 119*/
@@ -108,7 +108,7 @@ mod test {
 
     #[ignore = "rust-analyzer behaves non-deterministically"]
     #[test]
-    fn rust_analyzer_semantic_tokens_full_delta() {
+    fn rust_analyzer() {
         let source_file = TestFile::new(
             "src/main.rs",
             "pub fn main() {
