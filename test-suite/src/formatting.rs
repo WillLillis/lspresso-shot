@@ -20,7 +20,7 @@ mod test {
     }
 
     #[test]
-    fn test_server_formatting_state_simple_expect_some_got_some() {
+    fn test_server_state_simple_expect_some_got_some() {
         let contents = "Some source contents";
         let source_file = TestFile::new(test_server::get_dummy_source_path(), contents);
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
@@ -41,7 +41,7 @@ mod test {
     }
 
     #[test]
-    fn test_server_formatting_response_simple_expect_none_got_none() {
+    fn test_server_response_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
@@ -55,9 +55,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_formatting_response_simple_expect_none_got_some(
-        #[values(0, 1, 2, 3)] response_num: u32,
-    ) {
+    fn test_server_response_simple_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let edits = test_server::responses::get_formatting_response(response_num, &uri).unwrap();
         let source_file =
@@ -76,9 +74,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_formatting_response_simple_expect_some_got_some(
-        #[values(0, 1, 2, 3)] response_num: u32,
-    ) {
+    fn test_server_response_simple_expect_some_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let edits = test_server::responses::get_formatting_response(response_num, &uri).unwrap();
         let source_file =
@@ -99,7 +95,7 @@ mod test {
     }
 
     #[test]
-    fn rust_analyzer_formatting_state() {
+    fn rust_analyzer_state() {
         let source_file = TestFile::new(
             "src/main.rs",
             "pub fn main() {
@@ -128,7 +124,7 @@ let foo = 5;
     }
 
     #[test]
-    fn rust_analyzer_formatting_response() {
+    fn rust_analyzer_response() {
         let source_file = TestFile::new(
             "src/main.rs",
             "pub fn main() {
