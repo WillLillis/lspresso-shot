@@ -1,10 +1,9 @@
-use lsp_types::{
-    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, Range, SymbolKind,
-    SymbolTag, Uri,
-};
+use lsp_types::{CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall};
 use thiserror::Error;
 
-use super::{clean_uri, compare::Compare, CleanResponse, Empty, TestCase, TestResult};
+use super::{
+    clean_uri, compare::write_fields_comparison, CleanResponse, Empty, TestCase, TestResult,
+};
 
 impl Empty for Vec<CallHierarchyItem> {}
 impl Empty for Vec<CallHierarchyIncomingCall> {}
@@ -49,7 +48,7 @@ impl std::fmt::Display for IncomingCallsMismatchError {
             "Test {}: Incorrect IncomingCalls response:",
             self.test_id
         )?;
-        <Vec<CallHierarchyIncomingCall>>::compare(f, None, &self.expected, &self.actual, 0, None)
+        write_fields_comparison(f, "IncomingCalls", &self.expected, &self.actual, 0)
     }
 }
 
@@ -67,7 +66,7 @@ impl std::fmt::Display for OutgoingCallsMismatchError {
             "Test {}: Incorrect OutgoingCalls response:",
             self.test_id
         )?;
-        <Vec<CallHierarchyOutgoingCall>>::compare(f, None, &self.expected, &self.actual, 0, None)
+        write_fields_comparison(f, "OutgoingCalls", &self.expected, &self.actual, 0)
     }
 }
 
@@ -85,162 +84,6 @@ impl std::fmt::Display for PrepareCallHierachyMismatchError {
             "Test {}: Incorrect Prepare Call Hierarchy response:",
             self.test_id
         )?;
-        <Vec<CallHierarchyItem>>::compare(f, None, &self.expected, &self.actual, 0, None)
-    }
-}
-
-impl Compare for CallHierarchyIncomingCall {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        writeln!(f, "{padding}{name_str}CallHierarchyIncomingCall {{")?;
-        CallHierarchyItem::compare(
-            f,
-            Some("from"),
-            &expected.from,
-            &actual.from,
-            depth + 1,
-            override_color,
-        )?;
-        <Vec<Range>>::compare(
-            f,
-            Some("from_ranges"),
-            &expected.from_ranges,
-            &actual.from_ranges,
-            depth + 1,
-            override_color,
-        )?;
-        writeln!(f, "{padding}}}")?;
-
-        Ok(())
-    }
-}
-
-impl Compare for CallHierarchyItem {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        writeln!(f, "{padding}{name_str}CallHierarchyItem {{")?;
-        <String>::compare(
-            f,
-            Some("name"),
-            &expected.name,
-            &actual.name,
-            depth + 1,
-            override_color,
-        )?;
-        <SymbolKind>::compare(
-            f,
-            Some("kind"),
-            &expected.kind,
-            &actual.kind,
-            depth + 1,
-            override_color,
-        )?;
-        <Option<Vec<SymbolTag>>>::compare(
-            f,
-            Some("tags"),
-            &expected.tags,
-            &actual.tags,
-            depth + 1,
-            override_color,
-        )?;
-        <Option<String>>::compare(
-            f,
-            Some("detail"),
-            &expected.detail,
-            &actual.detail,
-            depth + 1,
-            override_color,
-        )?;
-        Uri::compare(
-            f,
-            Some("uri"),
-            &expected.uri,
-            &actual.uri,
-            depth + 1,
-            override_color,
-        )?;
-        Range::compare(
-            f,
-            Some("range"),
-            &expected.range,
-            &actual.range,
-            depth + 1,
-            override_color,
-        )?;
-        Range::compare(
-            f,
-            Some("selection_range"),
-            &expected.selection_range,
-            &actual.selection_range,
-            depth + 1,
-            override_color,
-        )?;
-        <Option<serde_json::Value>>::compare(
-            f,
-            Some("data"),
-            &expected.data,
-            &actual.data,
-            depth + 1,
-            override_color,
-        )?;
-        writeln!(f, "{padding}}}", padding = "  ".repeat(depth))?;
-
-        Ok(())
-    }
-}
-
-impl Compare for CallHierarchyOutgoingCall {
-    type Nested1 = ();
-    type Nested2 = ();
-    fn compare(
-        f: &mut std::fmt::Formatter<'_>,
-        name: Option<&str>,
-        expected: &Self,
-        actual: &Self,
-        depth: usize,
-        override_color: Option<anstyle::Color>,
-    ) -> std::fmt::Result {
-        let padding = "  ".repeat(depth);
-        let name_str = name.map_or_else(String::new, |name| format!("{name}: "));
-        writeln!(f, "{padding}{name_str}CallHierarchyOutgoingCall {{")?;
-        CallHierarchyItem::compare(
-            f,
-            Some("to"),
-            &expected.to,
-            &actual.to,
-            depth + 1,
-            override_color,
-        )?;
-        <Vec<Range>>::compare(
-            f,
-            Some("from_ranges"),
-            &expected.from_ranges,
-            &actual.from_ranges,
-            depth + 1,
-            override_color,
-        )?;
-        writeln!(f, "{padding}}}")?;
-
-        Ok(())
+        write_fields_comparison(f, "PrepareCallHierarchy", &self.expected, &self.actual, 0)
     }
 }
