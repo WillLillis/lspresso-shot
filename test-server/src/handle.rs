@@ -83,6 +83,7 @@ where
 {
     info!("Sending response for request {id}: {resp:#?}");
     let result = serde_json::to_value(resp).unwrap();
+    info!("Serialized response: {result:#?}");
     let result = Response {
         id,
         result: Some(result),
