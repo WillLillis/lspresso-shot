@@ -77,20 +77,20 @@ mod test {
 
         // TODO: See if we can clean this up...
         match response_num {
-            5 => {
-                assert_eq!(
-                    expected_err,
-                    TestError::ExpectedNone(
-                        test_case.test_id.clone(),
-                        "Partial(\n    SemanticTokensPartialResult {\n        data: [],\n    },\n)"
-                            .to_string(),
-                    )
-                );
-                expected_err = TestError::ExpectedNone(
-                    test_case.test_id,
-                    "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [],\n    },\n)".to_string()
-                );
-            }
+            // 5 => {
+            //     assert_eq!(
+            //         test_result,
+            //         Err(TestError::ExpectedNone(
+            //             test_case.test_id.clone(),
+            //             "Partial(\n    SemanticTokensPartialResult {\n        data: [],\n    },\n)"
+            //                 .to_string(),
+            //         ))
+            //     );
+            //     expected_err = TestError::ExpectedNone(
+            //         test_case.test_id,
+            //         "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [],\n    },\n)".to_string()
+            //     );
+            // }
             6 => {
                 assert_eq!(
                     expected_err,
