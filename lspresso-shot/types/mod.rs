@@ -21,6 +21,7 @@ pub mod selection_range;
 pub mod semantic_tokens;
 pub mod signature_help;
 pub mod type_definition;
+pub mod type_hierarchy;
 
 use crate::{
     init_dot_lua::get_init_dot_lua,
@@ -72,6 +73,7 @@ use lsp_types::{Position, Uri};
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use type_hierarchy::PrepareTypeHierarchyMismatchError;
 
 /// Specifies the type of test to run
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -118,6 +120,8 @@ pub enum TestType {
     OutgoingCalls,
     /// Test `textDocument/prepareCallHierarchy` requests
     PrepareCallHierarchy,
+    /// Test `textDocument/prepareTypeHierarchy` requests
+    PrepareTypeHierarchy,
     /// Test `textDocument/publishDiagnostics` requests
     PublishDiagnostics,
     /// Test `textDocument/references` requests
@@ -167,6 +171,7 @@ impl std::fmt::Display for TestType {
                 Self::Moniker => "textDocument/moniker",
                 Self::OutgoingCalls => "callHierarchy/outgoingCalls",
                 Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
+                Self::PrepareTypeHierarchy => "textDocument/prepareTypeHierarchy",
                 Self::PublishDiagnostics => "textDocument/publishDiagnostics",
                 Self::References => "textDocument/references",
                 Self::Rename => "textDocument/rename",
@@ -675,6 +680,8 @@ pub enum TestError {
     OutgoingCallsMismatch(#[from] OutgoingCallsMismatchError),
     #[error(transparent)]
     PrepareCallHierarchyMismatch(#[from] PrepareCallHierachyMismatchError),
+    #[error(transparent)]
+    PrepareTypeHierarchyMismatch(#[from] PrepareTypeHierarchyMismatchError),
     #[error(transparent)]
     ReferencesMismatch(#[from] ReferencesMismatchError),
     #[error(transparent)]

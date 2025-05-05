@@ -14,7 +14,7 @@ use lsp_types::{
         HoverRequest, InlayHintRequest, MonikerRequest, References, Rename, Request as _,
         ResolveCompletionItem, SelectionRangeRequest, SemanticTokensFullDeltaRequest,
         SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
-        WorkspaceDiagnosticRequest,
+        TypeHierarchyPrepare, WorkspaceDiagnosticRequest,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeActionParams, CodeLens, CodeLensParams, CompletionItem, CompletionParams,
@@ -22,8 +22,8 @@ use lsp_types::{
     DocumentLinkParams, DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams,
     HoverParams, InlayHintParams, MonikerParams, ReferenceParams, RenameParams,
     SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
-    SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams, Uri,
-    WorkspaceDiagnosticParams,
+    SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams, TypeHierarchyPrepareParams,
+    Uri, WorkspaceDiagnosticParams,
 };
 
 use crate::{
@@ -36,11 +36,12 @@ use crate::{
         get_document_symbol_response, get_folding_range_response, get_formatting_response,
         get_hover_response, get_implementation_response, get_incoming_calls_response,
         get_inlay_hint_response, get_moniker_response, get_outgoing_calls_response,
-        get_prepare_call_hierachy_response, get_publish_diagnostics_response,
-        get_references_response, get_rename_response, get_selection_range_response,
-        get_semantic_tokens_full_delta_response, get_semantic_tokens_full_response,
-        get_semantic_tokens_range_response, get_signature_help_response,
-        get_type_definition_response, get_workspace_diagnostics_response,
+        get_prepare_call_hierachy_response, get_prepare_type_hierachy_response,
+        get_publish_diagnostics_response, get_references_response, get_rename_response,
+        get_selection_range_response, get_semantic_tokens_full_delta_response,
+        get_semantic_tokens_full_response, get_semantic_tokens_range_response,
+        get_signature_help_response, get_type_definition_response,
+        get_workspace_diagnostics_response,
     },
 };
 
@@ -474,6 +475,17 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: SignatureHelpParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
+            )?;
+        }
+        TypeHierarchyPrepare::METHOD => {
+            handle_request!(
+                TypeHierarchyPrepare,
+                get_prepare_type_hierachy_response,
+                req,
+                conn,
+                |params: TypeHierarchyPrepareParams| -> Uri {
                     params.text_document_position_params.text_document.uri
                 }
             )?;

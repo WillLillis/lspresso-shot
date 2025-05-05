@@ -29,3 +29,4 @@ mod semantic_tokens_full_delta;
 mod semantic_tokens_range;
 mod signature_help;
 mod type_definition;
+mod type_hierarchy;
