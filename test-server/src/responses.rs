@@ -16,9 +16,9 @@ use lsp_types::{
     SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
     SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
     SignatureInformation, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit,
-    UnchangedDocumentDiagnosticReport, UniquenessLevel, Uri, WorkspaceDiagnosticReport,
-    WorkspaceDocumentDiagnosticReport, WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceUnchangedDocumentDiagnosticReport,
+    TypeHierarchyItem, UnchangedDocumentDiagnosticReport, UniquenessLevel, Uri,
+    WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport, WorkspaceEdit,
+    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
 };
 
 use crate::get_dummy_source_path;
@@ -733,6 +733,55 @@ pub fn get_prepare_call_hierachy_response(
         selection_range: Range {
             start: Position::new(13, 14),
             end: Position::new(15, 16),
+        },
+        data: None,
+    };
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![item1]),
+        2 => Some(vec![item2]),
+        3 => Some(vec![item1, item2]),
+        _ => None,
+    }
+}
+
+/// For use with `test_prepare_type_hierarchy`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_prepare_type_hierachy_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<Vec<TypeHierarchyItem>> {
+    _ = uri;
+    let item1 = TypeHierarchyItem {
+        name: "name1".to_string(),
+        kind: SymbolKind::FILE,
+        tags: None,
+        detail: Some("detail1".to_string()),
+        uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        selection_range: Range {
+            start: Position::new(5, 6),
+            end: Position::new(7, 8),
+        },
+        data: None,
+    };
+    let item2 = TypeHierarchyItem {
+        name: "name2".to_string(),
+        kind: SymbolKind::FILE,
+        tags: None,
+        detail: Some("detail2".to_string()),
+        uri: Uri::from_str(&get_dummy_source_path()).unwrap(),
+        range: Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        },
+        selection_range: Range {
+            start: Position::new(5, 6),
+            end: Position::new(7, 8),
         },
         data: None,
     };

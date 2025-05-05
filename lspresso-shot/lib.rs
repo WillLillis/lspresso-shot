@@ -9,7 +9,7 @@ use lsp_types::{
     GotoDefinitionResponse, Hover, InlayHint, Location, Moniker, Position, PreviousResultId, Range,
     SelectionRange, SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
     SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
-    SignatureHelpContext, TextEdit, WorkspaceDiagnosticReport, WorkspaceEdit,
+    SignatureHelpContext, TextEdit, TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit,
 };
 
 use std::{
@@ -50,6 +50,7 @@ use types::{
     },
     signature_help::SignatureHelpMismatchError,
     type_definition::TypeDefinitionMismatchError,
+    type_hierarchy::PrepareTypeHierarchyMismatchError,
     CleanResponse, Empty, EmptyResult, TestCase, TestError, TestResult, TestType, TimeoutError,
 };
 
@@ -1050,7 +1051,7 @@ pub fn test_inlay_hint(
     )
 }
 
-/// Tests the server's response to a 'textDocument/prepareCallHierarchy' request
+/// Tests the server's response to a 'textDocument/moniker' request
 ///
 /// # Errors
 ///
@@ -1083,7 +1084,7 @@ pub fn test_moniker(
     )
 }
 
-/// Tests the server's response to a 'textDocument/prepareCallHierarchy' request
+/// Tests the server's response to a 'callHierarchy/outgoingCalls' request
 ///
 /// # Errors
 ///
@@ -1139,6 +1140,60 @@ pub fn test_prepare_call_hierarchy(
         |expected, actual: &Vec<CallHierarchyItem>| {
             if expected != actual {
                 Err(PrepareCallHierachyMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type PrepareTypeHierarchyComparator =
+    fn(&Vec<TypeHierarchyItem>, &Vec<TypeHierarchyItem>, &TestCase) -> bool;
+
+/// Tests the server's response to a 'textDocument/prepareTypeHierarchy' request
+///
+/// - `items`: Type hierarchy items provided to the client at request type. The
+///   `uri` field of each item should be *relative* to the test case root, instead of
+///   an absolute path. (i.e. `uri = "file://test_file.rs"`).
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `items` fails
+pub fn test_prepare_type_hierarchy(
+    mut test_case: TestCase,
+    cursor_pos: &Position,
+    items: Option<&Vec<TypeHierarchyItem>>,
+    cmp: Option<PrepareTypeHierarchyComparator>,
+    expected: Option<&Vec<TypeHierarchyItem>>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::PrepareTypeHierarchy);
+    // TODO: We may need to prepend the relative paths in `items` with the test case root
+    let items = items.map_or_else(
+        || "null".to_string(),
+        |thi| {
+            serde_json::to_string_pretty(thi)
+                .expect("JSON deserialzation of type hierarchy items failed")
+        },
+    );
+    collect_results(
+        &test_case,
+        Some(&vec![get_cursor_replacement(cursor_pos), ("ITEMS", items)]),
+        expected,
+        |expected, actual: &Vec<TypeHierarchyItem>| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(PrepareTypeHierarchyMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),

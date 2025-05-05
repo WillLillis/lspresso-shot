@@ -91,6 +91,7 @@ As an eventual end goal, we'd obviously like to provide test coverage for *all* 
 So far, we have:
 
 - [x] `callHierarchy/incomingCalls`
+- [x] `callHierarchy/outgoingCalls`
 - [x] `codeLens/resolve`
 - [x] `completionItem/resolve`
 - [x] `documentLink/resolve`
@@ -106,9 +107,11 @@ So far, we have:
 - [x] `textDocument/foldingRange`
 - [x] `textDocument/formatting`
 - [x] `textDocument/implementation`
+- [x] `textDocument/inlayHint`
 - [x] `textDocument/hover`
 - [x] `textDocument/moniker`
 - [x] `textDocument/prepareCallHierarchy`
+- [ ] `textDocument/prepareTypeHierarchy`
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`
 - [x] `textDocument/rename`
