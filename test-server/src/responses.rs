@@ -3,22 +3,23 @@ use std::{collections::HashMap, str::FromStr};
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, ChangeAnnotation,
-    CodeAction, CodeActionKind, CodeActionOrCommand, CodeActionResponse, CodeDescription, CodeLens,
-    Command, CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
-    CompletionResponse, Diagnostic, DiagnosticRelatedInformation, DocumentChanges,
-    DocumentDiagnosticReport, DocumentDiagnosticReportKind, DocumentHighlight,
-    DocumentHighlightKind, DocumentLink, DocumentSymbol, DocumentSymbolResponse, Documentation,
-    FoldingRange, FoldingRangeKind, FullDocumentDiagnosticReport, GotoDefinitionResponse, Hover,
-    HoverContents, InlayHint, InlayHintKind, InlayHintLabel, InlayHintTooltip, LanguageString,
-    Location, LocationLink, MarkedString, MarkupContent, MarkupKind, Moniker, MonikerKind,
-    ParameterInformation, ParameterLabel, Position, PublishDiagnosticsParams, Range,
-    RelatedFullDocumentDiagnosticReport, SelectionRange, SemanticToken, SemanticTokens,
-    SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
-    SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
-    SignatureInformation, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit,
-    TypeHierarchyItem, UnchangedDocumentDiagnosticReport, UniquenessLevel, Uri,
-    WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport, WorkspaceEdit,
-    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
+    CodeAction, CodeActionDisabled, CodeActionKind, CodeActionOrCommand, CodeActionResponse,
+    CodeDescription, CodeLens, Command, CompletionItem, CompletionItemKind,
+    CompletionItemLabelDetails, CompletionList, CompletionResponse, Diagnostic,
+    DiagnosticRelatedInformation, DocumentChanges, DocumentDiagnosticReport,
+    DocumentDiagnosticReportKind, DocumentHighlight, DocumentHighlightKind, DocumentLink,
+    DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange, FoldingRangeKind,
+    FullDocumentDiagnosticReport, GotoDefinitionResponse, Hover, HoverContents, InlayHint,
+    InlayHintKind, InlayHintLabel, InlayHintTooltip, LanguageString, Location, LocationLink,
+    MarkedString, MarkupContent, MarkupKind, Moniker, MonikerKind, ParameterInformation,
+    ParameterLabel, Position, PublishDiagnosticsParams, Range, RelatedFullDocumentDiagnosticReport,
+    SelectionRange, SemanticToken, SemanticTokens, SemanticTokensDelta, SemanticTokensEdit,
+    SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
+    SemanticTokensResult, SignatureHelp, SignatureInformation, SymbolInformation, SymbolKind,
+    SymbolTag, TextDocumentEdit, TextEdit, TypeHierarchyItem, UnchangedDocumentDiagnosticReport,
+    UniquenessLevel, Uri, WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
+    WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceUnchangedDocumentDiagnosticReport,
 };
 
 use crate::get_dummy_source_path;
@@ -47,6 +48,39 @@ pub fn get_code_action_response(response_num: u32, uri: &Uri) -> Option<CodeActi
         1 => Some(vec![cmd]),
         2 => Some(vec![action]),
         3 => Some(vec![cmd, action]),
+        _ => None,
+    }
+}
+
+/// For use with `test_code_action_resolve`.
+pub fn get_code_action_resolve_response(response_num: u32, uri: &Uri) -> Option<CodeAction> {
+    _ = uri;
+    let action1 = CodeAction {
+        title: "action title 1".to_string(),
+        kind: Some(CodeActionKind::QUICKFIX),
+        diagnostics: None,
+        edit: None,
+        command: None,
+        is_preferred: None,
+        disabled: Some(CodeActionDisabled {
+            reason: "diabled reason".to_string(),
+        }),
+        data: None,
+    };
+    let action2 = CodeAction {
+        title: "action title 2".to_string(),
+        kind: Some(CodeActionKind::REFACTOR_EXTRACT),
+        diagnostics: None,
+        edit: None,
+        command: None,
+        is_preferred: Some(true),
+        disabled: None,
+        data: None,
+    };
+    // TODO: More test cases later...
+    match response_num {
+        0 => Some(action1),
+        1 => Some(action2),
         _ => None,
     }
 }

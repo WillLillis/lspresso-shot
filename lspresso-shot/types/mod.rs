@@ -68,6 +68,7 @@ use std::{
     time::Duration,
 };
 
+use code_action::CodeActionResolveMismatchError;
 use inlay_hint::InlayHintMismatchError;
 use lsp_types::{Position, Uri};
 use rand::distr::Distribution as _;
@@ -80,6 +81,8 @@ use type_hierarchy::PrepareTypeHierarchyMismatchError;
 pub enum TestType {
     /// Test `textDocument/codeAction` requests
     CodeAction,
+    /// Test `codeAction/resolve` requests
+    CodeActionResolve,
     /// Test `textDocument/codeLens` requests
     CodeLens,
     /// Test `codeLens/resolve` requests
@@ -151,6 +154,7 @@ impl std::fmt::Display for TestType {
             "{}",
             match self {
                 Self::CodeAction => "textDocument/codeAction",
+                Self::CodeActionResolve => "codeAction/resolve",
                 Self::CodeLens => "textDocument/codeLens",
                 Self::CodeLensResolve => "codeLens/resolve",
                 Self::Completion => "textDocument/completion",
@@ -638,6 +642,8 @@ pub enum TestError {
     ExpectedSome(String),
     #[error(transparent)]
     CodeActionMismatch(#[from] CodeActionMismatchError),
+    #[error(transparent)]
+    CodeActionResolveMismatch(#[from] CodeActionResolveMismatchError),
     #[error(transparent)]
     CodeLensMismatch(#[from] CodeLensMismatchError),
     #[error(transparent)]
