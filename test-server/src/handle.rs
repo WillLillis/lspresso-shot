@@ -7,17 +7,18 @@ use lsp_types::{
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
         CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare,
-        CodeActionRequest, CodeLensRequest, CodeLensResolve, Completion, DocumentDiagnosticRequest,
-        DocumentHighlightRequest, DocumentLinkRequest, DocumentLinkResolve, DocumentSymbolRequest,
-        FoldingRangeRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
-        GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
-        HoverRequest, InlayHintRequest, MonikerRequest, References, Rename, Request as _,
-        ResolveCompletionItem, SelectionRangeRequest, SemanticTokensFullDeltaRequest,
-        SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
-        TypeHierarchyPrepare, WorkspaceDiagnosticRequest,
+        CodeActionRequest, CodeActionResolveRequest, CodeLensRequest, CodeLensResolve, Completion,
+        DocumentDiagnosticRequest, DocumentHighlightRequest, DocumentLinkRequest,
+        DocumentLinkResolve, DocumentSymbolRequest, FoldingRangeRequest, Formatting,
+        GotoDeclaration, GotoDeclarationParams, GotoDefinition, GotoImplementation,
+        GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest,
+        InlayHintRequest, MonikerRequest, References, Rename, Request as _, ResolveCompletionItem,
+        SelectionRangeRequest, SemanticTokensFullDeltaRequest, SemanticTokensFullRequest,
+        SemanticTokensRangeRequest, SignatureHelpRequest, TypeHierarchyPrepare,
+        WorkspaceDiagnosticRequest,
     },
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    CodeActionParams, CodeLens, CodeLensParams, CompletionItem, CompletionParams,
+    CodeAction, CodeActionParams, CodeLens, CodeLensParams, CompletionItem, CompletionParams,
     DocumentDiagnosticParams, DocumentFormattingParams, DocumentHighlightParams, DocumentLink,
     DocumentLinkParams, DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams,
     HoverParams, InlayHintParams, MonikerParams, ReferenceParams, RenameParams,
@@ -29,19 +30,19 @@ use lsp_types::{
 use crate::{
     get_root_test_path, receive_response_num,
     responses::{
-        get_code_action_response, get_code_lens_resolve_response, get_code_lens_response,
-        get_completion_resolve_response, get_completion_response, get_declaration_response,
-        get_definition_response, get_diagnostic_response, get_document_highlight_response,
-        get_document_link_resolve_response, get_document_link_response,
-        get_document_symbol_response, get_folding_range_response, get_formatting_response,
-        get_hover_response, get_implementation_response, get_incoming_calls_response,
-        get_inlay_hint_response, get_moniker_response, get_outgoing_calls_response,
-        get_prepare_call_hierachy_response, get_prepare_type_hierachy_response,
-        get_publish_diagnostics_response, get_references_response, get_rename_response,
-        get_selection_range_response, get_semantic_tokens_full_delta_response,
-        get_semantic_tokens_full_response, get_semantic_tokens_range_response,
-        get_signature_help_response, get_type_definition_response,
-        get_workspace_diagnostics_response,
+        get_code_action_resolve_response, get_code_action_response, get_code_lens_resolve_response,
+        get_code_lens_response, get_completion_resolve_response, get_completion_response,
+        get_declaration_response, get_definition_response, get_diagnostic_response,
+        get_document_highlight_response, get_document_link_resolve_response,
+        get_document_link_response, get_document_symbol_response, get_folding_range_response,
+        get_formatting_response, get_hover_response, get_implementation_response,
+        get_incoming_calls_response, get_inlay_hint_response, get_moniker_response,
+        get_outgoing_calls_response, get_prepare_call_hierachy_response,
+        get_prepare_type_hierachy_response, get_publish_diagnostics_response,
+        get_references_response, get_rename_response, get_selection_range_response,
+        get_semantic_tokens_full_delta_response, get_semantic_tokens_full_response,
+        get_semantic_tokens_range_response, get_signature_help_response,
+        get_type_definition_response, get_workspace_diagnostics_response,
     },
 };
 
@@ -224,6 +225,19 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: CodeActionParams| -> Uri { params.text_document.uri }
+            )?;
+        }
+        CodeActionResolveRequest::METHOD => {
+            handle_request!(
+                CodeActionResolveRequest,
+                get_code_action_resolve_response,
+                req,
+                conn,
+                |params: CodeAction| -> Uri {
+                    let data = params.data.unwrap();
+                    let raw_uri = data.get("uri").unwrap().as_str().unwrap();
+                    Uri::from_str(raw_uri).unwrap()
+                }
             )?;
         }
         CodeLensRequest::METHOD => {

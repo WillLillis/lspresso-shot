@@ -3,13 +3,14 @@ pub mod types;
 
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
-    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeActionContext,
-    CodeActionResponse, CodeLens, CompletionItem, Diagnostic, DocumentDiagnosticReport,
-    DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
-    GotoDefinitionResponse, Hover, InlayHint, Location, Moniker, Position, PreviousResultId, Range,
-    SelectionRange, SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
-    SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
-    SignatureHelpContext, TextEdit, TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit,
+    CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
+    CodeActionContext, CodeActionResponse, CodeLens, CompletionItem, Diagnostic,
+    DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbolResponse,
+    FoldingRange, FormattingOptions, GotoDefinitionResponse, Hover, InlayHint, Location, Moniker,
+    Position, PreviousResultId, Range, SelectionRange, SemanticTokens, SemanticTokensDelta,
+    SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
+    SemanticTokensResult, SignatureHelp, SignatureHelpContext, TextEdit, TypeHierarchyItem,
+    WorkspaceDiagnosticReport, WorkspaceEdit,
 };
 
 use std::{
@@ -24,7 +25,7 @@ use types::{
     call_hierarchy::{
         IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
     },
-    code_action::CodeActionMismatchError,
+    code_action::{CodeActionMismatchError, CodeActionResolveMismatchError},
     code_lens::{CodeLensMismatchError, CodeLensResolveMismatchError},
     completion::{CompletionMismatchError, CompletionResolveMismatchError, CompletionResult},
     declaration::DeclarationMismatchError,
@@ -274,7 +275,7 @@ fn get_cursor_replacement(cursor_pos: &Position) -> (&str, String) {
 
 pub type CodeActionComparator = fn(&CodeActionResponse, &CodeActionResponse, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/codeLens' request
+/// Tests the server's response to a 'textDocument/codeAction' request
 ///
 /// - `cmp` is an optional custom comparator function that can be used to compare the expected
 ///   and actual results. Becaue the `CodeAction` struct can contain arbitrary JSON, it's not feasible
@@ -312,6 +313,53 @@ pub fn test_code_action(
             );
             if !eql {
                 Err(CodeActionMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: (*expected).clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type CodeActionResolveComparator = fn(&CodeAction, &CodeAction, &TestCase) -> bool;
+
+/// Tests the server's response to a 'textDocument/codeLens' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to compare the expected
+///   and actual results. Becaue the `CodeAction` struct can contain arbitrary JSON, it's not feasible
+///   to clean results from test-case specific information (e.g. the root path).
+///
+/// # Errors
+///
+/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `range` or `params` fails
+pub fn test_code_action_resolve(
+    mut test_case: TestCase,
+    params: &CodeAction,
+    cmp: Option<CodeActionResolveComparator>,
+    expected: &CodeAction,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::CodeActionResolve);
+    let params_json =
+        serde_json::to_string_pretty(params).expect("JSON deserialzation of params failed");
+
+    collect_results(
+        &test_case,
+        Some(&vec![("PARAMS", params_json)]),
+        Some(expected),
+        |expected, actual: &CodeAction| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(CodeActionResolveMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: (*expected).clone(),
                     actual: actual.clone(),
