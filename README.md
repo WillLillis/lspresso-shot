@@ -111,7 +111,7 @@ So far, we have:
 - [x] `textDocument/hover`
 - [x] `textDocument/moniker`
 - [x] `textDocument/prepareCallHierarchy`
-- [ ] `textDocument/prepareTypeHierarchy`
+- [x] `textDocument/prepareTypeHierarchy`
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/references`
 - [x] `textDocument/rename`
