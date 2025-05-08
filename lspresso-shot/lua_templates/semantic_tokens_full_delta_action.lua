@@ -7,10 +7,12 @@ local function check_progress_result()
         report_log(tostring(progress_count) .. ' < ' .. tostring(PROGRESS_THRESHOLD) .. '\n') ---@diagnostic disable-line: undefined-global
         return
     end
+    local params = {}
+    ---@diagnostic disable-next-line: undefined-global, exp-in-action
+    PARAM_ASSIGN
+
     report_log('Issuing semantic tokens full request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
-    local semantic_tokens_full_result = vim.lsp.buf_request_sync(0, 'textDocument/semanticTokens/full', {
-        textDocument = vim.lsp.util.make_text_document_params(0),
-    })
+    local semantic_tokens_full_result = vim.lsp.buf_request_sync(0, 'textDocument/semanticTokens/full', params)
 
     local result_id = nil
     if not semantic_tokens_full_result then

@@ -1,6 +1,7 @@
 mod init_dot_lua;
 pub mod types;
 
+use init_dot_lua::LuaReplacement;
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
@@ -127,7 +128,7 @@ impl Drop for RunnerGuard<'_> {
 /// Otherwise, we expect some results, and this function will return `Ok(Some(_))` or `Err`.
 fn test_inner<R1, R2>(
     test_case: &TestCase,
-    replacements: Option<&Vec<(&str, String)>>,
+    replacements: &mut Vec<LuaReplacement>,
 ) -> TestResult<Option<R2>>
 where
     R1: serde::de::DeserializeOwned + std::fmt::Debug + Empty + CleanResponse,
@@ -245,7 +246,7 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestResult<()> {
 
 fn collect_results<R1, R2>(
     test_case: &TestCase,
-    replacements: Option<&Vec<(&str, String)>>,
+    replacements: &mut Vec<LuaReplacement>,
     expected: Option<&R1>,
     cmp: impl Fn(&R1, &R2) -> TestResult<()>,
 ) -> TestResult<()>
@@ -261,16 +262,6 @@ where
         assert!(empty.is_none());
         Ok(())
     }
-}
-
-fn get_cursor_replacement(cursor_pos: &Position) -> (&str, String) {
-    (
-        "SET_CURSOR_POSITION",
-        format!(
-            "position = {{ line = {}, character = {} }}",
-            cursor_pos.line, cursor_pos.character
-        ),
-    )
 }
 
 pub type CodeActionComparator = fn(&CodeActionResponse, &CodeActionResponse, &TestCase) -> bool;
@@ -304,7 +295,17 @@ pub fn test_code_action(
 
     collect_results(
         &test_case,
-        Some(&vec![("RANGE", range_json), ("CONTEXT", context_json)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamDirect {
+                name: "range",
+                json: range_json,
+            },
+            LuaReplacement::ParamDirect {
+                name: "context",
+                json: context_json,
+            },
+        ],
         expected,
         |expected, actual: &CodeActionResponse| {
             let eql = cmp.as_ref().map_or_else(
@@ -346,12 +347,25 @@ pub fn test_code_action_resolve(
     expected: &CodeAction,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::CodeActionResolve);
-    let params_json =
+    let code_action_json =
         serde_json::to_string_pretty(params).expect("JSON deserialzation of params failed");
 
     collect_results(
         &test_case,
-        Some(&vec![("PARAMS", params_json)]),
+        &mut vec![LuaReplacement::ParamDestructure {
+            name: "code_action",
+            fields: vec![
+                "title",
+                "kind",
+                "diagnostics",
+                "edit",
+                "command",
+                "isPreferred",
+                "disabled",
+                "data",
+            ],
+            json: code_action_json,
+        }],
         Some(expected),
         |expected, actual: &CodeAction| {
             let eql = cmp.as_ref().map_or_else(
@@ -400,7 +414,13 @@ pub fn test_code_lens(
 
     collect_results(
         &test_case,
-        Some(&vec![("COMMANDS", command_str)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::Other {
+                from: "COMMANDS",
+                to: command_str,
+            },
+        ],
         expected,
         |expected, actual: &Vec<CodeLens>| {
             let eql = cmp.as_ref().map_or_else(
@@ -456,10 +476,17 @@ pub fn test_code_lens_resolve(
 
     collect_results(
         &test_case,
-        Some(&vec![
-            ("COMMANDS", command_str),
-            ("CODE_LENS", code_lens_json),
-        ]),
+        &mut vec![
+            LuaReplacement::ParamDestructure {
+                name: "code_lens",
+                fields: vec!["range", "data", "command"],
+                json: code_lens_json,
+            },
+            LuaReplacement::Other {
+                from: "COMMANDS",
+                to: command_str,
+            },
+        ],
         expected,
         |expected, actual: &CodeLens| {
             let eql = cmp.as_ref().map_or_else(
@@ -492,7 +519,10 @@ pub fn test_completion(
     test_case.test_type = Some(TestType::Completion);
     collect_results(
         &test_case,
-        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+        ],
         expected,
         |expected, actual| {
             if !expected.results_satisfy(actual) {
@@ -528,7 +558,31 @@ pub fn test_completion_resolve(
         .expect("JSON deserialzation of completion item failed");
     collect_results(
         &test_case,
-        Some(&vec![("COMPLETION_ITEM", completion_item)]),
+        &mut vec![LuaReplacement::ParamDestructure {
+            name: "completion_item",
+            fields: vec![
+                "label",
+                "labelDetails",
+                "kind",
+                "tags",
+                "detail",
+                "documentation",
+                "deprecated",
+                "preselect",
+                "sortText",
+                "filterText",
+                "insertText",
+                "insertTextFormat",
+                "insertTextMode",
+                "textEdit",
+                "textEditText",
+                "additionalTextEdits",
+                "commitCharacters",
+                "command",
+                "data",
+            ],
+            json: completion_item,
+        }],
         expected,
         |expected, actual| {
             if expected != actual {
@@ -556,7 +610,10 @@ pub fn test_declaration(
     test_case.test_type = Some(TestType::Declaration);
     collect_results(
         &test_case,
-        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+        ],
         expected,
         |expected, actual| {
             // HACK: Since the `GotoDeclarationResponse` is untagged, there's no way to differentiate
@@ -603,7 +660,10 @@ pub fn test_definition(
     test_case.test_type = Some(TestType::Definition);
     collect_results(
         &test_case,
-        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+        ],
         expected,
         |expected, actual| {
             // HACK: Since the `GotoDefinitionResponse` is untagged, there's no way to differentiate
@@ -654,11 +714,11 @@ pub fn test_diagnostic(
     expected: &DocumentDiagnosticReport,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Diagnostic);
-    let identifier = identifier.map_or_else(
+    let identifier_json = identifier.map_or_else(
         || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
         |id| serde_json::to_string_pretty(id).expect("JSON deserialzation of identifier failed"),
     );
-    let previous_result_id = previous_result_id.map_or_else(
+    let previous_result_id_json = previous_result_id.map_or_else(
         || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
         |id| {
             serde_json::to_string_pretty(id)
@@ -667,10 +727,17 @@ pub fn test_diagnostic(
     );
     collect_results(
         &test_case,
-        Some(&vec![
-            ("IDENTIFIER", identifier),
-            ("PREVIOUS_RESULT_ID", previous_result_id),
-        ]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamDirect {
+                name: "identifier",
+                json: identifier_json,
+            },
+            LuaReplacement::ParamDirect {
+                name: "previousResultId",
+                json: previous_result_id_json,
+            },
+        ],
         Some(expected),
         |expected: &DocumentDiagnosticReport, actual: &DocumentDiagnosticReport| {
             if expected != actual {
@@ -699,7 +766,10 @@ pub fn test_document_highlight(
     test_case.test_type = Some(TestType::DocumentHighlight);
     collect_results(
         &test_case,
-        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+        ],
         expected,
         |expected, actual: &Vec<DocumentHighlight>| {
             if expected != actual {
@@ -727,7 +797,7 @@ pub fn test_document_link(
     test_case.test_type = Some(TestType::DocumentLink);
     collect_results(
         &test_case,
-        None,
+        &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual: &Vec<DocumentLink>| {
             if expected != actual {
@@ -757,12 +827,16 @@ pub fn test_document_link_resolve(
     link: &DocumentLink,
     expected: Option<&DocumentLink>,
 ) -> TestResult<()> {
-    let json_link =
+    let document_link_json =
         serde_json::to_string_pretty(link).expect("JSON deserialzation of document link failed");
     test_case.test_type = Some(TestType::DocumentLinkResolve);
     collect_results(
         &test_case,
-        Some(&vec![("DOC_LINK", json_link)]),
+        &mut vec![LuaReplacement::ParamDestructure {
+            name: "link",
+            fields: vec!["range", "target", "tooltip", "data"],
+            json: document_link_json,
+        }],
         expected,
         |expected, actual: &DocumentLink| {
             if expected != actual {
@@ -788,35 +862,40 @@ pub fn test_document_symbol(
     expected: Option<&DocumentSymbolResponse>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::DocumentSymbol);
-    collect_results(&test_case, None, expected, |expected, actual| {
-        // HACK: Since the two types of DocumentSymbolResponse are untagged, there's no
-        // way to differentiate between the two if we get an empty vector in response.
-        // Just treat this as a special case and say it's ok.
-        match (expected, actual) {
-            (
-                DocumentSymbolResponse::Flat(flat_items),
-                DocumentSymbolResponse::Nested(nested_items),
-            )
-            | (
-                DocumentSymbolResponse::Nested(nested_items),
-                DocumentSymbolResponse::Flat(flat_items),
-            ) => {
-                if flat_items.is_empty() && nested_items.is_empty() {
-                    return Ok(());
+    collect_results(
+        &test_case,
+        &mut vec![LuaReplacement::ParamTextDocument],
+        expected,
+        |expected, actual| {
+            // HACK: Since the two types of DocumentSymbolResponse are untagged, there's no
+            // way to differentiate between the two if we get an empty vector in response.
+            // Just treat this as a special case and say it's ok.
+            match (expected, actual) {
+                (
+                    DocumentSymbolResponse::Flat(flat_items),
+                    DocumentSymbolResponse::Nested(nested_items),
+                )
+                | (
+                    DocumentSymbolResponse::Nested(nested_items),
+                    DocumentSymbolResponse::Flat(flat_items),
+                ) => {
+                    if flat_items.is_empty() && nested_items.is_empty() {
+                        return Ok(());
+                    }
                 }
+                _ => {}
             }
-            _ => {}
-        }
-        if expected != actual {
-            Err(DocumentSymbolMismatchError {
-                test_id: test_case.test_id.clone(),
-                expected: expected.clone(),
-                actual: actual.clone(),
-            })?;
-        }
+            if expected != actual {
+                Err(DocumentSymbolMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
 
-        Ok(())
-    })
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'textDocument/foldingRange' request
@@ -832,7 +911,7 @@ pub fn test_folding_range(
     test_case.test_type = Some(TestType::FoldingRange);
     collect_results(
         &test_case,
-        None,
+        &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual: &Vec<FoldingRange>| {
             if expected != actual {
@@ -847,6 +926,7 @@ pub fn test_folding_range(
     )
 }
 
+// TODO: Consider hard-assigning defaults here instead of supplying `None`
 /// Tests the server's response to a 'textDocument/formatting' request. If `options`
 /// is `None`, the following default is used:
 ///
@@ -882,15 +962,21 @@ pub fn test_formatting(
         insert_final_newline: None,
         trim_final_newlines: None,
     });
-    let json_opts = serde_json::to_string_pretty(&opts)
+    let format_opts_json = serde_json::to_string_pretty(&opts)
         .expect("JSON deserialzation of formatting options failed");
     match expected {
         Some(FormattingResult::Response(edits)) => collect_results(
             &test_case,
-            Some(&vec![
-                ("INVOKE_FORMAT", "false".to_string()),
-                ("JSON_OPTIONS", json_opts),
-            ]),
+            &mut vec![
+                LuaReplacement::Other {
+                    from: "INVOKE_FORMAT",
+                    to: "false".to_string(),
+                },
+                LuaReplacement::ParamDirect {
+                    name: "options",
+                    json: format_opts_json,
+                },
+            ],
             Some(edits),
             |expected, actual: &Vec<TextEdit>| {
                 if expected != actual {
@@ -905,10 +991,17 @@ pub fn test_formatting(
         ),
         Some(FormattingResult::EndState(state)) => collect_results(
             &test_case,
-            Some(&vec![
-                ("INVOKE_FORMAT", "true".to_string()),
-                ("JSON_OPTIONS", json_opts),
-            ]),
+            &mut vec![
+                LuaReplacement::ParamTextDocument,
+                LuaReplacement::Other {
+                    from: "INVOKE_FORMAT",
+                    to: "true".to_string(),
+                },
+                LuaReplacement::ParamDirect {
+                    name: "options",
+                    json: format_opts_json,
+                },
+            ],
             Some(state),
             |expected, actual: &String| {
                 if expected != actual {
@@ -923,10 +1016,16 @@ pub fn test_formatting(
         ),
         None => collect_results(
             &test_case,
-            Some(&vec![
-                ("INVOKE_FORMAT", "false".to_string()),
-                ("JSON_OPTIONS", json_opts),
-            ]),
+            &mut vec![
+                LuaReplacement::Other {
+                    from: "INVOKE_FORMAT",
+                    to: "false".to_string(),
+                },
+                LuaReplacement::ParamDirect {
+                    name: "options",
+                    json: format_opts_json,
+                },
+            ],
             None,
             |expected: &Vec<TextEdit>, actual: &Vec<TextEdit>| {
                 if expected != actual {
@@ -956,7 +1055,10 @@ pub fn test_hover(
     test_case.test_type = Some(TestType::Hover);
     collect_results(
         &test_case,
-        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+        ],
         expected,
         |expected, actual| {
             if expected != actual {
@@ -985,7 +1087,10 @@ pub fn test_implementation(
     test_case.test_type = Some(TestType::Implementation);
     collect_results(
         &test_case,
-        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+        ],
         expected,
         |expected, actual| {
             // HACK: Since `GotoImplementationResponse` is untagged, there is no way to
@@ -1035,13 +1140,14 @@ pub fn test_incoming_calls(
     expected: Option<&Vec<CallHierarchyIncomingCall>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::IncomingCalls);
+    let call_item_json =
+        serde_json::to_string_pretty(call_item).expect("JSON deserialzation of call item failed");
     collect_results(
         &test_case,
-        Some(&vec![(
-            "CALL_ITEM",
-            serde_json::to_string_pretty(call_item)
-                .expect("JSON deserialzation of call item failed"),
-        )]),
+        &mut vec![LuaReplacement::ParamDirect {
+            name: "item",
+            json: call_item_json,
+        }],
         expected,
         |expected, actual: &Vec<CallHierarchyIncomingCall>| {
             if expected != actual {
@@ -1067,7 +1173,7 @@ pub type InlayHintComparator = fn(&Vec<InlayHint>, &Vec<InlayHint>, &TestCase) -
 ///
 /// # Panics
 ///
-/// Panics if JSON deserialization of `range` fails
+/// Panics if JSON serialization of `range` fails
 pub fn test_inlay_hint(
     mut test_case: TestCase,
     range: &Range,
@@ -1075,12 +1181,17 @@ pub fn test_inlay_hint(
     expected: Option<&Vec<InlayHint>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::InlayHint);
+    let range_json =
+        serde_json::to_string_pretty(range).expect("JSON serialzation of range failed");
     collect_results(
         &test_case,
-        Some(&vec![(
-            "RANGE",
-            serde_json::to_string_pretty(range).expect("JSON serialzation of range failed"),
-        )]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamDirect {
+                name: "range",
+                json: range_json,
+            },
+        ],
         expected,
         |expected, actual: &Vec<InlayHint>| {
             let eql = cmp.as_ref().map_or_else(
@@ -1117,7 +1228,10 @@ pub fn test_moniker(
     test_case.test_type = Some(TestType::Moniker);
     collect_results(
         &test_case,
-        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+        ],
         expected,
         |expected, actual: &Vec<Moniker>| {
             if expected != actual {
@@ -1148,13 +1262,14 @@ pub fn test_outgoing_calls(
     expected: Option<&Vec<CallHierarchyOutgoingCall>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::OutgoingCalls);
+    let call_item_json =
+        serde_json::to_string_pretty(call_item).expect("JSON deserialzation of call item failed");
     collect_results(
         &test_case,
-        Some(&vec![(
-            "CALL_ITEM",
-            serde_json::to_string_pretty(call_item)
-                .expect("JSON deserialzation of call item failed"),
-        )]),
+        &mut vec![LuaReplacement::ParamDirect {
+            name: "item",
+            json: call_item_json,
+        }],
         expected,
         |expected, actual: &Vec<CallHierarchyOutgoingCall>| {
             if expected != actual {
@@ -1183,7 +1298,10 @@ pub fn test_prepare_call_hierarchy(
     test_case.test_type = Some(TestType::PrepareCallHierarchy);
     collect_results(
         &test_case,
-        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+        ],
         expected,
         |expected, actual: &Vec<CallHierarchyItem>| {
             if expected != actual {
@@ -1224,7 +1342,7 @@ pub fn test_prepare_type_hierarchy(
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::PrepareTypeHierarchy);
     // TODO: We may need to prepend the relative paths in `items` with the test case root
-    let items = items.map_or_else(
+    let items_json = items.map_or_else(
         || "null".to_string(),
         |thi| {
             serde_json::to_string_pretty(thi)
@@ -1233,7 +1351,14 @@ pub fn test_prepare_type_hierarchy(
     );
     collect_results(
         &test_case,
-        Some(&vec![get_cursor_replacement(cursor_pos), ("ITEMS", items)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::Other {
+                from: "items",
+                to: items_json,
+            },
+        ],
         expected,
         |expected, actual: &Vec<TypeHierarchyItem>| {
             let eql = cmp.as_ref().map_or_else(
@@ -1277,7 +1402,7 @@ pub fn test_publish_diagnostics(
     test_case.test_type = Some(TestType::PublishDiagnostics);
     collect_results(
         &test_case,
-        None,
+        &mut Vec::new(),
         Some(expected),
         |expected: &Vec<Diagnostic>, actual: &Vec<Diagnostic>| {
             if expected != actual {
@@ -1297,6 +1422,10 @@ pub fn test_publish_diagnostics(
 /// # Errors
 ///
 /// Returns `TestError` if the expected results don't match, or if some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `include_declaration` fails
 pub fn test_references(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -1304,15 +1433,21 @@ pub fn test_references(
     expected: Option<&Vec<Location>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::References);
+    let include_decl_json = serde_json::to_string_pretty(&include_declaration)
+        .expect("JSON deserialzation of include declaration failed");
     collect_results(
         &test_case,
-        Some(&vec![
-            get_cursor_replacement(cursor_pos),
-            (
-                "SET_CONTEXT",
-                format!("context = {{ includeDeclaration = {include_declaration} }}"),
-            ),
-        ]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamNested {
+                name: "context",
+                fields: vec![LuaReplacement::ParamDirect {
+                    name: "includeDeclaration",
+                    json: include_decl_json,
+                }],
+            },
+        ],
         expected,
         |expected, actual: &Vec<Location>| {
             if expected != actual {
@@ -1340,12 +1475,18 @@ pub fn test_rename(
     expected: Option<&WorkspaceEdit>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Rename);
+    let new_name_json =
+        serde_json::to_string_pretty(new_name).expect("JSON deserialzation of new name failed");
     collect_results(
         &test_case,
-        Some(&vec![
-            get_cursor_replacement(cursor_pos),
-            ("NEW_NAME", format!("newName = '{new_name}'")),
-        ]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamDirect {
+                name: "newName",
+                json: new_name_json,
+            },
+        ],
         expected,
         |expected, actual| {
             if expected != actual {
@@ -1375,12 +1516,18 @@ pub fn test_selection_range(
     expected: Option<&Vec<SelectionRange>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SelectionRange);
-    let positions_str =
+    let positions_json =
         serde_json::to_string_pretty(positions).expect("JSON deserialzation of `positions` failed");
 
     collect_results(
         &test_case,
-        Some(&vec![("POSITIONS", positions_str)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamDirect {
+                name: "positions",
+                json: positions_json,
+            },
+        ],
         expected,
         |expected, actual: &Vec<SelectionRange>| {
             if expected != actual {
@@ -1405,43 +1552,52 @@ pub fn test_semantic_tokens_full(
     expected: Option<&SemanticTokensResult>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SemanticTokensFull);
-    collect_results(&test_case, None, expected, |expected, actual| {
-        // HACK: Since the `SemanticTokensResult` is untagged, there's no way to differentiate
-        // between `SemanticTokensResult::Tokens` and `SemanticTokensResult::Partial`, as they
-        // are structurally identical when we have
-        // `SemanticTokensResult::Tokens(SemanticTokens { result_id: None, ...)`
-        // Treat this as a special case and say it's ok.
-        match (expected, actual) {
-            (
-                SemanticTokensResult::Tokens(SemanticTokens {
-                    result_id: None,
-                    data: token_data,
-                }),
-                SemanticTokensResult::Partial(SemanticTokensPartialResult { data: partial_data }),
-            )
-            | (
-                SemanticTokensResult::Partial(SemanticTokensPartialResult { data: partial_data }),
-                SemanticTokensResult::Tokens(SemanticTokens {
-                    result_id: None,
-                    data: token_data,
-                }),
-            ) => {
-                if token_data == partial_data {
-                    return Ok(());
+    collect_results(
+        &test_case,
+        &mut vec![LuaReplacement::ParamTextDocument],
+        expected,
+        |expected, actual| {
+            // HACK: Since the `SemanticTokensResult` is untagged, there's no way to differentiate
+            // between `SemanticTokensResult::Tokens` and `SemanticTokensResult::Partial`, as they
+            // are structurally identical when we have
+            // `SemanticTokensResult::Tokens(SemanticTokens { result_id: None, ...)`
+            // Treat this as a special case and say it's ok.
+            match (expected, actual) {
+                (
+                    SemanticTokensResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: token_data,
+                    }),
+                    SemanticTokensResult::Partial(SemanticTokensPartialResult {
+                        data: partial_data,
+                    }),
+                )
+                | (
+                    SemanticTokensResult::Partial(SemanticTokensPartialResult {
+                        data: partial_data,
+                    }),
+                    SemanticTokensResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: token_data,
+                    }),
+                ) => {
+                    if token_data == partial_data {
+                        return Ok(());
+                    }
                 }
+                _ => {}
             }
-            _ => {}
-        }
 
-        if expected != actual {
-            Err(SemanticTokensFullMismatchError {
-                test_id: test_case.test_id.clone(),
-                expected: expected.clone(),
-                actual: actual.clone(),
-            })?;
-        }
-        Ok(())
-    })
+            if expected != actual {
+                Err(SemanticTokensFullMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'textDocument/semanticTokens/full/delta' request
@@ -1458,89 +1614,94 @@ pub fn test_semantic_tokens_full_delta(
     expected: Option<&SemanticTokensFullDeltaResult>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SemanticTokensFullDelta);
-    collect_results(&test_case, None, expected, |expected, actual| {
-        match (expected, actual) {
-            (
-                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                    result_id: None,
-                    data: token_data,
-                }),
-                SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                    result_id: None,
-                    edits: edit_data,
-                }),
-            )
-            | (
-                SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                    result_id: None,
-                    edits: edit_data,
-                }),
-                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                    result_id: None,
-                    data: token_data,
-                }),
-            ) if token_data.is_empty() && edit_data.is_empty() => return Ok(()),
-            (
-                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                    result_id: None,
-                    data: token_data,
-                }),
-                SemanticTokensFullDeltaResult::PartialTokensDelta {
-                    edits: partial_data,
-                },
-            )
-            | (
-                SemanticTokensFullDeltaResult::PartialTokensDelta {
-                    edits: partial_data,
-                },
-                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                    result_id: None,
-                    data: token_data,
-                }),
-            ) if token_data.is_empty() && partial_data.is_empty() => return Ok(()),
-            (
-                SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                    result_id: None,
-                    edits: edit_data,
-                }),
-                SemanticTokensFullDeltaResult::PartialTokensDelta {
-                    edits: partial_data,
-                },
-            )
-            | (
-                SemanticTokensFullDeltaResult::PartialTokensDelta {
-                    edits: partial_data,
-                },
-                SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                    result_id: None,
-                    edits: edit_data,
-                }),
-            ) if edit_data.is_empty() && partial_data.is_empty() => return Ok(()),
-            (
-                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                    result_id: None,
-                    data: token_data,
-                }),
-                SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
-            )
-            | (
-                SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
-                SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                    result_id: None,
-                    data: token_data,
-                }),
-            ) if edit_data.is_empty() && token_data.is_empty() => return Ok(()),
-            _ => {}
-        }
-        if expected != actual {
-            Err(Box::new(SemanticTokensFullDeltaMismatchError {
-                test_id: test_case.test_id.clone(),
-                expected: expected.clone(),
-                actual: actual.clone(),
-            }))?;
-        }
-        Ok(())
-    })
+    collect_results(
+        &test_case,
+        &mut vec![LuaReplacement::ParamTextDocument],
+        expected,
+        |expected, actual| {
+            match (expected, actual) {
+                (
+                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: token_data,
+                    }),
+                    SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                        result_id: None,
+                        edits: edit_data,
+                    }),
+                )
+                | (
+                    SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                        result_id: None,
+                        edits: edit_data,
+                    }),
+                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: token_data,
+                    }),
+                ) if token_data.is_empty() && edit_data.is_empty() => return Ok(()),
+                (
+                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: token_data,
+                    }),
+                    SemanticTokensFullDeltaResult::PartialTokensDelta {
+                        edits: partial_data,
+                    },
+                )
+                | (
+                    SemanticTokensFullDeltaResult::PartialTokensDelta {
+                        edits: partial_data,
+                    },
+                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: token_data,
+                    }),
+                ) if token_data.is_empty() && partial_data.is_empty() => return Ok(()),
+                (
+                    SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                        result_id: None,
+                        edits: edit_data,
+                    }),
+                    SemanticTokensFullDeltaResult::PartialTokensDelta {
+                        edits: partial_data,
+                    },
+                )
+                | (
+                    SemanticTokensFullDeltaResult::PartialTokensDelta {
+                        edits: partial_data,
+                    },
+                    SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                        result_id: None,
+                        edits: edit_data,
+                    }),
+                ) if edit_data.is_empty() && partial_data.is_empty() => return Ok(()),
+                (
+                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: token_data,
+                    }),
+                    SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
+                )
+                | (
+                    SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
+                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: token_data,
+                    }),
+                ) if edit_data.is_empty() && token_data.is_empty() => return Ok(()),
+                _ => {}
+            }
+            if expected != actual {
+                Err(Box::new(SemanticTokensFullDeltaMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                }))?;
+            }
+            Ok(())
+        },
+    )
 }
 
 /// Tests the server's response to a 'textDocument/semanticTokens/range' request
@@ -1563,7 +1724,13 @@ pub fn test_semantic_tokens_range(
         serde_json::to_string_pretty(range).expect("JSON deserialzation of range failed");
     collect_results(
         &test_case,
-        Some(&vec![("RANGE", range_json)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamDirect {
+                name: "range",
+                json: range_json,
+            },
+        ],
         expected,
         |expected, actual| {
             // HACK: Since the `SemanticTokensRangeResult` is untagged, there's no way
@@ -1625,7 +1792,7 @@ pub fn test_signature_help(
     expected: Option<&SignatureHelp>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SignatureHelp);
-    let context = context.map_or_else(
+    let context_json = context.map_or_else(
         || "null".to_string(),
         |ctx| {
             serde_json::to_string_pretty(ctx)
@@ -1634,10 +1801,14 @@ pub fn test_signature_help(
     );
     collect_results(
         &test_case,
-        Some(&vec![
-            get_cursor_replacement(cursor_pos),
-            ("SIGNATURE_CONTEXT", context),
-        ]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamDirect {
+                name: "context",
+                json: context_json,
+            },
+        ],
         expected,
         |expected, actual| {
             if expected != actual {
@@ -1665,7 +1836,10 @@ pub fn test_type_definition(
     test_case.test_type = Some(TestType::TypeDefinition);
     collect_results(
         &test_case,
-        Some(&vec![get_cursor_replacement(cursor_pos)]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition(*cursor_pos),
+        ],
         expected,
         |expected, actual| {
             // HACK: Since the `GotoTypeDefinitionResponse` is untagged, there's no way
@@ -1716,18 +1890,25 @@ pub fn test_workspace_diagnostic(
     expected: &WorkspaceDiagnosticReport,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::WorkspaceDiagnostic);
-    let identifier = identifier.map_or_else(
+    let identifier_json = identifier.map_or_else(
         || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
         |id| serde_json::to_string_pretty(&id).expect("JSON deserialzation of identifier failed"),
     );
-    let previous_result_ids = serde_json::to_string_pretty(previous_result_ids)
+    let previous_result_ids_json = serde_json::to_string_pretty(previous_result_ids)
         .expect("JSON deserialzation of previous result id failed");
     collect_results(
         &test_case,
-        Some(&vec![
-            ("IDENTIFIER", identifier),
-            ("PREVIOUS_RESULT_ID", previous_result_ids),
-        ]),
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamDirect {
+                name: "identifier",
+                json: identifier_json,
+            },
+            LuaReplacement::ParamDirect {
+                name: "previousResultIds",
+                json: previous_result_ids_json,
+            },
+        ],
         Some(expected),
         |expected: &WorkspaceDiagnosticReport, actual: &WorkspaceDiagnosticReport| {
             if expected != actual {

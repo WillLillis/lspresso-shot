@@ -1,3 +1,6 @@
+use lsp_types::Position;
+use std::fmt::Write;
+
 use crate::types::{ServerStartType, TestCase, TestSetupError, TestSetupResult, TestType};
 
 /// Construct the contents of an `init.lua` file to test an lsp request corresponding
@@ -5,8 +8,37 @@ use crate::types::{ServerStartType, TestCase, TestSetupError, TestSetupResult, T
 pub fn get_init_dot_lua(
     test_case: &TestCase,
     test_type: TestType,
-    custom_replacements: Option<&Vec<(&str, String)>>,
+    replacements: &mut Vec<LuaReplacement>,
 ) -> TestSetupResult<String> {
+    replacements.extend(get_standard_replacements(test_case, test_type)?);
+    let mut raw_init = include_str!("lua_templates/helpers.lua").to_string();
+    raw_init.push_str(match test_type {
+        TestType::PublishDiagnostics => include_str!("lua_templates/diagnostic_autocmd.lua"),
+        TestType::Formatting => include_str!("lua_templates/formatting_action.lua"),
+        TestType::SemanticTokensFullDelta => {
+            include_str!("lua_templates/semantic_tokens_full_delta_action.lua")
+        }
+        _ => include_str!("lua_templates/request_action.lua"),
+    });
+    let replacement_set = LuaDocumentReplacement::new(replacements);
+    raw_init.push_str(include_str!("lua_templates/attach.lua"));
+    // This is how we get neovim to actually invoke the action to be tested
+    raw_init = match test_type {
+        // Diagnostics are handled via an autocmd, no need to handle `$/progress`
+        TestType::PublishDiagnostics => raw_init.replace("LSP_ACTION", ""),
+        _ => raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type)),
+    };
+    let final_init = replacement_set.fill_document(raw_init);
+
+    Ok(final_init)
+}
+
+/// Replacements common to all/nearly all test types.
+fn get_standard_replacements(
+    test_case: &TestCase,
+    test_type: TestType,
+) -> TestSetupResult<Vec<LuaReplacement>> {
+    let mut replacements = Vec::with_capacity(11);
     let results_file_path = test_case.get_results_file_path()?;
     let root_path = test_case.get_lspresso_dir()?;
     let error_path = test_case.get_error_file_path()?;
@@ -28,90 +60,56 @@ pub fn get_init_dot_lua(
                 test_case.source_file.path.to_string_lossy().to_string(),
             )
         })?;
-    // Start out with some utilities, adding the relevant filetype, attach logic,
-    // and the relevant `check_progress_result` function to invoke our request at
-    // the appropriate time
-    let mut raw_init = format!(
-        "{}{}{}",
-        include_str!("lua_templates/helpers.lua"),
-        get_attach_action(test_type),
-        include_str!("lua_templates/attach.lua"),
-    );
-    // This is how we actually invoke the action to be tested
-    match test_type {
-        TestType::CodeAction
-        | TestType::CodeActionResolve
-        | TestType::CodeLens
-        | TestType::CodeLensResolve
-        | TestType::Completion
-        | TestType::CompletionResolve
-        | TestType::Declaration
-        | TestType::Definition
-        | TestType::Diagnostic
-        | TestType::DocumentHighlight
-        | TestType::DocumentLink
-        | TestType::DocumentLinkResolve
-        | TestType::DocumentSymbol
-        | TestType::FoldingRange
-        | TestType::Formatting
-        | TestType::Hover
-        | TestType::Implementation
-        | TestType::InlayHint
-        | TestType::IncomingCalls
-        | TestType::Moniker
-        | TestType::OutgoingCalls
-        | TestType::PrepareCallHierarchy
-        | TestType::PrepareTypeHierarchy
-        | TestType::References
-        | TestType::Rename
-        | TestType::SelectionRange
-        | TestType::SemanticTokensFull
-        | TestType::SemanticTokensFullDelta
-        | TestType::SemanticTokensRange
-        | TestType::SignatureHelp
-        | TestType::TypeDefinition
-        | TestType::WorkspaceDiagnostic => {
-            raw_init = raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type));
-        }
-        TestType::PublishDiagnostics => {
-            // Diagnostics are handled via an autocmd, no need to handle `$/progress`
-            raw_init = raw_init.replace("LSP_ACTION", "");
-            raw_init.push_str(include_str!("lua_templates/diagnostic_autocmd.lua"));
-        }
-    }
-
-    if let Some(replacements) = custom_replacements {
-        for (from, to) in replacements {
-            raw_init = raw_init.replace(from, to);
-        }
-    }
-
-    let final_init = raw_init
-        .replace("RESULTS_FILE", results_file_path.to_str().unwrap())
-        .replace(
-            "EXECUTABLE_PATH",
-            test_case.executable_path.to_str().unwrap(),
-        )
-        .replace("ROOT_PATH", root_path.to_str().unwrap())
-        .replace("ERROR_PATH", error_path.to_str().unwrap())
-        .replace("LOG_PATH", log_path.to_str().unwrap())
-        .replace("EMPTY_PATH", empty_path.to_str().unwrap())
-        .replace("FILE_EXTENSION", source_extension)
-        .replace("COMMANDS", "") // clear out commands placeholder if they weren't set by `custom_replacements`
-        .replace(
-            "PROGRESS_THRESHOLD",
-            &progress_threshold(&test_case.start_type),
-        )
-        .replace(
-            "PARENT_PATH",
-            test_case
-                .get_source_file_path("")
-                .unwrap()
-                .to_str()
-                .unwrap(),
-        );
-
-    Ok(final_init)
+    replacements.push(LuaReplacement::Other {
+        from: "REQUEST_METHOD",
+        to: test_type.to_string(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "RESULTS_FILE",
+        to: results_file_path.to_str().unwrap().to_string(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "EXECUTABLE_PATH",
+        to: test_case.executable_path.to_str().unwrap().to_string(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "ROOT_PATH",
+        to: root_path.to_str().unwrap().to_string(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "ERROR_PATH",
+        to: error_path.to_str().unwrap().to_string(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "LOG_PATH",
+        to: log_path.to_str().unwrap().to_string(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "EMPTY_PATH",
+        to: empty_path.to_str().unwrap().to_string(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "FILE_EXTENSION",
+        to: source_extension.to_string(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "COMMANDS",
+        to: String::new(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "PROGRESS_THRESHOLD",
+        to: progress_threshold(&test_case.start_type),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "PARENT_PATH",
+        to: test_case
+            .get_source_file_path("")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string(),
+    });
+    Ok(replacements)
 }
 
 fn progress_threshold(start_type: &ServerStartType) -> String {
@@ -119,45 +117,6 @@ fn progress_threshold(start_type: &ServerStartType) -> String {
         ServerStartType::Simple => "1".to_string(),
         ServerStartType::Progress(threshold, _) => threshold.to_string(),
     }
-}
-
-fn get_attach_action(test_type: TestType) -> String {
-    match test_type {
-        TestType::CodeAction => include_str!("lua_templates/code_action_action.lua"),
-        TestType::CodeActionResolve => include_str!("lua_templates/code_action_resolve_action.lua"),
-        TestType::CodeLens => include_str!("lua_templates/code_lens_action.lua"),
-        TestType::CodeLensResolve => include_str!("lua_templates/code_lens_resolve_action.lua"),
-        TestType::Completion => include_str!("lua_templates/completion_action.lua"),
-        TestType::CompletionResolve => include_str!("lua_templates/completion_resolve_action.lua"),
-        TestType::Declaration => include_str!("lua_templates/declaration_action.lua"),
-        TestType::Definition => include_str!("lua_templates/definition_action.lua"),
-        TestType::Diagnostic => include_str!("lua_templates/diagnostic_action.lua"),
-        TestType::DocumentHighlight => include_str!("lua_templates/document_highlight_action.lua"),
-        TestType::DocumentLink => include_str!("lua_templates/document_link_action.lua"),
-        TestType::DocumentLinkResolve => include_str!("lua_templates/document_link_resolve_action.lua"),
-        TestType::DocumentSymbol => include_str!("lua_templates/document_symbol_action.lua"),
-        TestType::FoldingRange => include_str!("lua_templates/folding_range_action.lua"),
-        TestType::Formatting => include_str!("lua_templates/formatting_action.lua"),
-        TestType::Hover => include_str!("lua_templates/hover_action.lua"),
-        TestType::Implementation => include_str!("lua_templates/implementation_action.lua"),
-        TestType::IncomingCalls => include_str!("lua_templates/incoming_calls_action.lua"),
-        TestType::InlayHint => include_str!("lua_templates/inlay_hint_action.lua"),
-        TestType::Moniker => include_str!("lua_templates/moniker_action.lua"),
-        TestType::OutgoingCalls => include_str!("lua_templates/outgoing_calls_action.lua"),
-        TestType::PrepareCallHierarchy => include_str!("lua_templates/prepare_call_hierarchy_action.lua"),
-        TestType::PrepareTypeHierarchy => include_str!("lua_templates/prepare_type_hierarchy_action.lua"),
-        TestType::PublishDiagnostics => "\n-- NOTE: No `check_progress_result` function for diagnostics, instead handled by `DiagnosticChanged` autocmd\n",
-        TestType::References => include_str!("lua_templates/references_action.lua"),
-        TestType::Rename => include_str!("lua_templates/rename_action.lua"),
-        TestType::SelectionRange => include_str!("lua_templates/selection_range_action.lua"),
-        TestType::SemanticTokensFull => include_str!("lua_templates/semantic_tokens_full_action.lua"),
-        TestType::SemanticTokensFullDelta => include_str!("lua_templates/semantic_tokens_full_delta_action.lua"),
-        TestType::SemanticTokensRange => include_str!("lua_templates/semantic_tokens_range_action.lua"),
-        TestType::SignatureHelp => include_str!("lua_templates/signature_help_action.lua"),
-        TestType::TypeDefinition => include_str!("lua_templates/type_definition_action.lua"),
-        TestType::WorkspaceDiagnostic => include_str!("lua_templates/workspace_diagnostic_action.lua"),
-    }
-    .to_string()
 }
 
 /// In the simple case, the action is invoked immediately. If a server employs
@@ -182,5 +141,244 @@ fn invoke_lsp_action(start_type: &ServerStartType) -> String {
                 end"#
             )
         }
+    }
+}
+
+/// The type of replacement to be made in the `init.lua` file. Several common replacements
+/// are specified in their own variants, while others are specified via fields.
+#[derive(Debug, Clone)]
+pub enum LuaReplacement {
+    /// `textDocument = vim.lsp.util.make_text_document_params(0)`
+    ParamTextDocument,
+    /// `position = { line = <line>, character = <character> }`
+    ParamPosition(Position),
+    /// An object that is converted to JSON in order to pass to the lua side. This
+    /// object can be inserted directly into `params`.
+    ParamDirect { name: &'static str, json: String },
+    /// An object that is converted to JSON in order to pass to the lua side. After
+    /// conversion from JSON into a lua table, each field is insserted into `params`
+    /// individually.
+    ParamDestructure {
+        name: &'static str,
+        fields: Vec<&'static str>,
+        json: String,
+    },
+    /// An Object that needs to contain other nested objects. This covers an edge
+    /// case where certain params aren't easily passed from the `test_*` functions
+    /// (i.e. `TextDocumentPositionParams`).
+    ParamNested {
+        name: &'static str,
+        fields: Vec<LuaReplacement>,
+    },
+    /// Performs raw string substitution on the lua file. These subsituions are
+    /// made before any other type to prevent conflicts with user-supplied values.
+    Other { from: &'static str, to: String },
+}
+
+impl LuaReplacement {
+    fn perform_replacement(&self, doc: &mut LuaDocumentReplacement, parent_name: Option<&str>) {
+        let parent_name = parent_name.unwrap_or("params");
+        match self {
+            Self::ParamTextDocument => {
+                writeln!(
+                    &mut doc.params,
+                    "\tassert(not {parent_name}['textDocument'], \"{parent_name}['textDocument'] already set\")
+{parent_name}['textDocument'] = vim.lsp.util.make_text_document_params(0)"
+                )
+                .unwrap();
+            }
+            Self::ParamPosition(position) => {
+                writeln!(
+                    &mut doc.params,
+                    "\tassert(not {parent_name}['position'], \"{parent_name}['position'] already set\")
+{parent_name}['position'] = {{ line = {}, character = {} }}",
+                    position.line, position.character
+                )
+                .unwrap();
+            }
+            Self::ParamDirect { name, json } => {
+                writeln!(
+                    &mut doc.params,
+                    "\tlocal {name}_json = [[\n{json}\n]]
+\tassert(not {parent_name}['{name}'], \"{parent_name}['{name}'] already set\")
+\t{parent_name}['{name}'] = vim.json.decode({name}_json)"
+                )
+                .unwrap();
+            }
+            Self::ParamDestructure { name, fields, json } => {
+                writeln!(&mut doc.params, "\tlocal {name}_json = [[\n{json}\n]]\n\tlocal {name} = vim.json.decode({name}_json)").unwrap();
+                for field in fields {
+                    writeln!(
+                        &mut doc.params,
+                        "\tassert(not {parent_name}['{field}'], \"{parent_name}['{field}'] already set\")
+\t{parent_name}['{field}'] = {name}['{field}']"
+                    )
+                    .unwrap();
+                }
+            }
+            Self::ParamNested { name, fields } => {
+                writeln!(
+                    &mut doc.params,
+                    "\tassert(not {parent_name}['{name}'], \"{parent_name}['{name}'] already set\")"
+                )
+                .unwrap();
+                writeln!(&mut doc.params, "\tlocal {name} = {{}}").unwrap();
+                for field in fields {
+                    field.perform_replacement(doc, Some(name));
+                }
+                writeln!(&mut doc.params, "\t{parent_name}['{name}'] = {name}").unwrap();
+            }
+            Self::Other { from, to } => doc.raw.push(((*from).to_string(), to.to_string())),
+        }
+    }
+}
+
+/// Represents the combined replacements of a series of a series of `LuaReplacementType`s.
+#[derive(Debug, Clone, Default)]
+struct LuaDocumentReplacement {
+    /// Represents objects that are passed via a JSON string, converted to a lua
+    /// table, and inserted into `params`.
+    pub params: String,
+    /// Represents raw string replacements anywhere in the init.lua file.
+    pub raw: Vec<(String, String)>,
+}
+
+impl LuaDocumentReplacement {
+    pub fn fill_document(&self, mut doc: String) -> String {
+        for (repl_from, repl_to) in &self.raw {
+            doc = doc.replace(repl_from, repl_to);
+        }
+        doc.replace("PARAM_ASSIGN", &self.params)
+    }
+}
+
+impl LuaDocumentReplacement {
+    fn new(repls: &Vec<LuaReplacement>) -> Self {
+        let mut doc_repl = Self::default();
+        for repl in repls {
+            repl.perform_replacement(&mut doc_repl, None);
+        }
+        doc_repl
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use lsp_types::{CodeLens, Position, Range};
+
+    use super::{LuaDocumentReplacement, LuaReplacement};
+
+    #[test]
+    fn text_document_param() {
+        let replacements = vec![LuaReplacement::ParamTextDocument];
+        let doc_repl = LuaDocumentReplacement::new(&replacements);
+        let expected =
+            "\tassert(not params['textDocument'], \"params['textDocument'] already set\")
+params['textDocument'] = vim.lsp.util.make_text_document_params(0)\n";
+        assert_eq!(expected, doc_repl.params);
+        assert!(doc_repl.raw.is_empty());
+    }
+
+    #[test]
+    fn position_param() {
+        let replacements = vec![LuaReplacement::ParamPosition(lsp_types::Position {
+            line: 1,
+            character: 2,
+        })];
+        let doc_repl = LuaDocumentReplacement::new(&replacements);
+        let expected = "\tassert(not params['position'], \"params['position'] already set\")
+params['position'] = { line = 1, character = 2 }\n";
+        assert_eq!(expected, doc_repl.params);
+        assert!(doc_repl.raw.is_empty());
+    }
+
+    #[test]
+    fn param_direct() {
+        let position = Position::new(1, 2);
+        let position_json = serde_json::to_string(&position).expect("Failed to serialize position");
+        let replacements = vec![LuaReplacement::ParamDirect {
+            name: "position",
+            json: position_json.clone(),
+        }];
+        let doc_repl = LuaDocumentReplacement::new(&replacements);
+        let expected = format!(
+            "\tlocal position_json = [[\n{position_json}\n]]
+\tassert(not params['position'], \"params['position'] already set\")
+\tparams['position'] = vim.json.decode(position_json)\n"
+        );
+        assert_eq!(expected, doc_repl.params);
+        assert!(doc_repl.raw.is_empty());
+    }
+
+    #[test]
+    fn param_destructure() {
+        let code_lens = CodeLens {
+            range: Range::default(),
+            command: None,
+            data: None,
+        };
+        let code_lens_json =
+            serde_json::to_string(&code_lens).expect("Failed to serialize code lens");
+        let replacements = vec![LuaReplacement::ParamDestructure {
+            name: "code_lens",
+            fields: vec!["range", "data", "command"],
+            json: code_lens_json.clone(),
+        }];
+        let doc_repl = LuaDocumentReplacement::new(&replacements);
+        let expected = format!(
+            "\tlocal code_lens_json = [[\n{code_lens_json}\n]]
+\tlocal code_lens = vim.json.decode(code_lens_json)
+\tassert(not params['range'], \"params['range'] already set\")
+\tparams['range'] = code_lens['range']
+\tassert(not params['data'], \"params['data'] already set\")
+\tparams['data'] = code_lens['data']
+\tassert(not params['command'], \"params['command'] already set\")
+\tparams['command'] = code_lens['command']\n"
+        );
+        assert_eq!(expected, doc_repl.params);
+        assert!(doc_repl.raw.is_empty());
+    }
+
+    #[test]
+    fn param_nested() {
+        let include_decl_json = serde_json::to_string_pretty(&true)
+            .expect("JSON deserialzation of include declaration failed");
+        let replacements = vec![LuaReplacement::ParamNested {
+            name: "context",
+            fields: vec![LuaReplacement::ParamDirect {
+                name: "includeDeclaration",
+                json: include_decl_json.clone(),
+            }],
+        }];
+        let doc_repl = LuaDocumentReplacement::new(&replacements);
+        let expected = format!(
+            "\tassert(not params['context'], \"params['context'] already set\")
+\tlocal context = {{}}
+\tlocal includeDeclaration_json = [[\n{include_decl_json}\n]]
+\tassert(not context['includeDeclaration'], \"context['includeDeclaration'] already set\")
+\tcontext['includeDeclaration'] = vim.json.decode(includeDeclaration_json)
+\tparams['context'] = context\n"
+        );
+        assert_eq!(expected, doc_repl.params);
+        assert!(doc_repl.raw.is_empty());
+    }
+
+    #[test]
+    fn other() {
+        let command_str = "\"rust-analyzer.runSingle\",
+\"rust-analyzer.debugSingle\",
+\"rust-analyzer.showReferences\",
+\"rust-analyzer.gotoLocation\",
+";
+        let replacements = vec![LuaReplacement::Other {
+            from: "commands",
+            to: command_str.to_string(),
+        }];
+        let doc_repl = LuaDocumentReplacement::new(&replacements);
+        assert!(doc_repl.params.is_empty());
+        assert_eq!(1, doc_repl.raw.len());
+        let raw = doc_repl.raw.first().unwrap();
+        assert_eq!("commands", raw.0);
+        assert_eq!(command_str, raw.1);
     }
 }
