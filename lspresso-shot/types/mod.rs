@@ -24,7 +24,7 @@ pub mod type_definition;
 pub mod type_hierarchy;
 
 use crate::{
-    init_dot_lua::get_init_dot_lua,
+    init_dot_lua::{get_init_dot_lua, LuaReplacement},
     types::{
         call_hierarchy::{
             IncomingCallsMismatchError, OutgoingCallsMismatchError,
@@ -498,10 +498,10 @@ impl TestCase {
     ///
     /// Will panic if a test source file path doesn't have a parent directory (this
     /// should not be possible)
-    pub fn create_test(
+    pub(crate) fn create_test(
         &self,
         test_type: TestType,
-        replacements: Option<&Vec<(&str, String)>>,
+        replacements: &mut Vec<LuaReplacement>,
     ) -> TestSetupResult<PathBuf> {
         {
             let nvim_config = get_init_dot_lua(self, test_type, replacements)?;

@@ -8,13 +8,8 @@ local function check_progress_result()
         return
     end
 
-    -- Receive  json-encoded `FormattingOptions` from the rust side in `json_opts`
-    local json_opts = [[
-JSON_OPTIONS
-    ]]
-    local format_opts = vim.json.decode(json_opts)
+    local params = {}
 
-    report_log('Format opts: ' .. tostring(vim.inspect(format_opts)) .. '\n') ---@diagnostic disable-line: undefined-global
     report_log('Issuing formatting request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
 
     if INVOKE_FORMAT then ---@diagnostic disable-line: undefined-global
@@ -23,9 +18,13 @@ JSON_OPTIONS
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
             exit() ---@diagnostic disable-line: undefined-global
         end
+        ---@diagnostic disable-next-line: undefined-global, exp-in-action
+        PARAM_ASSIGN
+
+        report_log('Format opts: ' .. tostring(vim.inspect(params)) .. '\n') ---@diagnostic disable-line: undefined-global
         vim.lsp.buf.format({
             async = false,
-            formatting_options = format_opts
+            formatting_options = params.formatting_options,
         })
         local lines = vim.api.nvim_buf_get_lines(0, 0, -1, true)
         local formatted = table.concat(lines, "\\n")
@@ -34,9 +33,14 @@ JSON_OPTIONS
         results_file:close()
         ---@diagnostic enable: need-check-nil
     else
+        ---@diagnostic disable-next-line: undefined-global, exp-in-action
+        PARAM_ASSIGN
+
+        report_log('Format opts: ' .. tostring(vim.inspect(params)) .. '\n') ---@diagnostic disable-line: undefined-global
+
         local formatting_result = vim.lsp.buf_request_sync(0, 'textDocument/formatting', {
             textDocument = vim.lsp.util.make_text_document_params(0),
-            options = format_opts
+            options = params.options
         })
         if not formatting_result then
             ---@diagnostic disable-next-line: undefined-global

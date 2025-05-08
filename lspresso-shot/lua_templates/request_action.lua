@@ -7,32 +7,25 @@ local function check_progress_result()
         report_log(tostring(progress_count) .. ' < ' .. tostring(PROGRESS_THRESHOLD) .. '\n') ---@diagnostic disable-line: undefined-global
         return
     end
-    -- Receive  json-encoded `Range` from the rust side in `json_range`
-    local json_range = [[
-RANGE
-]]
-    local range = vim.json.decode(json_range)
+    local params = {}
+    ---@diagnostic disable-next-line: undefined-global, exp-in-action
+PARAM_ASSIGN
 
-    report_log('Range: ' .. vim.inspect(range) .. '\n') ---@diagnostic disable-line: undefined-global
-    report_log('Issuing semantic tokens range request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
-    local semantic_tokens_range_result = vim.lsp.buf_request_sync(0, 'textDocument/semanticTokens/range', {
-        textDocument = vim.lsp.util.make_text_document_params(0),
-        range = range
-    })
+    report_log('Params: ' .. tostring(vim.inspect(params)) .. '\n') ---@diagnostic disable-line: undefined-global
+    report_log('Issuing REQUEST_METHOD request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
+    local req_result = vim.lsp.buf_request_sync(0, 'REQUEST_METHOD', params)
 
-    if not semantic_tokens_range_result then
+    if not req_result then
         ---@diagnostic disable-next-line: undefined-global
-        report_log('No valid semantic tokens range result returned: ' ..
-        vim.inspect(semantic_tokens_range_result) .. '\n') ---@diagnostic disable-line: undefined-global
-    elseif semantic_tokens_range_result and #semantic_tokens_range_result >= 1 and semantic_tokens_range_result[1].result then
+        report_log('No valid REQUEST_METHOD result returned: ' .. vim.inspect(req_result) .. '\n')
+    elseif req_result and #req_result >= 1 and req_result[1].result then
         local results_file = io.open('RESULTS_FILE', 'w')
         if not results_file then
-            ---@diagnostic disable-next-line: undefined-global
             report_error('Could not open results file') ---@diagnostic disable-line: undefined-global
             exit() ---@diagnostic disable-line: undefined-global
         end
         ---@diagnostic disable: need-check-nil
-        results_file:write(vim.json.encode(semantic_tokens_range_result[1].result, { escape_slash = true }))
+        results_file:write(vim.json.encode(req_result[1].result, { escape_slash = true }))
         results_file:close()
         ---@diagnostic enable: need-check-nil
     else
