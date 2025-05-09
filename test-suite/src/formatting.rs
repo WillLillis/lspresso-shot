@@ -36,6 +36,7 @@ mod test {
         lspresso_shot!(test_formatting(
             test_case,
             None,
+            None,
             Some(&FormattingResult::EndState(contents.to_string()))
         ));
     }
@@ -51,7 +52,7 @@ mod test {
         send_capabiltiies(&formatting_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_formatting(test_case, None, None));
+        lspresso_shot!(test_formatting(test_case, None, None, None));
     }
 
     #[rstest]
@@ -68,7 +69,7 @@ mod test {
         send_capabiltiies(&formatting_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_formatting(test_case.clone(), None, None);
+        let test_result = test_formatting(test_case.clone(), None, None, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{edits:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -89,6 +90,7 @@ mod test {
 
         lspresso_shot!(test_formatting(
             test_case,
+            None,
             None,
             Some(&FormattingResult::Response(edits))
         ));
@@ -112,6 +114,7 @@ let foo = 5;
 
         lspresso_shot!(test_formatting(
             test_case,
+            None,
             None,
             Some(&FormattingResult::EndState(
                 "pub fn main() {
@@ -141,6 +144,7 @@ let foo = 5;
 
         lspresso_shot!(test_formatting(
             test_case,
+            None,
             None,
             Some(&FormattingResult::Response(vec![
                 TextEdit {

@@ -49,7 +49,7 @@ mod test {
         )
         .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_semantic_tokens_full_delta(test_case, None));
+        lspresso_shot!(test_semantic_tokens_full_delta(test_case, None, None));
     }
 
     #[rstest]
@@ -74,7 +74,7 @@ mod test {
             &test_case_root,
         )
         .expect("Failed to send capabilities");
-        let test_result = test_semantic_tokens_full_delta(test_case.clone(), None);
+        let test_result = test_semantic_tokens_full_delta(test_case.clone(), None, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -103,7 +103,11 @@ mod test {
         )
         .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_semantic_tokens_full_delta(test_case, Some(&resp)));
+        lspresso_shot!(test_semantic_tokens_full_delta(
+            test_case,
+            None,
+            Some(&resp)
+        ));
     }
 
     #[ignore = "rust-analyzer behaves non-deterministically"]
@@ -172,6 +176,6 @@ mod test {
                 ],
             }),
         ];
-        lspresso_shot!(test_semantic_tokens_full_delta(test_case, None));
+        lspresso_shot!(test_semantic_tokens_full_delta(test_case, None, None));
     }
 }

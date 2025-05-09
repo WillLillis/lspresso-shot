@@ -30,7 +30,13 @@ mod test {
         send_capabiltiies(&references_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_references(test_case, &Position::default(), true, None));
+        lspresso_shot!(test_references(
+            test_case,
+            &Position::default(),
+            true,
+            None,
+            None
+        ));
     }
 
     #[rstest]
@@ -46,7 +52,8 @@ mod test {
         send_capabiltiies(&references_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_references(test_case.clone(), &Position::default(), true, None);
+        let test_result =
+            test_references(test_case.clone(), &Position::default(), true, None, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{refs:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -68,6 +75,7 @@ mod test {
             test_case,
             &Position::default(),
             true,
+            None,
             Some(&refs)
         ));
     }
@@ -92,6 +100,7 @@ mod test {
             reference_test_case,
             &Position::new(1, 9),
             true,
+            None,
             Some(&vec![Location {
                 uri: Uri::from_str("src/main.rs").unwrap(),
                 range: Range {

@@ -33,7 +33,7 @@ mod test {
         send_capabiltiies(&document_symbol_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_document_symbol(test_case, None));
+        lspresso_shot!(test_document_symbol(test_case, None, None));
     }
 
     #[rstest]
@@ -50,7 +50,7 @@ mod test {
         send_capabiltiies(&document_symbol_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_document_symbol(test_case.clone(), None);
+        let test_result = test_document_symbol(test_case.clone(), None, None);
         let mut expected_err =
             TestError::ExpectedNone(test_case.test_id.clone(), format!("{syms:#?}"));
         if response_num == 1 {
@@ -83,7 +83,7 @@ mod test {
         send_capabiltiies(&document_symbol_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_document_symbol(test_case, Some(&syms)));
+        lspresso_shot!(test_document_symbol(test_case, None, Some(&syms)));
     }
 
     #[test]
@@ -96,7 +96,7 @@ mod test {
         );
         let doc_sym_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                NonZeroU32::new(5).unwrap(),
+                NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
             .timeout(Duration::from_secs(20))
@@ -104,6 +104,7 @@ mod test {
 
         lspresso_shot!(test_document_symbol(
             doc_sym_test_case,
+            None,
             #[allow(deprecated)]
             Some(&DocumentSymbolResponse::Nested(vec![DocumentSymbol {
                 name: "main".to_string(),

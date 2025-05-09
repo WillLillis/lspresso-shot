@@ -57,7 +57,7 @@ mod test {
             data: None,
         };
 
-        lspresso_shot!(test_document_link_resolve(test_case, &link, None));
+        lspresso_shot!(test_document_link_resolve(test_case, &link, None, None));
     }
 
     #[rstest]
@@ -94,7 +94,7 @@ mod test {
             data: None,
         };
 
-        let test_result = test_document_link_resolve(test_case.clone(), &link, None);
+        let test_result = test_document_link_resolve(test_case.clone(), &link, None, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -133,7 +133,12 @@ mod test {
             data: None,
         };
 
-        lspresso_shot!(test_document_link_resolve(test_case, &link, Some(&resp)));
+        lspresso_shot!(test_document_link_resolve(
+            test_case,
+            &link,
+            None,
+            Some(&resp)
+        ));
     }
 
     // NOTE: rust-analyzer doesn't support `documentLink/resolve`

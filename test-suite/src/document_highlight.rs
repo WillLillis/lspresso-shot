@@ -34,6 +34,7 @@ mod test {
         lspresso_shot!(test_document_highlight(
             test_case,
             &Position::default(),
+            None,
             None
         ));
     }
@@ -55,7 +56,8 @@ mod test {
         send_capabiltiies(&document_highlight_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_document_highlight(test_case.clone(), &Position::default(), None);
+        let test_result =
+            test_document_highlight(test_case.clone(), &Position::default(), None, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -78,6 +80,7 @@ mod test {
         lspresso_shot!(test_document_highlight(
             test_case,
             &Position::default(),
+            None,
             Some(&resp)
         ));
     }
@@ -92,7 +95,7 @@ mod test {
         );
         let test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                NonZeroU32::new(5).unwrap(),
+                NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
             .timeout(Duration::from_secs(20))
@@ -101,6 +104,7 @@ mod test {
         lspresso_shot!(test_document_highlight(
             test_case,
             &Position::new(1, 9),
+            None,
             Some(&vec![DocumentHighlight {
                 range: Range {
                     start: Position::new(1, 8),

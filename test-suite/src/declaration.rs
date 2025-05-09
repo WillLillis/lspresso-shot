@@ -33,7 +33,12 @@ mod test {
         send_capabiltiies(&declaration_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_declaration(test_case, &Position::default(), None));
+        lspresso_shot!(test_declaration(
+            test_case,
+            &Position::default(),
+            None,
+            None
+        ));
     }
 
     #[rstest]
@@ -49,7 +54,7 @@ mod test {
         send_capabiltiies(&declaration_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_declaration(test_case.clone(), &Position::default(), None);
+        let test_result = test_declaration(test_case.clone(), &Position::default(), None, None);
         let mut expected_err =
             TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
         if response_num == 3 {
@@ -81,6 +86,7 @@ mod test {
         lspresso_shot!(test_declaration(
             test_case,
             &Position::default(),
+            None,
             Some(&resp)
         ));
     }
@@ -96,7 +102,7 @@ mod test {
         );
         let test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                NonZeroU32::new(5).unwrap(),
+                NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
             .timeout(Duration::from_secs(20))
@@ -105,6 +111,7 @@ mod test {
         lspresso_shot!(test_declaration(
             test_case,
             &Position::new(2, 5),
+            None,
             Some(&GotoDefinitionResponse::Link(vec![LocationLink {
                 target_uri: Uri::from_str("src/main.rs").unwrap(),
                 origin_selection_range: Some(Range {

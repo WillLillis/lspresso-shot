@@ -65,7 +65,7 @@ mod tests {
         send_capabiltiies(&diagnostic_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_diagnostic(test_case, None, None, &resp));
+        lspresso_shot!(test_diagnostic(test_case, None, None, None, &resp));
     }
 
     #[rstest]
@@ -85,7 +85,7 @@ mod tests {
         send_capabiltiies(&diagnostic_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_publish_diagnostics(test_case, &resp.diagnostics));
+        lspresso_shot!(test_publish_diagnostics(test_case, None, &resp.diagnostics));
     }
 
     #[rstest]
@@ -115,6 +115,7 @@ mod tests {
             test_case,
             Some(path),
             &Vec::new(),
+            None,
             &resp
         ));
     }
@@ -137,6 +138,7 @@ mod tests {
 
         lspresso_shot!(test_diagnostic(
             diagnostic_test_case,
+            None,
             None,
             None,
             &DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport {
@@ -183,6 +185,7 @@ mod tests {
         };
         lspresso_shot!(test_publish_diagnostics(
             diagnostic_test_case,
+            None,
             &vec![
                 Diagnostic {
                     range,
@@ -245,6 +248,7 @@ mod tests {
         );
         lspresso_shot!(test_publish_diagnostics(
             diagnostic_test_case,
+            None,
             &vec![Diagnostic {
                 range: Range {
                     start: Position {

@@ -5,8 +5,8 @@ use init_dot_lua::LuaReplacement;
 use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
-    CodeActionContext, CodeActionResponse, CodeLens, CompletionItem, Diagnostic,
-    DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbolResponse,
+    CodeActionContext, CodeActionResponse, CodeLens, CompletionItem, CompletionResponse,
+    Diagnostic, DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbolResponse,
     FoldingRange, FormattingOptions, GotoDefinitionResponse, Hover, InlayHint, Location, Moniker,
     Position, PreviousResultId, Range, SelectionRange, SemanticTokens, SemanticTokensDelta,
     SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
@@ -181,9 +181,9 @@ where
             ))?
         }
         // Invariant: `results.json` and `empty` should never both exist
-        (true | false, true, true) => unreachable!(),
+        (_, true, true) => unreachable!(),
         // No results
-        (true | false, false, false) => Err(TestError::NoResults(test_case.test_id.clone()))?,
+        (_, false, false) => Err(TestError::NoResults(test_case.test_id.clone()))?,
         // Expected some results, got none
         (false, true, false) => Err(TestError::ExpectedSome(test_case.test_id.clone()))?,
         // Expected and got some results
@@ -255,7 +255,8 @@ where
     R2: serde::de::DeserializeOwned + std::fmt::Debug + Empty + CleanResponse,
 {
     if let Some(expected) = expected {
-        let actual = test_inner::<R2, R2>(test_case, replacements)?.unwrap();
+        let actual =
+            test_inner::<R2, R2>(test_case, replacements)?.expect("Expected results, got `None`");
         Ok(cmp(expected, &actual)?)
     } else {
         let empty = test_inner::<EmptyResult, R2>(test_case, replacements)?;
@@ -268,9 +269,8 @@ pub type CodeActionComparator = fn(&CodeActionResponse, &CodeActionResponse, &Te
 
 /// Tests the server's response to a 'textDocument/codeAction' request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to compare the expected
-///   and actual results. Becaue the `CodeAction` struct can contain arbitrary JSON, it's not feasible
-///   to clean results from test-case specific information (e.g. the root path).
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -328,9 +328,8 @@ pub type CodeActionResolveComparator = fn(&CodeAction, &CodeAction, &TestCase) -
 
 /// Tests the server's response to a 'textDocument/codeLens' request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to compare the expected
-///   and actual results. Becaue the `CodeAction` struct can contain arbitrary JSON, it's not feasible
-///   to clean results from test-case specific information (e.g. the root path).
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -392,9 +391,8 @@ pub type CodeLensComparator = fn(&Vec<CodeLens>, &Vec<CodeLens>, &TestCase) -> b
 ///   capabilities (e.g. "rust-analyzer.runSingle"). This enables command-based `CodeLens`
 ///   responses from the server, such as "Run" or "Debug" actions.
 ///
-/// - `cmp` is an optional custom comparator function that can be used to compare the expected
-///   and actual results. Becaue the `CodeLens` struct can contain arbitrary JSON, it's not feasible
-///   to clean results from test-case specific information (e.g. the root path).
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -447,9 +445,8 @@ pub type CodeLensResolveComparator = fn(&CodeLens, &CodeLens, &TestCase) -> bool
 ///   capabilities (e.g. "rust-analyzer.runSingle"). This enables command-based `CodeLens`
 ///   responses from the server, such as "Run" or "Debug" actions.
 ///
-/// - `cmp` is an optional custom comparator function that can be used to compare the expected
-///   and actual results. Becaue the `CodeLens` struct can contain arbitrary JSON, it's not feasible
-///   to clean results from test-case specific information (e.g. the root path).
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -505,7 +502,12 @@ pub fn test_code_lens_resolve(
     )
 }
 
+pub type CompletionComparator = fn(&CompletionResult, &CompletionResponse, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/complection' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -514,6 +516,7 @@ pub fn test_code_lens_resolve(
 pub fn test_completion(
     mut test_case: TestCase,
     cursor_pos: &Position,
+    cmp: Option<CompletionComparator>,
     expected: Option<&CompletionResult>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Completion);
@@ -525,7 +528,11 @@ pub fn test_completion(
         ],
         expected,
         |expected, actual| {
-            if !expected.results_satisfy(actual) {
+            let eql = cmp.as_ref().map_or_else(
+                || expected.results_satisfy(actual),
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(CompletionMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: (*expected).clone(),
@@ -537,7 +544,12 @@ pub fn test_completion(
     )
 }
 
+pub type CompletionResolveComparator = fn(&CompletionItem, &CompletionItem, &TestCase) -> bool;
+
 /// Tests the server's response to a 'completionItem/resolve' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -550,6 +562,7 @@ pub fn test_completion(
 pub fn test_completion_resolve(
     mut test_case: TestCase,
     completion_item: &CompletionItem,
+    cmp: Option<CompletionResolveComparator>,
     expected: Option<&CompletionItem>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::CompletionResolve);
@@ -585,7 +598,11 @@ pub fn test_completion_resolve(
         }],
         expected,
         |expected, actual| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(Box::new(CompletionResolveMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: (*expected).clone(),
@@ -597,7 +614,13 @@ pub fn test_completion_resolve(
     )
 }
 
+pub type DeclarationComparator =
+    fn(&GotoDeclarationResponse, &GotoDeclarationResponse, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/declaration' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -605,6 +628,7 @@ pub fn test_completion_resolve(
 pub fn test_declaration(
     mut test_case: TestCase,
     cursor_pos: &Position,
+    cmp: Option<DeclarationComparator>,
     expected: Option<&GotoDeclarationResponse>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Declaration);
@@ -616,26 +640,32 @@ pub fn test_declaration(
         ],
         expected,
         |expected, actual| {
-            // HACK: Since the `GotoDeclarationResponse` is untagged, there's no way to differentiate
-            // between the `Array` and `Link` if we get an empty vector in response. Just
-            // treat this as a special case and say it's ok.
-            match (expected, actual) {
-                (
-                    GotoDeclarationResponse::Array(array_items),
-                    GotoDeclarationResponse::Link(link_items),
-                )
-                | (
-                    GotoDeclarationResponse::Link(link_items),
-                    GotoDeclarationResponse::Array(array_items),
-                ) => {
-                    if array_items.is_empty() && link_items.is_empty() {
-                        return Ok(());
+            let eql = cmp.as_ref().map_or_else(
+                || {
+                    // HACK: Since the `GotoDeclarationResponse` is untagged, there's no way to differentiate
+                    // between the `Array` and `Link` if we get an empty vector in response. Just
+                    // treat this as a special case and say it's ok.
+                    let mut eql_result = false;
+                    match (expected, actual) {
+                        (
+                            GotoDeclarationResponse::Array(array_items),
+                            GotoDeclarationResponse::Link(link_items),
+                        )
+                        | (
+                            GotoDeclarationResponse::Link(link_items),
+                            GotoDeclarationResponse::Array(array_items),
+                        ) => {
+                            if array_items.is_empty() && link_items.is_empty() {
+                                eql_result = true;
+                            }
+                        }
+                        _ => eql_result = expected == actual,
                     }
-                }
-                _ => {}
-            }
-
-            if *expected != *actual {
+                    eql_result
+                },
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(Box::new(DeclarationMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -647,7 +677,13 @@ pub fn test_declaration(
     )
 }
 
+pub type DefinitionComparator =
+    fn(&GotoDefinitionResponse, &GotoDefinitionResponse, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/definition' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -655,6 +691,7 @@ pub fn test_declaration(
 pub fn test_definition(
     mut test_case: TestCase,
     cursor_pos: &Position,
+    cmp: Option<DefinitionComparator>,
     expected: Option<&GotoDefinitionResponse>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Definition);
@@ -666,26 +703,32 @@ pub fn test_definition(
         ],
         expected,
         |expected, actual| {
-            // HACK: Since the `GotoDefinitionResponse` is untagged, there's no way to differentiate
-            // between the `Array` and `Link` if we get an empty vector in response. Just
-            // treat this as a special case and say it's ok.
-            match (expected, actual) {
-                (
-                    GotoDefinitionResponse::Array(array_items),
-                    GotoDefinitionResponse::Link(link_items),
-                )
-                | (
-                    GotoDefinitionResponse::Link(link_items),
-                    GotoDefinitionResponse::Array(array_items),
-                ) => {
-                    if array_items.is_empty() && link_items.is_empty() {
-                        return Ok(());
+            let eql = cmp.as_ref().map_or_else(
+                || {
+                    // HACK: Since the `GotoDefinitionResponse` is untagged, there's no way to differentiate
+                    // between the `Array` and `Link` if we get an empty vector in response. Just
+                    // treat this as a special case and say it's ok.
+                    let mut eql_result = false;
+                    match (expected, actual) {
+                        (
+                            GotoDefinitionResponse::Array(array_items),
+                            GotoDefinitionResponse::Link(link_items),
+                        )
+                        | (
+                            GotoDefinitionResponse::Link(link_items),
+                            GotoDefinitionResponse::Array(array_items),
+                        ) => {
+                            if array_items.is_empty() && link_items.is_empty() {
+                                eql_result = true;
+                            }
+                        }
+                        _ => eql_result = expected == actual,
                     }
-                }
-                _ => {}
-            }
-
-            if *expected != *actual {
+                    eql_result
+                },
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(Box::new(DefinitionMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -697,7 +740,13 @@ pub fn test_definition(
     )
 }
 
+pub type DiagnosticComparator =
+    fn(&DocumentDiagnosticReport, &DocumentDiagnosticReport, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/diagnostic' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -711,6 +760,7 @@ pub fn test_diagnostic(
     mut test_case: TestCase,
     identifier: Option<&str>,
     previous_result_id: Option<&str>,
+    cmp: Option<DiagnosticComparator>,
     expected: &DocumentDiagnosticReport,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Diagnostic);
@@ -740,7 +790,11 @@ pub fn test_diagnostic(
         ],
         Some(expected),
         |expected: &DocumentDiagnosticReport, actual: &DocumentDiagnosticReport| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(Box::new(DiagnosticMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -752,7 +806,13 @@ pub fn test_diagnostic(
     )
 }
 
+pub type DocumentHighlightComparator =
+    fn(&Vec<DocumentHighlight>, &Vec<DocumentHighlight>, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/documentHighlight' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -761,6 +821,7 @@ pub fn test_diagnostic(
 pub fn test_document_highlight(
     mut test_case: TestCase,
     cursor_pos: &Position,
+    cmp: Option<DocumentHighlightComparator>,
     expected: Option<&Vec<DocumentHighlight>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::DocumentHighlight);
@@ -772,7 +833,11 @@ pub fn test_document_highlight(
         ],
         expected,
         |expected, actual: &Vec<DocumentHighlight>| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(DocumentHighlightMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -784,7 +849,12 @@ pub fn test_document_highlight(
     )
 }
 
+pub type DocumentLinkComparator = fn(&Vec<DocumentLink>, &Vec<DocumentLink>, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/documentLink' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -792,6 +862,7 @@ pub fn test_document_highlight(
 /// or some other failure occurs
 pub fn test_document_link(
     mut test_case: TestCase,
+    cmp: Option<DocumentLinkComparator>,
     expected: Option<&Vec<DocumentLink>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::DocumentLink);
@@ -800,7 +871,11 @@ pub fn test_document_link(
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual: &Vec<DocumentLink>| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(DocumentLinkMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -812,7 +887,12 @@ pub fn test_document_link(
     )
 }
 
+pub type DocumentLinkResolveComparator = fn(&DocumentLink, &DocumentLink, &TestCase) -> bool;
+
 /// Tests the server's response to a 'documentLink/resolve' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -825,6 +905,7 @@ pub fn test_document_link(
 pub fn test_document_link_resolve(
     mut test_case: TestCase,
     link: &DocumentLink,
+    cmp: Option<DocumentLinkResolveComparator>,
     expected: Option<&DocumentLink>,
 ) -> TestResult<()> {
     let document_link_json =
@@ -839,7 +920,11 @@ pub fn test_document_link_resolve(
         }],
         expected,
         |expected, actual: &DocumentLink| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(Box::new(DocumentLinkResolveMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -851,7 +936,13 @@ pub fn test_document_link_resolve(
     )
 }
 
+pub type DocumentSymbolComparator =
+    fn(&DocumentSymbolResponse, &DocumentSymbolResponse, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/documentSymbol' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -859,6 +950,7 @@ pub fn test_document_link_resolve(
 /// or some other failure occurs
 pub fn test_document_symbol(
     mut test_case: TestCase,
+    cmp: Option<DocumentSymbolComparator>,
     expected: Option<&DocumentSymbolResponse>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::DocumentSymbol);
@@ -867,25 +959,32 @@ pub fn test_document_symbol(
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual| {
-            // HACK: Since the two types of DocumentSymbolResponse are untagged, there's no
-            // way to differentiate between the two if we get an empty vector in response.
-            // Just treat this as a special case and say it's ok.
-            match (expected, actual) {
-                (
-                    DocumentSymbolResponse::Flat(flat_items),
-                    DocumentSymbolResponse::Nested(nested_items),
-                )
-                | (
-                    DocumentSymbolResponse::Nested(nested_items),
-                    DocumentSymbolResponse::Flat(flat_items),
-                ) => {
-                    if flat_items.is_empty() && nested_items.is_empty() {
-                        return Ok(());
+            let eql = cmp.as_ref().map_or_else(
+                || {
+                    // HACK: Since the two types of DocumentSymbolResponse are untagged, there's no
+                    // way to differentiate between the two if we get an empty vector in response.
+                    // Just treat this as a special case and say it's ok.
+                    let mut eql_result = false;
+                    match (expected, actual) {
+                        (
+                            DocumentSymbolResponse::Flat(flat_items),
+                            DocumentSymbolResponse::Nested(nested_items),
+                        )
+                        | (
+                            DocumentSymbolResponse::Nested(nested_items),
+                            DocumentSymbolResponse::Flat(flat_items),
+                        ) => {
+                            if flat_items.is_empty() && nested_items.is_empty() {
+                                eql_result = true;
+                            }
+                        }
+                        _ => eql_result = expected == actual,
                     }
-                }
-                _ => {}
-            }
-            if expected != actual {
+                    eql_result
+                },
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(DocumentSymbolMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -898,7 +997,12 @@ pub fn test_document_symbol(
     )
 }
 
+pub type FoldingRangeComparator = fn(&Vec<FoldingRange>, &Vec<FoldingRange>, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/foldingRange' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -906,6 +1010,7 @@ pub fn test_document_symbol(
 /// or some other failure occurs
 pub fn test_folding_range(
     mut test_case: TestCase,
+    cmp: Option<FoldingRangeComparator>,
     expected: Option<&Vec<FoldingRange>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::FoldingRange);
@@ -914,7 +1019,11 @@ pub fn test_folding_range(
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual: &Vec<FoldingRange>| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(FoldingRangeMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -926,21 +1035,28 @@ pub fn test_folding_range(
     )
 }
 
-// TODO: Consider hard-assigning defaults here instead of supplying `None`
-/// Tests the server's response to a 'textDocument/formatting' request. If `options`
-/// is `None`, the following default is used:
+pub type FormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) -> bool;
+
+/// Tests the server's response to a 'textDocument/formatting' request.
+///
+/// - `options` is the formatting options passed to the LSP client. If `None`, then
+///   the following default is used:
 ///
 /// ```rust
 /// lsp_types::FormattingOptions {
 ///     tab_size: 4,
 ///     insert_spaces: true,
 ///     properties: std::collections::HashMap::new(),
-///     trim_trailing_whitespace: None,
-///     insert_final_newline: None,
-///     trim_final_newlines: None,
+///     trim_trailing_whitespace: Some(true),
+///     insert_final_newline: Some(true),
+///     trim_final_newlines: Some(true),
 /// };
-///
 /// ```
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results. Note that a custom comparator is only
+///   availble for the `FormattingResult::Response` variant.
+///
 /// # Errors
 ///
 /// Returns `TestError` if the expected results don't match, or if some other failure occurs
@@ -951,6 +1067,7 @@ pub fn test_folding_range(
 pub fn test_formatting(
     mut test_case: TestCase,
     options: Option<FormattingOptions>,
+    cmp: Option<FormattingComparator>,
     expected: Option<&FormattingResult>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Formatting);
@@ -958,9 +1075,9 @@ pub fn test_formatting(
         tab_size: 4,
         insert_spaces: true,
         properties: HashMap::new(),
-        trim_trailing_whitespace: None,
-        insert_final_newline: None,
-        trim_final_newlines: None,
+        trim_trailing_whitespace: Some(true),
+        insert_final_newline: Some(true),
+        trim_final_newlines: Some(true),
     });
     let format_opts_json = serde_json::to_string_pretty(&opts)
         .expect("JSON deserialzation of formatting options failed");
@@ -979,7 +1096,11 @@ pub fn test_formatting(
             ],
             Some(edits),
             |expected, actual: &Vec<TextEdit>| {
-                if expected != actual {
+                let eql = cmp.as_ref().map_or_else(
+                    || expected == actual,
+                    |cmp_fn| cmp_fn(expected, actual, &test_case),
+                );
+                if !eql {
                     Err(FormattingMismatchError {
                         test_id: test_case.test_id.clone(),
                         expected: FormattingResult::Response(expected.clone()),
@@ -1041,7 +1162,12 @@ pub fn test_formatting(
     }
 }
 
+pub type HoverComparator = fn(&Hover, &Hover, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/hover' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -1050,6 +1176,7 @@ pub fn test_formatting(
 pub fn test_hover(
     mut test_case: TestCase,
     cursor_pos: &Position,
+    cmp: Option<HoverComparator>,
     expected: Option<&Hover>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Hover);
@@ -1061,7 +1188,11 @@ pub fn test_hover(
         ],
         expected,
         |expected, actual| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(Box::new(HoverMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1073,7 +1204,15 @@ pub fn test_hover(
     )
 }
 
+pub type ImplementationComparator =
+    fn(&GotoImplementationResponse, &GotoImplementationResponse, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/implementation' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// # Errors
 ///
 /// # Errors
 ///
@@ -1082,6 +1221,7 @@ pub fn test_hover(
 pub fn test_implementation(
     mut test_case: TestCase,
     cursor_pos: &Position,
+    cmp: Option<ImplementationComparator>,
     expected: Option<&GotoImplementationResponse>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Implementation);
@@ -1093,26 +1233,33 @@ pub fn test_implementation(
         ],
         expected,
         |expected, actual| {
-            // HACK: Since `GotoImplementationResponse` is untagged, there is no way to
-            // differentiate between the `Array` and `Link` variants if we get an empty
-            // vector in response.
-            // Just treat this as a special case and say it's ok.
-            match (expected, actual) {
-                (
-                    GotoImplementationResponse::Array(array_items),
-                    GotoImplementationResponse::Link(link_items),
-                )
-                | (
-                    GotoImplementationResponse::Link(link_items),
-                    GotoImplementationResponse::Array(array_items),
-                ) => {
-                    if array_items.is_empty() && link_items.is_empty() {
-                        return Ok(());
+            let eql = cmp.as_ref().map_or_else(
+                || {
+                    // HACK: Since `GotoImplementationResponse` is untagged, there is no way to
+                    // differentiate between the `Array` and `Link` variants if we get an empty
+                    // vector in response.
+                    // Just treat this as a special case and say it's ok.
+                    let mut eql_result = false;
+                    match (expected, actual) {
+                        (
+                            GotoImplementationResponse::Array(array_items),
+                            GotoImplementationResponse::Link(link_items),
+                        )
+                        | (
+                            GotoImplementationResponse::Link(link_items),
+                            GotoImplementationResponse::Array(array_items),
+                        ) => {
+                            if array_items.is_empty() && link_items.is_empty() {
+                                eql_result = true;
+                            }
+                        }
+                        _ => eql_result = expected == actual,
                     }
-                }
-                _ => {}
-            }
-            if expected != actual {
+                    eql_result
+                },
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(Box::new(ImplementationMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1124,7 +1271,13 @@ pub fn test_implementation(
     )
 }
 
+pub type IncomingCallsComparator =
+    fn(&Vec<CallHierarchyIncomingCall>, &Vec<CallHierarchyIncomingCall>, &TestCase) -> bool;
+
 /// Tests the server's response to a 'callHierarchy/incomingCalls' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -1137,6 +1290,7 @@ pub fn test_implementation(
 pub fn test_incoming_calls(
     mut test_case: TestCase,
     call_item: &CallHierarchyItem,
+    cmp: Option<IncomingCallsComparator>,
     expected: Option<&Vec<CallHierarchyIncomingCall>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::IncomingCalls);
@@ -1150,7 +1304,11 @@ pub fn test_incoming_calls(
         }],
         expected,
         |expected, actual: &Vec<CallHierarchyIncomingCall>| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(IncomingCallsMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1165,6 +1323,9 @@ pub fn test_incoming_calls(
 pub type InlayHintComparator = fn(&Vec<InlayHint>, &Vec<InlayHint>, &TestCase) -> bool;
 
 /// Tests the server's response to a 'textDocument/inlayHint' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -1210,6 +1371,8 @@ pub fn test_inlay_hint(
     )
 }
 
+pub type MonikerComparator = fn(&Vec<Moniker>, &Vec<Moniker>, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/moniker' request
 ///
 /// # Errors
@@ -1223,6 +1386,7 @@ pub fn test_inlay_hint(
 pub fn test_moniker(
     mut test_case: TestCase,
     cursor_pos: &Position,
+    cmp: Option<MonikerComparator>,
     expected: Option<&Vec<Moniker>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Moniker);
@@ -1234,7 +1398,11 @@ pub fn test_moniker(
         ],
         expected,
         |expected, actual: &Vec<Moniker>| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(MonikerMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1246,7 +1414,13 @@ pub fn test_moniker(
     )
 }
 
+pub type OutgoingCallsComparator =
+    fn(&Vec<CallHierarchyOutgoingCall>, &Vec<CallHierarchyOutgoingCall>, &TestCase) -> bool;
+
 /// Tests the server's response to a 'callHierarchy/outgoingCalls' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -1259,6 +1433,7 @@ pub fn test_moniker(
 pub fn test_outgoing_calls(
     mut test_case: TestCase,
     call_item: &CallHierarchyItem,
+    cmp: Option<OutgoingCallsComparator>,
     expected: Option<&Vec<CallHierarchyOutgoingCall>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::OutgoingCalls);
@@ -1271,8 +1446,12 @@ pub fn test_outgoing_calls(
             json: call_item_json,
         }],
         expected,
-        |expected, actual: &Vec<CallHierarchyOutgoingCall>| {
-            if expected != actual {
+        |expected, actual| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(OutgoingCallsMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1284,7 +1463,13 @@ pub fn test_outgoing_calls(
     )
 }
 
+pub type PrepareCallHierarchyComparator =
+    fn(&Vec<CallHierarchyItem>, &Vec<CallHierarchyItem>, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/prepareCallHierarchy' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -1293,6 +1478,7 @@ pub fn test_outgoing_calls(
 pub fn test_prepare_call_hierarchy(
     mut test_case: TestCase,
     cursor_pos: &Position,
+    cmp: Option<PrepareCallHierarchyComparator>,
     expected: Option<&Vec<CallHierarchyItem>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::PrepareCallHierarchy);
@@ -1304,7 +1490,11 @@ pub fn test_prepare_call_hierarchy(
         ],
         expected,
         |expected, actual: &Vec<CallHierarchyItem>| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(PrepareCallHierachyMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1324,6 +1514,9 @@ pub type PrepareTypeHierarchyComparator =
 /// - `items`: Type hierarchy items provided to the client at request type. The
 ///   `uri` field of each item should be *relative* to the test case root, instead of
 ///   an absolute path. (i.e. `uri = "file://test_file.rs"`).
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -1377,6 +1570,8 @@ pub fn test_prepare_type_hierarchy(
     )
 }
 
+pub type PublishDiagnosticsComparator = fn(&Vec<Diagnostic>, &Vec<Diagnostic>, &TestCase) -> bool;
+
 // NOTE: As far as I can tell, we can't directly accept a `PublishDiagnosticsParams` object,
 // since diagnostics are requested via a `textDocument/publishDiagnostics` notification instead
 // of a request. The `vim.lsp.buf_notify` method only returns a boolean to indicate success,
@@ -1397,6 +1592,7 @@ pub fn test_prepare_type_hierarchy(
 /// or some other failure occurs
 pub fn test_publish_diagnostics(
     mut test_case: TestCase,
+    cmp: Option<PublishDiagnosticsComparator>,
     expected: &Vec<Diagnostic>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::PublishDiagnostics);
@@ -1405,7 +1601,11 @@ pub fn test_publish_diagnostics(
         &mut Vec::new(),
         Some(expected),
         |expected: &Vec<Diagnostic>, actual: &Vec<Diagnostic>| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(PublishDiagnosticsMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1416,6 +1616,8 @@ pub fn test_publish_diagnostics(
         },
     )
 }
+
+pub type ReferencesComparator = fn(&Vec<Location>, &Vec<Location>, &TestCase) -> bool;
 
 /// Tests the server's response to a 'textDocument/references' request
 ///
@@ -1430,6 +1632,7 @@ pub fn test_references(
     mut test_case: TestCase,
     cursor_pos: &Position,
     include_declaration: bool,
+    cmp: Option<ReferencesComparator>,
     expected: Option<&Vec<Location>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::References);
@@ -1450,7 +1653,11 @@ pub fn test_references(
         ],
         expected,
         |expected, actual: &Vec<Location>| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(ReferencesMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1462,16 +1669,22 @@ pub fn test_references(
     )
 }
 
+pub type RenameComparator = fn(&WorkspaceEdit, &WorkspaceEdit, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/rename' request
 ///
 /// # Errors
 ///
 /// Returns `TestError` if the expected results don't match, or if some other failure occurs
-#[allow(clippy::missing_panics_doc)]
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `new_name` fails
 pub fn test_rename(
     mut test_case: TestCase,
     cursor_pos: &Position,
     new_name: &str,
+    cmp: Option<RenameComparator>,
     expected: Option<&WorkspaceEdit>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Rename);
@@ -1489,7 +1702,11 @@ pub fn test_rename(
         ],
         expected,
         |expected, actual| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(Box::new(RenameMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1500,6 +1717,9 @@ pub fn test_rename(
         },
     )
 }
+
+pub type SelectionRangeComparator =
+    fn(&Vec<SelectionRange>, &Vec<SelectionRange>, &TestCase) -> bool;
 
 /// Tests the server's response to a 'textDocument/typeDefinition' request
 ///
@@ -1513,12 +1733,12 @@ pub fn test_rename(
 pub fn test_selection_range(
     mut test_case: TestCase,
     positions: &Vec<Position>,
+    cmp: Option<SelectionRangeComparator>,
     expected: Option<&Vec<SelectionRange>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SelectionRange);
     let positions_json =
         serde_json::to_string_pretty(positions).expect("JSON deserialzation of `positions` failed");
-
     collect_results(
         &test_case,
         &mut vec![
@@ -1530,7 +1750,11 @@ pub fn test_selection_range(
         ],
         expected,
         |expected, actual: &Vec<SelectionRange>| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(SelectionRangeMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1542,6 +1766,9 @@ pub fn test_selection_range(
     )
 }
 
+pub type SemanticTokensFullComparator =
+    fn(&SemanticTokensResult, &SemanticTokensResult, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/semanticTokens/full' request
 ///
 /// # Errors
@@ -1549,6 +1776,7 @@ pub fn test_selection_range(
 /// Returns `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_semantic_tokens_full(
     mut test_case: TestCase,
+    cmp: Option<SemanticTokensFullComparator>,
     expected: Option<&SemanticTokensResult>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SemanticTokensFull);
@@ -1557,38 +1785,44 @@ pub fn test_semantic_tokens_full(
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual| {
-            // HACK: Since the `SemanticTokensResult` is untagged, there's no way to differentiate
-            // between `SemanticTokensResult::Tokens` and `SemanticTokensResult::Partial`, as they
-            // are structurally identical when we have
-            // `SemanticTokensResult::Tokens(SemanticTokens { result_id: None, ...)`
-            // Treat this as a special case and say it's ok.
-            match (expected, actual) {
-                (
-                    SemanticTokensResult::Tokens(SemanticTokens {
-                        result_id: None,
-                        data: token_data,
-                    }),
-                    SemanticTokensResult::Partial(SemanticTokensPartialResult {
-                        data: partial_data,
-                    }),
-                )
-                | (
-                    SemanticTokensResult::Partial(SemanticTokensPartialResult {
-                        data: partial_data,
-                    }),
-                    SemanticTokensResult::Tokens(SemanticTokens {
-                        result_id: None,
-                        data: token_data,
-                    }),
-                ) => {
-                    if token_data == partial_data {
-                        return Ok(());
+            let eql = cmp.as_ref().map_or_else(
+                || {
+                    // HACK: Since the `SemanticTokensResult` is untagged, there's no way to differentiate
+                    // between `SemanticTokensResult::Tokens` and `SemanticTokensResult::Partial`, as they
+                    // are structurally identical when we have
+                    // `SemanticTokensResult::Tokens(SemanticTokens { result_id: None, ...)`
+                    // Treat this as a special case and say it's ok.
+                    let mut eql_result = false;
+                    match (expected, actual) {
+                        (
+                            SemanticTokensResult::Tokens(SemanticTokens {
+                                result_id: None,
+                                data: token_data,
+                            }),
+                            SemanticTokensResult::Partial(SemanticTokensPartialResult {
+                                data: partial_data,
+                            }),
+                        )
+                        | (
+                            SemanticTokensResult::Partial(SemanticTokensPartialResult {
+                                data: partial_data,
+                            }),
+                            SemanticTokensResult::Tokens(SemanticTokens {
+                                result_id: None,
+                                data: token_data,
+                            }),
+                        ) => {
+                            if token_data == partial_data {
+                                eql_result = true;
+                            }
+                        }
+                        _ => eql_result = expected == actual,
                     }
-                }
-                _ => {}
-            }
-
-            if expected != actual {
+                    eql_result
+                },
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(SemanticTokensFullMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1600,17 +1834,24 @@ pub fn test_semantic_tokens_full(
     )
 }
 
+pub type SemanticTokensFullDeltaComparator =
+    fn(&SemanticTokensFullDeltaResult, &SemanticTokensFullDeltaResult, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/semanticTokens/full/delta' request
 ///
 /// First sends a `textDocument/semanticTokens/full` request to get the initial state,
 /// and then issues a `textDocument/semanticTokens/full/delta` request if the first
 /// response contained a `result_id`.
 ///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
 /// # Errors
 ///
 /// Returns `TestError` if the expected results don't match, or if some other failure occurs
 pub fn test_semantic_tokens_full_delta(
     mut test_case: TestCase,
+    cmp: Option<SemanticTokensFullDeltaComparator>,
     expected: Option<&SemanticTokensFullDeltaResult>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SemanticTokensFullDelta);
@@ -1619,80 +1860,92 @@ pub fn test_semantic_tokens_full_delta(
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual| {
-            match (expected, actual) {
-                (
-                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                        result_id: None,
-                        data: token_data,
-                    }),
-                    SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                        result_id: None,
-                        edits: edit_data,
-                    }),
-                )
-                | (
-                    SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                        result_id: None,
-                        edits: edit_data,
-                    }),
-                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                        result_id: None,
-                        data: token_data,
-                    }),
-                ) if token_data.is_empty() && edit_data.is_empty() => return Ok(()),
-                (
-                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                        result_id: None,
-                        data: token_data,
-                    }),
-                    SemanticTokensFullDeltaResult::PartialTokensDelta {
-                        edits: partial_data,
-                    },
-                )
-                | (
-                    SemanticTokensFullDeltaResult::PartialTokensDelta {
-                        edits: partial_data,
-                    },
-                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                        result_id: None,
-                        data: token_data,
-                    }),
-                ) if token_data.is_empty() && partial_data.is_empty() => return Ok(()),
-                (
-                    SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                        result_id: None,
-                        edits: edit_data,
-                    }),
-                    SemanticTokensFullDeltaResult::PartialTokensDelta {
-                        edits: partial_data,
-                    },
-                )
-                | (
-                    SemanticTokensFullDeltaResult::PartialTokensDelta {
-                        edits: partial_data,
-                    },
-                    SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                        result_id: None,
-                        edits: edit_data,
-                    }),
-                ) if edit_data.is_empty() && partial_data.is_empty() => return Ok(()),
-                (
-                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                        result_id: None,
-                        data: token_data,
-                    }),
-                    SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
-                )
-                | (
-                    SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
-                    SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                        result_id: None,
-                        data: token_data,
-                    }),
-                ) if edit_data.is_empty() && token_data.is_empty() => return Ok(()),
-                _ => {}
-            }
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || {
+                    // HACK: Since the `SemanticTokensFullDeltaResult` is untagged, there's no way
+                    // to differentiate between the `Tokens`, `TokensDelta`, and `PartialTokensDelta`
+                    // variants if we get an empty vector in response. Just treat this as a special
+                    // case and say it's ok.
+                    #[allow(unused_assignments)] // false positive?
+                    let mut eql_result = false;
+                    match (expected, actual) {
+                        (
+                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                                result_id: None,
+                                data: token_data,
+                            }),
+                            SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                                result_id: None,
+                                edits: edit_data,
+                            }),
+                        )
+                        | (
+                            SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                                result_id: None,
+                                edits: edit_data,
+                            }),
+                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                                result_id: None,
+                                data: token_data,
+                            }),
+                        ) if token_data.is_empty() && edit_data.is_empty() => eql_result = true,
+                        (
+                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                                result_id: None,
+                                data: token_data,
+                            }),
+                            SemanticTokensFullDeltaResult::PartialTokensDelta {
+                                edits: partial_data,
+                            },
+                        )
+                        | (
+                            SemanticTokensFullDeltaResult::PartialTokensDelta {
+                                edits: partial_data,
+                            },
+                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                                result_id: None,
+                                data: token_data,
+                            }),
+                        ) if token_data.is_empty() && partial_data.is_empty() => eql_result = true,
+                        (
+                            SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                                result_id: None,
+                                edits: edit_data,
+                            }),
+                            SemanticTokensFullDeltaResult::PartialTokensDelta {
+                                edits: partial_data,
+                            },
+                        )
+                        | (
+                            SemanticTokensFullDeltaResult::PartialTokensDelta {
+                                edits: partial_data,
+                            },
+                            SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
+                                result_id: None,
+                                edits: edit_data,
+                            }),
+                        ) if edit_data.is_empty() && partial_data.is_empty() => eql_result = true,
+                        (
+                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                                result_id: None,
+                                data: token_data,
+                            }),
+                            SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
+                        )
+                        | (
+                            SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
+                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
+                                result_id: None,
+                                data: token_data,
+                            }),
+                        ) if edit_data.is_empty() && token_data.is_empty() => eql_result = true,
+                        _ => eql_result = expected == actual,
+                    }
+                    eql_result
+                },
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(Box::new(SemanticTokensFullDeltaMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1704,7 +1957,13 @@ pub fn test_semantic_tokens_full_delta(
     )
 }
 
+pub type SemanticTokensRangeComparator =
+    fn(&SemanticTokensRangeResult, &SemanticTokensRangeResult, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/semanticTokens/range' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -1716,10 +1975,10 @@ pub fn test_semantic_tokens_full_delta(
 pub fn test_semantic_tokens_range(
     mut test_case: TestCase,
     range: &Range,
+    cmp: Option<SemanticTokensRangeComparator>,
     expected: Option<&SemanticTokensRangeResult>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SemanticTokensRange);
-
     let range_json =
         serde_json::to_string_pretty(range).expect("JSON deserialzation of range failed");
     collect_results(
@@ -1733,38 +1992,44 @@ pub fn test_semantic_tokens_range(
         ],
         expected,
         |expected, actual| {
-            // HACK: Since the `SemanticTokensRangeResult` is untagged, there's no way
-            // to differentiate between `SemanticTokensRangeResult::Tokens` and
-            // `SemanticTokensRangeResult::Partial`, as they are structurally identical
-            // when we have `SemanticTokensResult::Tokens(SemanticTokens { result_id: None, ...)`
-            // Treat this as a special case and say it's ok.
-            match (expected, actual) {
-                (
-                    SemanticTokensRangeResult::Tokens(SemanticTokens {
-                        result_id: None,
-                        data: token_data,
-                    }),
-                    SemanticTokensRangeResult::Partial(SemanticTokensPartialResult {
-                        data: partial_data,
-                    }),
-                )
-                | (
-                    SemanticTokensRangeResult::Partial(SemanticTokensPartialResult {
-                        data: partial_data,
-                    }),
-                    SemanticTokensRangeResult::Tokens(SemanticTokens {
-                        result_id: None,
-                        data: token_data,
-                    }),
-                ) => {
-                    if token_data == partial_data {
-                        return Ok(());
+            let eql = cmp.as_ref().map_or_else(
+                || {
+                    // HACK: Since the `SemanticTokensRangeResult` is untagged, there's no way
+                    // to differentiate between `SemanticTokensRangeResult::Tokens` and
+                    // `SemanticTokensRangeResult::Partial`, as they are structurally identical
+                    // when we have `SemanticTokensResult::Tokens(SemanticTokens { result_id: None, ...)`
+                    // Treat this as a special case and say it's ok.
+                    let mut eql_result = false;
+                    match (expected, actual) {
+                        (
+                            SemanticTokensRangeResult::Tokens(SemanticTokens {
+                                result_id: None,
+                                data: token_data,
+                            }),
+                            SemanticTokensRangeResult::Partial(SemanticTokensPartialResult {
+                                data: partial_data,
+                            }),
+                        )
+                        | (
+                            SemanticTokensRangeResult::Partial(SemanticTokensPartialResult {
+                                data: partial_data,
+                            }),
+                            SemanticTokensRangeResult::Tokens(SemanticTokens {
+                                result_id: None,
+                                data: token_data,
+                            }),
+                        ) => {
+                            if token_data == partial_data {
+                                eql_result = true;
+                            }
+                        }
+                        _ => eql_result = expected == actual,
                     }
-                }
-                _ => {}
-            }
-
-            if expected != actual {
+                    eql_result
+                },
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(SemanticTokensRangeMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1776,7 +2041,12 @@ pub fn test_semantic_tokens_range(
     )
 }
 
+pub type SeignatureHelpComparator = fn(&SignatureHelp, &SignatureHelp, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/signatureHelp' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -1789,6 +2059,7 @@ pub fn test_signature_help(
     mut test_case: TestCase,
     cursor_pos: &Position,
     context: Option<&SignatureHelpContext>,
+    cmp: Option<SeignatureHelpComparator>,
     expected: Option<&SignatureHelp>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SignatureHelp);
@@ -1811,7 +2082,11 @@ pub fn test_signature_help(
         ],
         expected,
         |expected, actual| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(SignatureHelpMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1823,6 +2098,9 @@ pub fn test_signature_help(
     )
 }
 
+pub type TypeDefinitionComparator =
+    fn(&GotoTypeDefinitionResponse, &GotoTypeDefinitionResponse, &TestCase) -> bool;
+
 /// Tests the server's response to a 'textDocument/typeDefinition' request
 ///
 /// # Errors
@@ -1831,6 +2109,7 @@ pub fn test_signature_help(
 pub fn test_type_definition(
     mut test_case: TestCase,
     cursor_pos: &Position,
+    cmp: Option<TypeDefinitionComparator>,
     expected: Option<&GotoTypeDefinitionResponse>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::TypeDefinition);
@@ -1842,26 +2121,32 @@ pub fn test_type_definition(
         ],
         expected,
         |expected, actual| {
-            // HACK: Since the `GotoTypeDefinitionResponse` is untagged, there's no way
-            // to differentiate between the `Array` and `Link` if we get an empty vector
-            // in response. Just treat this as a special case and say it's ok.
-            match (expected, actual) {
-                (
-                    GotoTypeDefinitionResponse::Array(array_items),
-                    GotoTypeDefinitionResponse::Link(link_items),
-                )
-                | (
-                    GotoTypeDefinitionResponse::Link(link_items),
-                    GotoTypeDefinitionResponse::Array(array_items),
-                ) => {
-                    if array_items.is_empty() && link_items.is_empty() {
-                        return Ok(());
+            let eql = cmp.as_ref().map_or_else(
+                || {
+                    // HACK: Since the `GotoTypeDefinitionResponse` is untagged, there's no way
+                    // to differentiate between the `Array` and `Link` if we get an empty vector
+                    // in response. Just treat this as a special case and say it's ok.
+                    let mut eql_result = false;
+                    match (expected, actual) {
+                        (
+                            GotoTypeDefinitionResponse::Array(array_items),
+                            GotoTypeDefinitionResponse::Link(link_items),
+                        )
+                        | (
+                            GotoTypeDefinitionResponse::Link(link_items),
+                            GotoTypeDefinitionResponse::Array(array_items),
+                        ) => {
+                            if array_items.is_empty() && link_items.is_empty() {
+                                eql_result = true;
+                            }
+                        }
+                        _ => eql_result = expected == actual,
                     }
-                }
-                _ => {}
-            }
-
-            if *expected != *actual {
+                    eql_result
+                },
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(Box::new(TypeDefinitionMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
@@ -1873,7 +2158,13 @@ pub fn test_type_definition(
     )
 }
 
+pub type WorkspaceDiagnosticComparator =
+    fn(&WorkspaceDiagnosticReport, &WorkspaceDiagnosticReport, &TestCase) -> bool;
+
 /// Tests the server's response to a 'workspace/diagnostic' request
+///
+/// - `cmp` is an optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -1887,6 +2178,7 @@ pub fn test_workspace_diagnostic(
     mut test_case: TestCase,
     identifier: Option<String>,
     previous_result_ids: &Vec<PreviousResultId>,
+    cmp: Option<WorkspaceDiagnosticComparator>,
     expected: &WorkspaceDiagnosticReport,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::WorkspaceDiagnostic);
@@ -1911,7 +2203,11 @@ pub fn test_workspace_diagnostic(
         ],
         Some(expected),
         |expected: &WorkspaceDiagnosticReport, actual: &WorkspaceDiagnosticReport| {
-            if expected != actual {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
                 Err(Box::new(WorkspaceDiagnosticMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
