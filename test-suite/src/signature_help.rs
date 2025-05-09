@@ -46,6 +46,7 @@ mod test {
             test_case,
             &Position::default(),
             None,
+            None,
             None
         ));
     }
@@ -65,7 +66,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         let expected_err = TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
-        let test_result = test_signature_help(test_case, &Position::default(), None, None);
+        let test_result = test_signature_help(test_case, &Position::default(), None, None, None);
         assert_eq!(Err(expected_err), test_result);
     }
 
@@ -87,6 +88,7 @@ mod test {
             test_case,
             &Position::default(),
             None,
+            None,
             Some(&resp),
         ));
     }
@@ -102,7 +104,7 @@ pub fn main() {
         );
         let test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                NonZeroU32::new(5).unwrap(),
+                NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
             .timeout(Duration::from_secs(20))
@@ -111,6 +113,7 @@ pub fn main() {
         lspresso_shot!(test_signature_help(
             test_case,
             &Position::new(2, 8),
+            None,
             None,
             Some(&SignatureHelp {
                 signatures: vec![SignatureInformation {

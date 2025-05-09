@@ -48,7 +48,7 @@ mod test {
         send_capabiltiies(&hover_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_hover(test_case, &Position::default(), None));
+        lspresso_shot!(test_hover(test_case, &Position::default(), None, None));
     }
 
     #[rstest]
@@ -65,7 +65,7 @@ mod test {
         send_capabiltiies(&hover_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_hover(test_case.clone(), &Position::default(), None);
+        let test_result = test_hover(test_case.clone(), &Position::default(), None, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -84,7 +84,12 @@ mod test {
         send_capabiltiies(&hover_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_hover(test_case, &Position::default(), Some(&resp)));
+        lspresso_shot!(test_hover(
+            test_case,
+            &Position::default(),
+            None,
+            Some(&resp)
+        ));
     }
 
     #[test]
@@ -106,6 +111,7 @@ mod test {
         lspresso_shot!(test_hover(
         test_case,
         &Position::new(1, 5),
+        None,
         Some(&Hover {
             range: Some(Range {
                 start: Position {

@@ -33,7 +33,7 @@ mod test {
         send_capabiltiies(&rename_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_rename(test_case, &Position::default(), "", None));
+        lspresso_shot!(test_rename(test_case, &Position::default(), "", None, None));
     }
 
     #[rstest]
@@ -49,7 +49,7 @@ mod test {
         send_capabiltiies(&rename_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_rename(test_case.clone(), &Position::default(), "", None);
+        let test_result = test_rename(test_case.clone(), &Position::default(), "", None, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{edits:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -71,6 +71,7 @@ mod test {
             test_case,
             &Position::default(),
             "",
+            None,
             Some(&edits)
         ));
     }
@@ -85,7 +86,7 @@ mod test {
         );
         let rename_test_case = TestCase::new("rust-analyzer", source_file)
             .start_type(ServerStartType::Progress(
-                NonZeroU32::new(5).unwrap(),
+                NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
             .timeout(Duration::from_secs(20))
@@ -95,6 +96,7 @@ mod test {
             rename_test_case,
             &Position::new(1, 9),
             "bar",
+            None,
             Some(&WorkspaceEdit {
                 changes: None,
                 document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {

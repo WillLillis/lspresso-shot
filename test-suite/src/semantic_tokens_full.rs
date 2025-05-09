@@ -46,7 +46,7 @@ mod test {
         send_capabiltiies(&semantic_tokens_full_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_semantic_tokens_full(test_case, None));
+        lspresso_shot!(test_semantic_tokens_full(test_case, None, None));
     }
 
     #[rstest]
@@ -64,7 +64,7 @@ mod test {
         send_response_num(response_num, &test_case_root).expect("Failed to send response num");
         send_capabiltiies(&semantic_tokens_full_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
-        let test_result = test_semantic_tokens_full(test_case.clone(), None);
+        let test_result = test_semantic_tokens_full(test_case.clone(), None, None);
         let mut expected_err =
             TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
         match response_num {
@@ -124,7 +124,7 @@ mod test {
         send_capabiltiies(&semantic_tokens_full_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_semantic_tokens_full(test_case, Some(&resp)));
+        lspresso_shot!(test_semantic_tokens_full(test_case, None, Some(&resp)));
     }
 
     #[test]
@@ -166,6 +166,7 @@ mod test {
             ..
         })) = test_semantic_tokens_full(
             test_case.clone(),
+            None,
             Some(&SemanticTokensResult::Tokens(SemanticTokens {
                 result_id: Some("4".to_string()),
                 data: expected_tokens.clone(),
@@ -174,6 +175,7 @@ mod test {
             if data != expected_tokens {
                 lspresso_shot!(test_semantic_tokens_full(
                     test_case,
+                    None,
                     Some(&SemanticTokensResult::Tokens(SemanticTokens {
                         result_id: Some("4".to_string()),
                         data: expected_tokens

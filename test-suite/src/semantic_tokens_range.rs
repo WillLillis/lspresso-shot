@@ -49,6 +49,7 @@ mod test {
         lspresso_shot!(test_semantic_tokens_range(
             test_case,
             &Range::default(),
+            None,
             None
         ));
     }
@@ -71,7 +72,8 @@ mod test {
             &test_case_root,
         )
         .expect("Failed to send capabilities");
-        let test_result = test_semantic_tokens_range(test_case.clone(), &Range::default(), None);
+        let test_result =
+            test_semantic_tokens_range(test_case.clone(), &Range::default(), None, None);
         let mut expected_err =
             TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
 
@@ -157,6 +159,7 @@ mod test {
         lspresso_shot!(test_semantic_tokens_range(
             test_case,
             &Range::default(),
+            None,
             Some(&resp)
         ));
     }
@@ -213,13 +216,14 @@ mod test {
             end: Position::new(0, 10),
         };
         for result in &possible_results {
-            if test_semantic_tokens_range(test_case.clone(), &range, Some(result)).is_ok() {
+            if test_semantic_tokens_range(test_case.clone(), &range, None, Some(result)).is_ok() {
                 return;
             }
         }
         lspresso_shot!(test_semantic_tokens_range(
             test_case,
             &range,
+            None,
             Some(&possible_results[1]),
         ));
     }

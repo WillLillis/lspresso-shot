@@ -40,6 +40,7 @@ mod test {
         lspresso_shot!(test_prepare_call_hierarchy(
             test_case,
             &Position::default(),
+            None,
             None
         ));
     }
@@ -63,7 +64,7 @@ mod test {
         .expect("Failed to send capabilities");
 
         let test_result =
-            test_prepare_call_hierarchy(test_case.clone(), &Position::default(), None);
+            test_prepare_call_hierarchy(test_case.clone(), &Position::default(), None, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -89,6 +90,7 @@ mod test {
         lspresso_shot!(test_prepare_call_hierarchy(
             test_case,
             &Position::default(),
+            None,
             Some(&resp)
         ));
     }
@@ -112,6 +114,7 @@ mod test {
         lspresso_shot!(test_prepare_call_hierarchy(
             test_case,
             &Position::new(0, 8),
+            None,
             Some(&vec![CallHierarchyItem {
                 name: "main".to_string(),
                 kind: SymbolKind::FUNCTION,
