@@ -58,3 +58,8 @@ capabilities.experimental = {
         },
     },
 }
+
+vim.lsp.log.set_format_func(function (msg)
+    report_log('LSP LOG: ' .. msg)
+    return msg
+end)
