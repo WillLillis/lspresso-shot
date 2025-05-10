@@ -14,6 +14,19 @@ use lsp_types::{
     WorkspaceDiagnosticReport, WorkspaceEdit,
 };
 
+// These imports are included for the sake of doc comments, they aren't used
+#[allow(unused_imports)]
+use lsp_types::{
+    request::{GotoDeclarationParams, GotoImplementationParams, GotoTypeDefinitionParams},
+    CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
+    CodeActionParams, CompletionParams, DocumentDiagnosticParams, DocumentHighlightParams,
+    GotoDefinitionParams, HoverParams, InlayHintParams, MonikerParams, ReferenceParams,
+    RenameParams, SelectionRangeParams, SemanticTokensRangeParams, SignatureHelpParams,
+    TypeHierarchyPrepareParams, WorkspaceDiagnosticParams,
+};
+#[allow(unused_imports)]
+use types::ServerStartType;
+
 use std::{
     collections::HashMap,
     fs,
@@ -120,7 +133,7 @@ impl Drop for RunnerGuard<'_> {
 /// results.
 ///
 /// `R2` is *always* the expected response type for the given test case. If the test case is
-/// expecting `Some(_)` results, then `R1 == R2`. If `None` is expected, `R1` is `EmptyResult`.
+/// expecting `Some(_)` results, then `R1 == R2`. If `None` is expected, `R1` is [`EmptyResult`]
 ///
 /// If `R1` is `Empty`, we expect empty results and this will only return `Err`
 /// or `Ok(None)`.
@@ -267,19 +280,23 @@ where
 
 pub type CodeActionComparator = fn(&CodeActionResponse, &CodeActionResponse, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/codeAction' request
+/// Tests the server's response to a [`textDocument/codeAction`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `range`: Passed to the client via the request's [`CodeActionParams`]
+/// - `context`: Passed to the client via the request's [`CodeActionParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
-/// Panics if JSON serialization of `range` or `params` fails
+/// Panics if JSON serialization of `range` or `context` fails
+///
+/// [`textDocument/codeAction`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction
 pub fn test_code_action(
     mut test_case: TestCase,
     range: &Range,
@@ -289,9 +306,9 @@ pub fn test_code_action(
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::CodeAction);
     let range_json =
-        serde_json::to_string_pretty(range).expect("JSON deserialzation of range failed");
+        serde_json::to_string_pretty(range).expect("JSON deserialzation of `range` failed");
     let context_json =
-        serde_json::to_string_pretty(context).expect("JSON deserialzation of params failed");
+        serde_json::to_string_pretty(context).expect("JSON deserialzation of `params` failed");
 
     collect_results(
         &test_case,
@@ -326,19 +343,22 @@ pub fn test_code_action(
 
 pub type CodeActionResolveComparator = fn(&CodeAction, &CodeAction, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/codeLens' request
+/// Tests the server's response to a [`codeLens/resolve`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `params`: Passed to the client via the request's [`CodeAction`] param
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
-/// Panics if JSON serialization of `range` or `params` fails
+/// Panics if JSON serialization of `params` fails
+///
+/// [`codeLens/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve
 pub fn test_code_action_resolve(
     mut test_case: TestCase,
     params: &CodeAction,
@@ -385,19 +405,20 @@ pub fn test_code_action_resolve(
 
 pub type CodeLensComparator = fn(&Vec<CodeLens>, &Vec<CodeLens>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/codeLens' request
+/// Tests the server's response to a [`textDocument/codeLens`] request
 ///
-/// - `commands` is a list of LSP command names the client should advertise support for in its
+/// - `commands`: A list of LSP command names the client should advertise support for in its
 ///   capabilities (e.g. "rust-analyzer.runSingle"). This enables command-based `CodeLens`
 ///   responses from the server, such as "Run" or "Debug" actions.
-///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
+///
+/// [`textDocument/codeLens`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeLens
 pub fn test_code_lens(
     mut test_case: TestCase,
     commands: Option<&Vec<String>>,
@@ -439,23 +460,25 @@ pub fn test_code_lens(
 
 pub type CodeLensResolveComparator = fn(&CodeLens, &CodeLens, &TestCase) -> bool;
 
-/// Tests the server's response to a 'codeLens/resolve' request
+/// Tests the server's response to a [`codeLens/resolve`] request
 ///
 /// - `commands` is a list of LSP command names the client should advertise support for in its
-///   capabilities (e.g. "rust-analyzer.runSingle"). This enables command-based `CodeLens`
+///   capabilities (e.g. "rust-analyzer.runSingle"). This enables command-based [`CodeLens`]
 ///   responses from the server, such as "Run" or "Debug" actions.
-///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `code_lens`: Passed to the client via the request's [`CodeLens`] param
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `code_lens` fails
+///
+/// [`codeLens/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve
 pub fn test_code_lens_resolve(
     mut test_case: TestCase,
     commands: Option<&Vec<String>>,
@@ -504,15 +527,19 @@ pub fn test_code_lens_resolve(
 
 pub type CompletionComparator = fn(&CompletionResult, &CompletionResponse, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/complection' request
+/// Tests the server's response to a [`textDocument/completion`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`CompletionParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
+///
+/// [`textDocument/completion`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion
 pub fn test_completion(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -546,19 +573,22 @@ pub fn test_completion(
 
 pub type CompletionResolveComparator = fn(&CompletionItem, &CompletionItem, &TestCase) -> bool;
 
-/// Tests the server's response to a 'completionItem/resolve' request
+/// Tests the server's response to a [`completionItem/resolve`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `completion_item`: Passed to the client via the request's [`CompletionItem`] param
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `completion_item` fails
+///
+/// [`completionItem/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve
 pub fn test_completion_resolve(
     mut test_case: TestCase,
     completion_item: &CompletionItem,
@@ -567,7 +597,7 @@ pub fn test_completion_resolve(
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::CompletionResolve);
 
-    let completion_item = serde_json::to_string_pretty(completion_item)
+    let completion_item_json = serde_json::to_string_pretty(completion_item)
         .expect("JSON deserialzation of completion item failed");
     collect_results(
         &test_case,
@@ -594,7 +624,7 @@ pub fn test_completion_resolve(
                 "command",
                 "data",
             ],
-            json: completion_item,
+            json: completion_item_json,
         }],
         expected,
         |expected, actual| {
@@ -617,14 +647,19 @@ pub fn test_completion_resolve(
 pub type DeclarationComparator =
     fn(&GotoDeclarationResponse, &GotoDeclarationResponse, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/declaration' request
+/// Tests the server's response to a [`textDocument/declaration`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`GotoDeclarationParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// [`textDocument/declaration`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration
 pub fn test_declaration(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -680,14 +715,18 @@ pub fn test_declaration(
 pub type DefinitionComparator =
     fn(&GotoDefinitionResponse, &GotoDefinitionResponse, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/definition' request
+/// Tests the server's response to a [`textDocument/definition`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`GotoDefinitionParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns [`TestError`] if the expected results don't match, or if some other failure occurs
+///
+/// [`textDocument/definition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition
 pub fn test_definition(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -743,19 +782,23 @@ pub fn test_definition(
 pub type DiagnosticComparator =
     fn(&DocumentDiagnosticReport, &DocumentDiagnosticReport, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/diagnostic' request
+/// Tests the server's response to a [`textDocument/diagnostic`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `identifier`: Passed to the client via the request's [`DocumentDiagnosticParams`]
+/// - `previous_result_id`: Passed to the client via the request's [`DocumentDiagnosticParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `identifier` or `previous_result_id` fails
+///
+/// [`textDocument/diagnostic`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_diagnostic
 pub fn test_diagnostic(
     mut test_case: TestCase,
     identifier: Option<&str>,
@@ -809,15 +852,19 @@ pub fn test_diagnostic(
 pub type DocumentHighlightComparator =
     fn(&Vec<DocumentHighlight>, &Vec<DocumentHighlight>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/documentHighlight' request
+/// Tests the server's response to a [`textDocument/documentHighlight`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`DocumentHighlightParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
+///
+/// [`textDocument/documentHighlight`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentHighlight
 pub fn test_document_highlight(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -851,15 +898,17 @@ pub fn test_document_highlight(
 
 pub type DocumentLinkComparator = fn(&Vec<DocumentLink>, &Vec<DocumentLink>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/documentLink' request
+/// Tests the server's response to a [`textDocument/documentLink`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
+///
+/// [`textDocument/documentLink`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentLink
 pub fn test_document_link(
     mut test_case: TestCase,
     cmp: Option<DocumentLinkComparator>,
@@ -889,27 +938,30 @@ pub fn test_document_link(
 
 pub type DocumentLinkResolveComparator = fn(&DocumentLink, &DocumentLink, &TestCase) -> bool;
 
-/// Tests the server's response to a 'documentLink/resolve' request
+/// Tests the server's response to a [`documentLink/resolve`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `link`: Passed to the client via the request's [`DocumentLink`] params
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `link` fails
+///
+/// [`documentLink/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve
 pub fn test_document_link_resolve(
     mut test_case: TestCase,
-    link: &DocumentLink,
+    params: &DocumentLink,
     cmp: Option<DocumentLinkResolveComparator>,
     expected: Option<&DocumentLink>,
 ) -> TestResult<()> {
     let document_link_json =
-        serde_json::to_string_pretty(link).expect("JSON deserialzation of document link failed");
+        serde_json::to_string_pretty(params).expect("JSON deserialzation of document link failed");
     test_case.test_type = Some(TestType::DocumentLinkResolve);
     collect_results(
         &test_case,
@@ -939,15 +991,17 @@ pub fn test_document_link_resolve(
 pub type DocumentSymbolComparator =
     fn(&DocumentSymbolResponse, &DocumentSymbolResponse, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/documentSymbol' request
+/// Tests the server's response to a [`textDocument/documentSymbol`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
+///
+/// [`textDocument/documentSymbol`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol
 pub fn test_document_symbol(
     mut test_case: TestCase,
     cmp: Option<DocumentSymbolComparator>,
@@ -999,15 +1053,17 @@ pub fn test_document_symbol(
 
 pub type FoldingRangeComparator = fn(&Vec<FoldingRange>, &Vec<FoldingRange>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/foldingRange' request
+/// Tests the server's response to a [`textDocument/foldingRange`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
+///
+/// [`textDocument/foldingRange`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange
 pub fn test_folding_range(
     mut test_case: TestCase,
     cmp: Option<FoldingRangeComparator>,
@@ -1037,9 +1093,9 @@ pub fn test_folding_range(
 
 pub type FormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/formatting' request.
+/// Tests the server's response to a [`textDocument/formatting`] request.
 ///
-/// - `options` is the formatting options passed to the LSP client. If `None`, then
+/// - `options`:  The formatting options passed to the LSP client. If `None`, then
 ///   the following default is used:
 ///
 /// ```rust
@@ -1053,17 +1109,19 @@ pub type FormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) ->
 /// };
 /// ```
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results. Note that a custom comparator is only
 ///   availble for the `FormattingResult::Response` variant.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns [`TestError`] if the expected results don't match, or if some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `options` fails
+///
+/// [`textDocument/formatting`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting
 pub fn test_formatting(
     mut test_case: TestCase,
     options: Option<FormattingOptions>,
@@ -1164,15 +1222,19 @@ pub fn test_formatting(
 
 pub type HoverComparator = fn(&Hover, &Hover, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/hover' request
+/// Tests the server's response to a [`textDocument/hover`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`HoverParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
+///
+/// [`textDocument/hover`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover
 pub fn test_hover(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -1207,17 +1269,19 @@ pub fn test_hover(
 pub type ImplementationComparator =
     fn(&GotoImplementationResponse, &GotoImplementationResponse, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/implementation' request
+/// Tests the server's response to a [`textDocument/implementation`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`GotoImplementationParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// # Errors
-///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
+///
+/// [`textDocument/implementation`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation
 pub fn test_implementation(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -1274,19 +1338,22 @@ pub fn test_implementation(
 pub type IncomingCallsComparator =
     fn(&Vec<CallHierarchyIncomingCall>, &Vec<CallHierarchyIncomingCall>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'callHierarchy/incomingCalls' request
+/// Tests the server's response to a [`callHierarchy/incomingCalls`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `call_item`: Passed to the client via the request's [`CallHierarchyIncomingCallsParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `call_item` fails
+///
+/// [`callHierarchy/incomingCalls`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_incomingCalls
 pub fn test_incoming_calls(
     mut test_case: TestCase,
     call_item: &CallHierarchyItem,
@@ -1322,19 +1389,22 @@ pub fn test_incoming_calls(
 
 pub type InlayHintComparator = fn(&Vec<InlayHint>, &Vec<InlayHint>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/inlayHint' request
+/// Tests the server's response to a [`textDocument/inlayHint`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `range`: Passed to the client via the request's [`InlayHintParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `range` fails
+///
+/// [`textDocument/inlayHint`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlayHint
 pub fn test_inlay_hint(
     mut test_case: TestCase,
     range: &Range,
@@ -1373,16 +1443,23 @@ pub fn test_inlay_hint(
 
 pub type MonikerComparator = fn(&Vec<Moniker>, &Vec<Moniker>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/moniker' request
+/// Tests the server's response to a [`textDocument/moniker`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`MonikerParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `call_item` fails
+///
+/// [`textDocument/moniker`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_moniker
 pub fn test_moniker(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -1417,19 +1494,22 @@ pub fn test_moniker(
 pub type OutgoingCallsComparator =
     fn(&Vec<CallHierarchyOutgoingCall>, &Vec<CallHierarchyOutgoingCall>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'callHierarchy/outgoingCalls' request
+/// Tests the server's response to a [`callHierarchy/outgoingCalls`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `call_item`: Passed to the client via the request's [`CallHierarchyOutgoingCallsParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `call_item` fails
+///
+/// [`callHierarchy/outgoingCalls`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_outgoingCalls
 pub fn test_outgoing_calls(
     mut test_case: TestCase,
     call_item: &CallHierarchyItem,
@@ -1466,15 +1546,19 @@ pub fn test_outgoing_calls(
 pub type PrepareCallHierarchyComparator =
     fn(&Vec<CallHierarchyItem>, &Vec<CallHierarchyItem>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/prepareCallHierarchy' request
+/// Tests the server's response to a [`textDocument/prepareCallHierarchy`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`CallHierarchyPrepareParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
+///
+/// [`textDocument/prepareCallHierarchy`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareCallHierarchy
 pub fn test_prepare_call_hierarchy(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -1509,23 +1593,26 @@ pub fn test_prepare_call_hierarchy(
 pub type PrepareTypeHierarchyComparator =
     fn(&Vec<TypeHierarchyItem>, &Vec<TypeHierarchyItem>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/prepareTypeHierarchy' request
+/// Tests the server's response to a [`textDocument/prepareTypeHierarchy`] request
 ///
-/// - `items`: Type hierarchy items provided to the client at request type. The
-///   `uri` field of each item should be *relative* to the test case root, instead of
-///   an absolute path. (i.e. `uri = "file://test_file.rs"`).
-///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`TypeHierarchyPrepareParams`]
+/// - `items`: Type hierarchy items provided to the client via [`TypeHierarchyPrepareParams`].
+///   The `uri` field of each item should be *relative* to the test case root, instead of an
+///   absolute path. (i.e. `uri = "file://src/test_file.rs"`)
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `items` fails
+///
+/// [`textDocument/prepareTypeHierarchy`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareTypeHierarchy
 pub fn test_prepare_type_hierarchy(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -1576,20 +1663,27 @@ pub type PublishDiagnosticsComparator = fn(&Vec<Diagnostic>, &Vec<Diagnostic>, &
 // since diagnostics are requested via a `textDocument/publishDiagnostics` notification instead
 // of a request. The `vim.lsp.buf_notify` method only returns a boolean to indicate success,
 // so we can't access the actual data.
-/// Tests the server's response to a 'textDocument/publishDiagnostics' request.
+
+/// Tests the server's response to a [`textDocument/publishDiagnostics`] request.
 ///
-/// Specifying a `ServerStartType::Progress` for a diagnostics test is overloaded to
-/// determine which `DiagnosticChanged` autocmd to use. This can be useful if your
-/// server sends multiple `textDocument/publishDiagnostics` notifications before
+/// Specifying a [`ServerStartType::Progress`] for a diagnostics test is overloaded to
+/// determine which [`DiagnosticChanged`] autocmd to use. This can be useful if your
+/// server sends multiple [`textDocument/publishDiagnostics`] notifications before
 /// fully analyzing a source file.
 ///
 /// An `Option` is not used for `expected` because the LSP spec does not allow for
-/// nil parameters in the `textDocument/publishDiagnostics` notification.
+/// nil parameters in the [`textDocument/publishDiagnostics`] notification
+///
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
+///
+/// [`textDocument/publishDiagnostics`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_publishDiagnostics
+/// [`DiagnosticChanged`]: https://neovim.io/doc/user/diagnostic.html#DiagnosticChanged
 pub fn test_publish_diagnostics(
     mut test_case: TestCase,
     cmp: Option<PublishDiagnosticsComparator>,
@@ -1619,15 +1713,24 @@ pub fn test_publish_diagnostics(
 
 pub type ReferencesComparator = fn(&Vec<Location>, &Vec<Location>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/references' request
+/// Tests the server's response to a [`textDocument/references`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`ReferenceParams`]
+/// - `include_declaration`: Passed to the client via the request's [`ReferenceParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `include_declaration` fails
+///
+/// [`textDocument/references`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references
 pub fn test_references(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -1671,15 +1774,24 @@ pub fn test_references(
 
 pub type RenameComparator = fn(&WorkspaceEdit, &WorkspaceEdit, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/rename' request
+/// Tests the server's response to a [`textDocument/rename`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`RenameParams`]
+/// - `new_name`: Passed to the client via the request's [`RenameParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `new_name` fails
+///
+/// [`textDocument/rename`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename
 pub fn test_rename(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -1721,15 +1833,22 @@ pub fn test_rename(
 pub type SelectionRangeComparator =
     fn(&Vec<SelectionRange>, &Vec<SelectionRange>, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/typeDefinition' request
+/// Tests the server's response to a [`textDocument/selectionRange`] request
+///
+/// - `positions`: Passed to the client via the request's [`SelectionRangeParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `positions` fails
+///
+/// [`textDocument/typeDefinition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange
 pub fn test_selection_range(
     mut test_case: TestCase,
     positions: &Vec<Position>,
@@ -1769,11 +1888,17 @@ pub fn test_selection_range(
 pub type SemanticTokensFullComparator =
     fn(&SemanticTokensResult, &SemanticTokensResult, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/semanticTokens/full' request
+/// Tests the server's response to a [`textDocument/semanticTokens/full`] request
+///
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// [`textDocument/semanticTokens/full`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_fullRequest
 pub fn test_semantic_tokens_full(
     mut test_case: TestCase,
     cmp: Option<SemanticTokensFullComparator>,
@@ -1837,18 +1962,22 @@ pub fn test_semantic_tokens_full(
 pub type SemanticTokensFullDeltaComparator =
     fn(&SemanticTokensFullDeltaResult, &SemanticTokensFullDeltaResult, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/semanticTokens/full/delta' request
+/// Tests the server's response to a [`textDocument/semanticTokens/full/delta`] request
 ///
-/// First sends a `textDocument/semanticTokens/full` request to get the initial state,
-/// and then issues a `textDocument/semanticTokens/full/delta` request if the first
+/// First sends a [`textDocument/semanticTokens/full`] request to get the initial state,
+/// and then issues a [`textDocument/semanticTokens/full/delta`] request if the first
 /// response contained a `result_id`.
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// [`textDocument/semanticTokens/full`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_fullRequest
+/// [`textDocument/semanticTokens/full/delta`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_deltaRequest
 pub fn test_semantic_tokens_full_delta(
     mut test_case: TestCase,
     cmp: Option<SemanticTokensFullDeltaComparator>,
@@ -1866,8 +1995,7 @@ pub fn test_semantic_tokens_full_delta(
                     // to differentiate between the `Tokens`, `TokensDelta`, and `PartialTokensDelta`
                     // variants if we get an empty vector in response. Just treat this as a special
                     // case and say it's ok.
-                    #[allow(unused_assignments)] // false positive?
-                    let mut eql_result = false;
+                    // #[allow(unused_assignments)] // false positive?
                     match (expected, actual) {
                         (
                             SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
@@ -1888,7 +2016,7 @@ pub fn test_semantic_tokens_full_delta(
                                 result_id: None,
                                 data: token_data,
                             }),
-                        ) if token_data.is_empty() && edit_data.is_empty() => eql_result = true,
+                        ) if token_data.is_empty() && edit_data.is_empty() => true,
                         (
                             SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
                                 result_id: None,
@@ -1906,7 +2034,7 @@ pub fn test_semantic_tokens_full_delta(
                                 result_id: None,
                                 data: token_data,
                             }),
-                        ) if token_data.is_empty() && partial_data.is_empty() => eql_result = true,
+                        ) if token_data.is_empty() && partial_data.is_empty() => true,
                         (
                             SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
                                 result_id: None,
@@ -1924,7 +2052,7 @@ pub fn test_semantic_tokens_full_delta(
                                 result_id: None,
                                 edits: edit_data,
                             }),
-                        ) if edit_data.is_empty() && partial_data.is_empty() => eql_result = true,
+                        ) if edit_data.is_empty() && partial_data.is_empty() => true,
                         (
                             SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
                                 result_id: None,
@@ -1938,10 +2066,9 @@ pub fn test_semantic_tokens_full_delta(
                                 result_id: None,
                                 data: token_data,
                             }),
-                        ) if edit_data.is_empty() && token_data.is_empty() => eql_result = true,
-                        _ => eql_result = expected == actual,
+                        ) if edit_data.is_empty() && token_data.is_empty() => true,
+                        _ => expected == actual,
                     }
-                    eql_result
                 },
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
@@ -1960,18 +2087,22 @@ pub fn test_semantic_tokens_full_delta(
 pub type SemanticTokensRangeComparator =
     fn(&SemanticTokensRangeResult, &SemanticTokensRangeResult, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/semanticTokens/range' request
+/// Tests the server's response to a [`textDocument/semanticTokens/range`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `range`: Passed to the client via the request's [`SemanticTokensRangeParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `range` fails
+///
+/// [`textDocument/semanticTokens/range`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_rangeRequest
 pub fn test_semantic_tokens_range(
     mut test_case: TestCase,
     range: &Range,
@@ -2043,18 +2174,24 @@ pub fn test_semantic_tokens_range(
 
 pub type SeignatureHelpComparator = fn(&SignatureHelp, &SignatureHelp, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/signatureHelp' request
+/// Tests the server's response to a [`textDocument/signatureHelp`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`SignatureHelpParams`]
+/// - `context`: Passed to the client via the request's [`SignatureHelpParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `context` fails
+///
+/// [`textDocument/signatureHelp`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp
 pub fn test_signature_help(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -2101,11 +2238,19 @@ pub fn test_signature_help(
 pub type TypeDefinitionComparator =
     fn(&GotoTypeDefinitionResponse, &GotoTypeDefinitionResponse, &TestCase) -> bool;
 
-/// Tests the server's response to a 'textDocument/typeDefinition' request
+/// Tests the server's response to a [`textDocument/typeDefinition`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`GotoTypeDefinitionParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the expected results don't match, or if some other failure occurs
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// [`textDocument/typeDefinition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition
 pub fn test_type_definition(
     mut test_case: TestCase,
     cursor_pos: &Position,
@@ -2161,19 +2306,23 @@ pub fn test_type_definition(
 pub type WorkspaceDiagnosticComparator =
     fn(&WorkspaceDiagnosticReport, &WorkspaceDiagnosticReport, &TestCase) -> bool;
 
-/// Tests the server's response to a 'workspace/diagnostic' request
+/// Tests the server's response to a [`workspace/diagnostic`] request
 ///
-/// - `cmp` is an optional custom comparator function that can be used to determine equality
+/// - `identifier`: Passed to the client via the request's [`WorkspaceDiagnosticParams`]
+/// - `previous_result_id`: Passed to the client via the request's [`WorkspaceDiagnosticParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
 /// # Errors
 ///
-/// Returns `TestError` if the test case is invalid, the expected results don't match,
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
 /// # Panics
 ///
 /// Panics if JSON serialization of `identifier` or `previous_result_id` fails
+///
+/// [`workspace/diagnostic`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic
 pub fn test_workspace_diagnostic(
     mut test_case: TestCase,
     identifier: Option<String>,
