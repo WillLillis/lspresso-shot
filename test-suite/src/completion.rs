@@ -5,7 +5,7 @@ mod test {
     use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
     use lspresso_shot::{
         lspresso_shot, test_completion,
-        types::{completion::CompletionResult, ServerStartType, TestCase, TestError, TestFile},
+        types::{ServerStartType, TestCase, TestError, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
@@ -35,7 +35,7 @@ mod test {
     }
 
     #[test]
-    fn test_server_exact_simple_expect_none_got_none() {
+    fn test_server_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
@@ -49,9 +49,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_exact_simple_expect_none_got_some(
-        #[values(0, 1, 2, 3, 4, 5)] response_num: u32,
-    ) {
+    fn test_server_simple_expect_none_got_some(#[values(0, 1, 2, 3, 4, 5)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let resp = test_server::responses::get_completion_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
@@ -69,12 +67,9 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_exact_simple_expect_some_got_some(
-        #[values(0, 1, 2, 3, 4, 5)] response_num: u32,
-    ) {
+    fn test_server_simple_expect_some_got_some(#[values(0, 1, 2, 3, 4, 5)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let resp = test_server::responses::get_completion_response(response_num, &uri).unwrap();
-        let comp_result = CompletionResult::Exact(resp);
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
@@ -88,49 +83,14 @@ mod test {
             test_case,
             &Position::default(),
             None,
-            Some(&comp_result)
+            Some(&resp)
         ));
     }
 
-    #[rstest]
-    fn test_server_contains_simple_expect_some_got_some(
-        #[values(0, 1, 2, 3, 4, 5)] response_num: u32,
-    ) {
-        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
-        let resp = test_server::responses::get_completion_response(response_num, &uri).unwrap();
-        let comp_result = match resp {
-            CompletionResponse::Array(items)
-            | CompletionResponse::List(CompletionList { items, .. }) => {
-                CompletionResult::Contains(items)
-            }
-        };
-        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
-        let test_case = TestCase::new(get_dummy_server_path(), source_file);
-        let test_case_root = test_case
-            .get_lspresso_dir()
-            .expect("Failed to get test case's root directory");
-        send_response_num(response_num, &test_case_root).expect("Failed to send response num");
-        send_capabiltiies(&completion_capabilities_simple(), &test_case_root)
-            .expect("Failed to send capabilities");
-
-        lspresso_shot!(test_completion(
-            test_case,
-            &Position::default(),
-            None,
-            Some(&comp_result)
-        ));
-    }
-
-    // TODO: The end user experience for debugging completions test with CompletionResult::Contains
-    // is pretty awful. If we're not going to check by struct equality, there needs
-    // to be some helpers for cases where you have the "right" expected completion
-    // item, but a few fields are off. Maybe write a function to sort the provided
-    // results by similarity to the first unnaccounted for expected item. Then we
-    // can use the json diff printing logic to help highlight differences
     #[allow(clippy::too_many_lines)]
     #[test]
     fn rust_analyzer_completion() {
-        let expected_comps = CompletionResult::Contains(vec![CompletionItem {
+        let expected_item = CompletionResponse::Array(vec![CompletionItem {
             label: "println!(…)".to_string(),
             label_details: None,
             kind: Some(CompletionItemKind::FUNCTION),
@@ -224,12 +184,36 @@ println!("format {local_variable} arguments");
             ))
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
+        // Just find the completion item we care about!
+        let cmp = |expected: &CompletionResponse,
+                   actual: &CompletionResponse,
+                   _test_case: &TestCase|
+         -> bool {
+            let expected_item = match expected {
+                CompletionResponse::Array(items) => items[0].clone(),
+                CompletionResponse::List(_) => unreachable!(),
+            };
+            match actual {
+                CompletionResponse::Array(completion_items)
+                | CompletionResponse::List(CompletionList {
+                    items: completion_items,
+                    ..
+                }) => {
+                    for item in completion_items {
+                        if item.label == "println!(…)" {
+                            return expected_item == *item;
+                        }
+                    }
+                }
+            }
+            false
+        };
 
         lspresso_shot!(test_completion(
             test_case,
             &Position::new(1, 9),
-            None,
-            Some(&expected_comps)
+            Some(cmp),
+            Some(&expected_item)
         ));
     }
 }

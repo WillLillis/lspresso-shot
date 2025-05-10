@@ -41,7 +41,7 @@ use types::{
     },
     code_action::{CodeActionMismatchError, CodeActionResolveMismatchError},
     code_lens::{CodeLensMismatchError, CodeLensResolveMismatchError},
-    completion::{CompletionMismatchError, CompletionResolveMismatchError, CompletionResult},
+    completion::{CompletionMismatchError, CompletionResolveMismatchError},
     declaration::DeclarationMismatchError,
     definition::DefinitionMismatchError,
     diagnostic::{
@@ -525,7 +525,7 @@ pub fn test_code_lens_resolve(
     )
 }
 
-pub type CompletionComparator = fn(&CompletionResult, &CompletionResponse, &TestCase) -> bool;
+pub type CompletionComparator = fn(&CompletionResponse, &CompletionResponse, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/completion`] request
 ///
@@ -544,7 +544,7 @@ pub fn test_completion(
     mut test_case: TestCase,
     cursor_pos: &Position,
     cmp: Option<CompletionComparator>,
-    expected: Option<&CompletionResult>,
+    expected: Option<&CompletionResponse>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Completion);
     collect_results(
@@ -556,7 +556,7 @@ pub fn test_completion(
         expected,
         |expected, actual| {
             let eql = cmp.as_ref().map_or_else(
-                || expected.results_satisfy(actual),
+                || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
