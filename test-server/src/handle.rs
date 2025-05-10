@@ -4,6 +4,14 @@ use anyhow::Result;
 use log::{error, info};
 use lsp_server::{Connection, Message, Notification, Request, RequestId, Response};
 use lsp_types::{
+    CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
+    CodeAction, CodeActionParams, CodeLens, CodeLensParams, CompletionItem, CompletionParams,
+    DocumentDiagnosticParams, DocumentFormattingParams, DocumentHighlightParams, DocumentLink,
+    DocumentLinkParams, DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams,
+    HoverParams, InlayHintParams, MonikerParams, ReferenceParams, RenameParams,
+    SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
+    SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams, TypeHierarchyPrepareParams,
+    Uri, WorkspaceDiagnosticParams,
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
         CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare,
@@ -17,14 +25,6 @@ use lsp_types::{
         SemanticTokensRangeRequest, SignatureHelpRequest, TypeHierarchyPrepare,
         WorkspaceDiagnosticRequest,
     },
-    CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    CodeAction, CodeActionParams, CodeLens, CodeLensParams, CompletionItem, CompletionParams,
-    DocumentDiagnosticParams, DocumentFormattingParams, DocumentHighlightParams, DocumentLink,
-    DocumentLinkParams, DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams,
-    HoverParams, InlayHintParams, MonikerParams, ReferenceParams, RenameParams,
-    SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
-    SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams, TypeHierarchyPrepareParams,
-    Uri, WorkspaceDiagnosticParams,
 };
 
 use crate::{

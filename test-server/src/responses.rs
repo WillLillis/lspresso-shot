@@ -1,7 +1,6 @@
 use std::{collections::HashMap, str::FromStr};
 
 use lsp_types::{
-    request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, ChangeAnnotation,
     CodeAction, CodeActionDisabled, CodeActionKind, CodeActionOrCommand, CodeActionResponse,
     CodeDescription, CodeLens, Command, CompletionItem, CompletionItemKind,
@@ -20,6 +19,7 @@ use lsp_types::{
     UniquenessLevel, Uri, WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
     WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport,
     WorkspaceUnchangedDocumentDiagnosticReport,
+    request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
 use crate::get_dummy_source_path;

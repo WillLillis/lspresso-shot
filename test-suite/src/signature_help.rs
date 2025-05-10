@@ -4,7 +4,7 @@ mod test {
 
     use std::{num::NonZeroU32, time::Duration};
 
-    use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
+    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lspresso_shot::{
         lspresso_shot, test_signature_help,
         types::{ServerStartType, TestCase, TestError, TestFile},

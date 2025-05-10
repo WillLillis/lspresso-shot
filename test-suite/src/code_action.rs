@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
+    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lsp_types::{
         CodeAction, CodeActionContext, CodeActionKind, CodeActionOptions, CodeActionOrCommand,
         CodeActionProviderCapability, CodeActionResponse, Position, Range, ServerCapabilities,

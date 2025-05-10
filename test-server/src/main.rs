@@ -5,7 +5,7 @@ use std::{
 
 use test_server::handle::{handle_notification, handle_request};
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use log::{error, info};
 use lsp_server::{Connection, Message};
 use lsp_types::{InitializeParams, ServerCapabilities};

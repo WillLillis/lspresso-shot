@@ -2,7 +2,7 @@
 mod test {
     use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
-    use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
+    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lspresso_shot::{
         lspresso_shot, test_selection_range,
         types::{ServerStartType, TestCase, TestError, TestFile},

@@ -1,7 +1,7 @@
 use lsp_types::{CodeAction, CodeActionOrCommand, CodeActionResponse};
 use thiserror::Error;
 
-use super::{compare::write_fields_comparison, CleanResponse, Empty, TestResult};
+use super::{CleanResponse, Empty, TestResult, compare::write_fields_comparison};
 
 impl Empty for CodeActionResponse {}
 impl Empty for CodeAction {}
