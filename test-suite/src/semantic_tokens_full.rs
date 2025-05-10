@@ -2,12 +2,12 @@
 mod test {
     use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
-    use crate::test_helpers::{cargo_dot_toml, NON_RESPONSE_NUM};
+    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lspresso_shot::{
         lspresso_shot, test_semantic_tokens_full,
         types::{
-            semantic_tokens::SemanticTokensFullMismatchError, ServerStartType, TestCase, TestError,
-            TestFile,
+            ServerStartType, TestCase, TestError, TestFile,
+            semantic_tokens::SemanticTokensFullMismatchError,
         },
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};

@@ -2,7 +2,7 @@ use lsp_types::TypeHierarchyItem;
 use thiserror::Error;
 
 use super::{
-    clean_uri, compare::write_fields_comparison, CleanResponse, Empty, TestCase, TestResult,
+    CleanResponse, Empty, TestCase, TestResult, clean_uri, compare::write_fields_comparison,
 };
 
 impl Empty for Vec<TypeHierarchyItem> {}

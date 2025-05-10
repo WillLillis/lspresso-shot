@@ -24,7 +24,7 @@ pub mod type_definition;
 pub mod type_hierarchy;
 
 use crate::{
-    init_dot_lua::{get_init_dot_lua, LuaReplacement},
+    init_dot_lua::{LuaReplacement, get_init_dot_lua},
     types::{
         call_hierarchy::{
             IncomingCallsMismatchError, OutgoingCallsMismatchError,
@@ -359,7 +359,7 @@ impl TestCase {
         }
 
         self.validate_path(&self.source_file.path)?;
-        for TestFile { ref path, .. } in &self.other_files {
+        for TestFile { path, .. } in &self.other_files {
             self.validate_path(path)?;
         }
 

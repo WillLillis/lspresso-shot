@@ -2,7 +2,7 @@ use lsp_types::{CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgo
 use thiserror::Error;
 
 use super::{
-    clean_uri, compare::write_fields_comparison, CleanResponse, Empty, TestCase, TestResult,
+    CleanResponse, Empty, TestCase, TestResult, clean_uri, compare::write_fields_comparison,
 };
 
 impl Empty for Vec<CallHierarchyItem> {}

@@ -3,7 +3,6 @@ pub mod types;
 
 use init_dot_lua::LuaReplacement;
 use lsp_types::{
-    request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
     CodeActionContext, CodeActionResponse, CodeLens, CompletionItem, CompletionResponse,
     Diagnostic, DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbolResponse,
@@ -12,17 +11,18 @@ use lsp_types::{
     SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
     SemanticTokensResult, SignatureHelp, SignatureHelpContext, TextEdit, TypeHierarchyItem,
     WorkspaceDiagnosticReport, WorkspaceEdit,
+    request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
 // These imports are included for the sake of doc comments, they aren't used
 #[allow(unused_imports)]
 use lsp_types::{
-    request::{GotoDeclarationParams, GotoImplementationParams, GotoTypeDefinitionParams},
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeActionParams, CompletionParams, DocumentDiagnosticParams, DocumentHighlightParams,
     GotoDefinitionParams, HoverParams, InlayHintParams, MonikerParams, ReferenceParams,
     RenameParams, SelectionRangeParams, SemanticTokensRangeParams, SignatureHelpParams,
     TypeHierarchyPrepareParams, WorkspaceDiagnosticParams,
+    request::{GotoDeclarationParams, GotoImplementationParams, GotoTypeDefinitionParams},
 };
 #[allow(unused_imports)]
 use types::ServerStartType;
@@ -36,6 +36,7 @@ use std::{
 };
 
 use types::{
+    CleanResponse, Empty, EmptyResult, TestCase, TestError, TestResult, TestType, TimeoutError,
     call_hierarchy::{
         IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
     },
@@ -66,7 +67,6 @@ use types::{
     signature_help::SignatureHelpMismatchError,
     type_definition::TypeDefinitionMismatchError,
     type_hierarchy::PrepareTypeHierarchyMismatchError,
-    CleanResponse, Empty, EmptyResult, TestCase, TestError, TestResult, TestType, TimeoutError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the

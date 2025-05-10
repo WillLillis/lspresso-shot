@@ -1,7 +1,7 @@
 use lsp_types::SignatureHelp;
 use thiserror::Error;
 
-use super::{compare::write_fields_comparison, CleanResponse, Empty};
+use super::{CleanResponse, Empty, compare::write_fields_comparison};
 
 #[derive(Debug, Error, PartialEq, Eq)]
 pub struct SignatureHelpMismatchError {

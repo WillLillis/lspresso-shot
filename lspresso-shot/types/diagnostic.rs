@@ -7,7 +7,7 @@ use lsp_types::{
 use thiserror::Error;
 
 use super::{
-    clean_uri, compare::write_fields_comparison, CleanResponse, Empty, TestCase, TestResult,
+    CleanResponse, Empty, TestCase, TestResult, clean_uri, compare::write_fields_comparison,
 };
 
 impl Empty for Vec<Diagnostic> {}
@@ -30,7 +30,7 @@ impl CleanResponse for Vec<Diagnostic> {
 impl CleanResponse for DocumentDiagnosticReportKind {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
         match &mut self {
-            Self::Full(ref mut report) => {
+            Self::Full(report) => {
                 report.items = report.items.clone().clean_response(test_case)?;
             }
             Self::Unchanged(_) => {}
@@ -73,7 +73,7 @@ impl CleanResponse for WorkspaceDiagnosticReport {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
         for report in &mut self.items {
             match report {
-                WorkspaceDocumentDiagnosticReport::Full(ref mut report) => {
+                WorkspaceDocumentDiagnosticReport::Full(report) => {
                     report.uri = clean_uri(&report.uri, test_case)?;
                     for report in &mut report.full_document_diagnostic_report.items {
                         if let Some(ref mut related_info) = report.related_information {
@@ -83,7 +83,7 @@ impl CleanResponse for WorkspaceDiagnosticReport {
                         }
                     }
                 }
-                WorkspaceDocumentDiagnosticReport::Unchanged(ref mut report) => {
+                WorkspaceDocumentDiagnosticReport::Unchanged(report) => {
                     report.uri = clean_uri(&report.uri, test_case)?;
                 }
             }

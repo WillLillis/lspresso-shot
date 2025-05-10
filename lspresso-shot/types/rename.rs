@@ -4,7 +4,7 @@ use lsp_types::{DocumentChangeOperation, DocumentChanges, ResourceOp, WorkspaceE
 use thiserror::Error;
 
 use super::{
-    clean_uri, compare::write_fields_comparison, CleanResponse, Empty, TestCase, TestResult,
+    CleanResponse, Empty, TestCase, TestResult, clean_uri, compare::write_fields_comparison,
 };
 
 impl Empty for WorkspaceEdit {}
@@ -28,15 +28,15 @@ impl CleanResponse for WorkspaceEdit {
             Some(DocumentChanges::Operations(ref mut ops)) => {
                 for op in ops {
                     match op {
-                        DocumentChangeOperation::Op(ref mut op) => match op {
-                            ResourceOp::Create(ref mut create) => {
+                        DocumentChangeOperation::Op(op) => match op {
+                            ResourceOp::Create(create) => {
                                 create.uri = clean_uri(&create.uri, test_case)?;
                             }
-                            ResourceOp::Rename(ref mut rename) => {
+                            ResourceOp::Rename(rename) => {
                                 rename.old_uri = clean_uri(&rename.old_uri, test_case)?;
                                 rename.new_uri = clean_uri(&rename.new_uri, test_case)?;
                             }
-                            ResourceOp::Delete(ref mut delete) => {
+                            ResourceOp::Delete(delete) => {
                                 delete.uri = clean_uri(&delete.uri, test_case)?;
                             }
                         },

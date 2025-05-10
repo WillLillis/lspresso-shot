@@ -1,7 +1,7 @@
 use lsp_types::DocumentHighlight;
 use thiserror::Error;
 
-use super::{compare::write_fields_comparison, CleanResponse, Empty};
+use super::{CleanResponse, Empty, compare::write_fields_comparison};
 
 impl Empty for Vec<DocumentHighlight> {}
 

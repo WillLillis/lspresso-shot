@@ -38,13 +38,15 @@ fn compare_fields(
             format!(" {actual}")
         };
         writeln!(
-                f,
-                "{}",
-                paint(
-                    RED,
-                    &format!("{padding}{key_render}\n{padding}  Expected:{expected_render}\n{padding}  Actual:{actual_render}")
+            f,
+            "{}",
+            paint(
+                RED,
+                &format!(
+                    "{padding}{key_render}\n{padding}  Expected:{expected_render}\n{padding}  Actual:{actual_render}"
                 )
-            )?;
+            )
+        )?;
     }
 
     std::fmt::Result::Ok(())
