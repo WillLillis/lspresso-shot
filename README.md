@@ -2,10 +2,6 @@
 
 A concentrated dose of LSP testing power!
 
-## WIP
-
-This library is currently a work in progress and is *not* ready for use in other projects!
-
 ## Goal
 
 Provide an easy way to perform integration tests on language servers implemented in Rust.
@@ -69,23 +65,7 @@ are necessary.
 for examples of how to use the library.
 - TODO: Add asm-lsp/other LSPs here once it's being used.
 
-## TODOs/Ideas:
-
-- [ ] Most of the Lua files share the same structure. We can probably pull the common
-      logic out and do some string interpolation instead of duplicating it a ton.
-- [ ] Clean up Lua logic (I'm unfamiliar with the neovim API)
-    - Add Lua unit tests? (Do we roll our own/ is there an easy framework?)
-- [ ] Utilize `vim.uv.hr_time()` to provide a benchmarking utility
-    - This could provide two (more?) means of measurement. One would simply test the time
-    between issuing the request and receiving a response. The other would measure the time
-    between the server attaching and the receiving a reponse to the request of interest.
-- [x] Add CI and whatnot (Improvements to current lua workflow?)
-- [ ] It may be possible to extend this library's functionality as a CLI tool.
-    - Users could specify test cases through JSON, which we can then deserialize
-    and run the testing logic on as normal. 
-    - This would allow lspresso-shot to be used with non-Rust LSPs, which would be nice.
-    - It probably doesn't make sense to work on this logic until the library internals
-    are more flushed out.
+## TODO:
 
 As an eventual end goal, we'd obviously like to provide test coverage for *all* LSP methods.
 So far, we have:
