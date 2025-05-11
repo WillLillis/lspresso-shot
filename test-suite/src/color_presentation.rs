@@ -43,8 +43,8 @@ mod test {
 
         lspresso_shot!(test_color_presentation(
             test_case,
-            &color,
-            &Range::default(),
+            color,
+            Range::default(),
             None,
             &resp
         ));

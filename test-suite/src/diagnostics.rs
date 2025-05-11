@@ -113,7 +113,7 @@ mod tests {
 
         lspresso_shot!(test_workspace_diagnostic(
             test_case,
-            Some(path),
+            Some(&path),
             &Vec::new(),
             None,
             &resp

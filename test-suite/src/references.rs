@@ -32,7 +32,7 @@ mod test {
 
         lspresso_shot!(test_references(
             test_case,
-            &Position::default(),
+            Position::default(),
             true,
             None,
             None
@@ -52,8 +52,7 @@ mod test {
         send_capabiltiies(&references_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result =
-            test_references(test_case.clone(), &Position::default(), true, None, None);
+        let test_result = test_references(test_case.clone(), Position::default(), true, None, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{refs:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -73,7 +72,7 @@ mod test {
 
         lspresso_shot!(test_references(
             test_case,
-            &Position::default(),
+            Position::default(),
             true,
             None,
             Some(&refs)
@@ -98,7 +97,7 @@ mod test {
 
         lspresso_shot!(test_references(
             reference_test_case,
-            &Position::new(1, 9),
+            Position::new(1, 9),
             true,
             None,
             Some(&vec![Location {

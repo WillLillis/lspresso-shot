@@ -33,7 +33,7 @@ mod test {
 
         lspresso_shot!(test_prepare_type_hierarchy(
             test_case,
-            &Position::default(),
+            Position::default(),
             None,
             None,
             None
@@ -56,7 +56,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         let test_result =
-            test_prepare_type_hierarchy(test_case.clone(), &Position::default(), None, None, None);
+            test_prepare_type_hierarchy(test_case.clone(), Position::default(), None, None, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -78,7 +78,7 @@ mod test {
 
         lspresso_shot!(test_prepare_type_hierarchy(
             test_case,
-            &Position::default(),
+            Position::default(),
             None,
             None,
             Some(&resp)
