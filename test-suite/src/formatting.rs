@@ -75,7 +75,7 @@ mod test {
 
         lspresso_shot!(test_range_formatting(
             test_case,
-            &Range::default(),
+            Range::default(),
             None,
             None,
             None,
@@ -140,7 +140,7 @@ mod test {
 
         lspresso_shot!(test_range_formatting(
             test_case,
-            &Range::default(),
+            Range::default(),
             None,
             None,
             Some(&edits)

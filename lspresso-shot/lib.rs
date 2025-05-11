@@ -301,14 +301,14 @@ pub type CodeActionComparator = fn(&CodeActionResponse, &CodeActionResponse, &Te
 /// [`textDocument/codeAction`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction
 pub fn test_code_action(
     mut test_case: TestCase,
-    range: &Range,
+    range: Range,
     context: &CodeActionContext,
     cmp: Option<CodeActionComparator>,
     expected: Option<&CodeActionResponse>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::CodeAction);
     let range_json =
-        serde_json::to_string_pretty(range).expect("JSON deserialzation of `range` failed");
+        serde_json::to_string_pretty(&range).expect("JSON deserialzation of `range` failed");
     let context_json =
         serde_json::to_string_pretty(context).expect("JSON deserialzation of `params` failed");
 
@@ -547,16 +547,16 @@ pub type ColorPresentationComparator =
 /// [`textDocument/colorPresentation`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_colorPresentation
 pub fn test_color_presentation(
     mut test_case: TestCase,
-    color: &Color,
-    range: &Range,
+    color: Color,
+    range: Range,
     cmp: Option<ColorPresentationComparator>,
     expected: &Vec<ColorPresentation>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::ColorPresentation);
     let color_json =
-        serde_json::to_string_pretty(color).expect("JSON serialzation of `color` failed");
+        serde_json::to_string_pretty(&color).expect("JSON serialzation of `color` failed");
     let range_json =
-        serde_json::to_string_pretty(range).expect("JSON serialzation of `range` failed");
+        serde_json::to_string_pretty(&range).expect("JSON serialzation of `range` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -605,7 +605,7 @@ pub type CompletionComparator = fn(&CompletionResponse, &CompletionResponse, &Te
 /// [`textDocument/completion`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion
 pub fn test_completion(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     cmp: Option<CompletionComparator>,
     expected: Option<&CompletionResponse>,
 ) -> TestResult<()> {
@@ -614,7 +614,7 @@ pub fn test_completion(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
         ],
         expected,
         |expected, actual| {
@@ -725,7 +725,7 @@ pub type DeclarationComparator =
 /// [`textDocument/declaration`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration
 pub fn test_declaration(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     cmp: Option<DeclarationComparator>,
     expected: Option<&GotoDeclarationResponse>,
 ) -> TestResult<()> {
@@ -734,7 +734,7 @@ pub fn test_declaration(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
         ],
         expected,
         |expected, actual| {
@@ -792,7 +792,7 @@ pub type DefinitionComparator =
 /// [`textDocument/definition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition
 pub fn test_definition(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     cmp: Option<DefinitionComparator>,
     expected: Option<&GotoDefinitionResponse>,
 ) -> TestResult<()> {
@@ -801,7 +801,7 @@ pub fn test_definition(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
         ],
         expected,
         |expected, actual| {
@@ -971,7 +971,7 @@ pub type DocumentHighlightComparator =
 /// [`textDocument/documentHighlight`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentHighlight
 pub fn test_document_highlight(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     cmp: Option<DocumentHighlightComparator>,
     expected: Option<&Vec<DocumentHighlight>>,
 ) -> TestResult<()> {
@@ -980,7 +980,7 @@ pub fn test_document_highlight(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
         ],
         expected,
         |expected, actual: &Vec<DocumentHighlight>| {
@@ -1348,7 +1348,7 @@ pub type HoverComparator = fn(&Hover, &Hover, &TestCase) -> bool;
 /// [`textDocument/hover`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover
 pub fn test_hover(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     cmp: Option<HoverComparator>,
     expected: Option<&Hover>,
 ) -> TestResult<()> {
@@ -1357,7 +1357,7 @@ pub fn test_hover(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
         ],
         expected,
         |expected, actual| {
@@ -1395,7 +1395,7 @@ pub type ImplementationComparator =
 /// [`textDocument/implementation`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation
 pub fn test_implementation(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     cmp: Option<ImplementationComparator>,
     expected: Option<&GotoImplementationResponse>,
 ) -> TestResult<()> {
@@ -1404,7 +1404,7 @@ pub fn test_implementation(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
         ],
         expected,
         |expected, actual| {
@@ -1518,13 +1518,13 @@ pub type InlayHintComparator = fn(&Vec<InlayHint>, &Vec<InlayHint>, &TestCase) -
 /// [`textDocument/inlayHint`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlayHint
 pub fn test_inlay_hint(
     mut test_case: TestCase,
-    range: &Range,
+    range: Range,
     cmp: Option<InlayHintComparator>,
     expected: Option<&Vec<InlayHint>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::InlayHint);
     let range_json =
-        serde_json::to_string_pretty(range).expect("JSON serialzation of `range` failed");
+        serde_json::to_string_pretty(&range).expect("JSON serialzation of `range` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -1573,7 +1573,7 @@ pub type MonikerComparator = fn(&Vec<Moniker>, &Vec<Moniker>, &TestCase) -> bool
 /// [`textDocument/moniker`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_moniker
 pub fn test_moniker(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     cmp: Option<MonikerComparator>,
     expected: Option<&Vec<Moniker>>,
 ) -> TestResult<()> {
@@ -1582,7 +1582,7 @@ pub fn test_moniker(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
         ],
         expected,
         |expected, actual: &Vec<Moniker>| {
@@ -1672,7 +1672,7 @@ pub type PrepareCallHierarchyComparator =
 /// [`textDocument/prepareCallHierarchy`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareCallHierarchy
 pub fn test_prepare_call_hierarchy(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     cmp: Option<PrepareCallHierarchyComparator>,
     expected: Option<&Vec<CallHierarchyItem>>,
 ) -> TestResult<()> {
@@ -1681,7 +1681,7 @@ pub fn test_prepare_call_hierarchy(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
         ],
         expected,
         |expected, actual: &Vec<CallHierarchyItem>| {
@@ -1726,7 +1726,7 @@ pub type PrepareTypeHierarchyComparator =
 /// [`textDocument/prepareTypeHierarchy`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareTypeHierarchy
 pub fn test_prepare_type_hierarchy(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     items: Option<&Vec<TypeHierarchyItem>>,
     cmp: Option<PrepareTypeHierarchyComparator>,
     expected: Option<&Vec<TypeHierarchyItem>>,
@@ -1744,7 +1744,7 @@ pub fn test_prepare_type_hierarchy(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
             LuaReplacement::Other {
                 from: "items",
                 to: items_json,
@@ -1855,14 +1855,14 @@ pub type RangeFormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCas
 /// [`textDocument/rangeFormatting`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting
 pub fn test_range_formatting(
     mut test_case: TestCase,
-    range: &Range,
+    range: Range,
     options: Option<&FormattingOptions>,
     cmp: Option<RangeFormattingComparator>,
     expected: Option<&Vec<TextEdit>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::RangeFormatting);
     let range_json =
-        serde_json::to_string_pretty(range).expect("JSON deserialzation of `range` failed");
+        serde_json::to_string_pretty(&range).expect("JSON deserialzation of `range` failed");
     let options_json = options
         .map_or_else(
             || serde_json::to_string_pretty(&default_format_opts()),
@@ -1922,7 +1922,7 @@ pub type ReferencesComparator = fn(&Vec<Location>, &Vec<Location>, &TestCase) ->
 /// [`textDocument/references`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references
 pub fn test_references(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     include_declaration: bool,
     cmp: Option<ReferencesComparator>,
     expected: Option<&Vec<Location>>,
@@ -1934,7 +1934,7 @@ pub fn test_references(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
             LuaReplacement::ParamNested {
                 name: "context",
                 fields: vec![LuaReplacement::ParamDirect {
@@ -1983,7 +1983,7 @@ pub type RenameComparator = fn(&WorkspaceEdit, &WorkspaceEdit, &TestCase) -> boo
 /// [`textDocument/rename`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename
 pub fn test_rename(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     new_name: &str,
     cmp: Option<RenameComparator>,
     expected: Option<&WorkspaceEdit>,
@@ -1995,7 +1995,7 @@ pub fn test_rename(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
             LuaReplacement::ParamDirect {
                 name: "newName",
                 json: new_name_json,
@@ -2294,13 +2294,13 @@ pub type SemanticTokensRangeComparator =
 /// [`textDocument/semanticTokens/range`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_rangeRequest
 pub fn test_semantic_tokens_range(
     mut test_case: TestCase,
-    range: &Range,
+    range: Range,
     cmp: Option<SemanticTokensRangeComparator>,
     expected: Option<&SemanticTokensRangeResult>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SemanticTokensRange);
     let range_json =
-        serde_json::to_string_pretty(range).expect("JSON deserialzation of range failed");
+        serde_json::to_string_pretty(&range).expect("JSON deserialzation of range failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -2361,7 +2361,7 @@ pub fn test_semantic_tokens_range(
     )
 }
 
-pub type SeignatureHelpComparator = fn(&SignatureHelp, &SignatureHelp, &TestCase) -> bool;
+pub type SignatureHelpComparator = fn(&SignatureHelp, &SignatureHelp, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/signatureHelp`] request
 ///
@@ -2383,9 +2383,9 @@ pub type SeignatureHelpComparator = fn(&SignatureHelp, &SignatureHelp, &TestCase
 /// [`textDocument/signatureHelp`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp
 pub fn test_signature_help(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     context: Option<&SignatureHelpContext>,
-    cmp: Option<SeignatureHelpComparator>,
+    cmp: Option<SignatureHelpComparator>,
     expected: Option<&SignatureHelp>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SignatureHelp);
@@ -2400,7 +2400,7 @@ pub fn test_signature_help(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
             LuaReplacement::ParamDirect {
                 name: "context",
                 json: context_json,
@@ -2442,7 +2442,7 @@ pub type TypeDefinitionComparator =
 /// [`textDocument/typeDefinition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition
 pub fn test_type_definition(
     mut test_case: TestCase,
-    cursor_pos: &Position,
+    cursor_pos: Position,
     cmp: Option<TypeDefinitionComparator>,
     expected: Option<&GotoTypeDefinitionResponse>,
 ) -> TestResult<()> {
@@ -2451,7 +2451,7 @@ pub fn test_type_definition(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(*cursor_pos),
+            LuaReplacement::ParamPosition(cursor_pos),
         ],
         expected,
         |expected, actual| {
@@ -2514,7 +2514,7 @@ pub type WorkspaceDiagnosticComparator =
 /// [`workspace/diagnostic`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic
 pub fn test_workspace_diagnostic(
     mut test_case: TestCase,
-    identifier: Option<String>,
+    identifier: Option<&str>,
     previous_result_ids: &Vec<PreviousResultId>,
     cmp: Option<WorkspaceDiagnosticComparator>,
     expected: &WorkspaceDiagnosticReport,
@@ -2522,7 +2522,7 @@ pub fn test_workspace_diagnostic(
     test_case.test_type = Some(TestType::WorkspaceDiagnostic);
     let identifier_json = identifier.map_or_else(
         || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
-        |id| serde_json::to_string_pretty(&id).expect("JSON deserialzation of identifier failed"),
+        |id| serde_json::to_string_pretty(id).expect("JSON deserialzation of identifier failed"),
     );
     let previous_result_ids_json = serde_json::to_string_pretty(previous_result_ids)
         .expect("JSON deserialzation of previous result id failed");

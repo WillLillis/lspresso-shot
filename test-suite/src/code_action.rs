@@ -49,7 +49,7 @@ mod test {
 
         lspresso_shot!(test_code_action(
             test_case,
-            &Range::default(),
+            Range::default(),
             &CodeActionContext::default(),
             None,
             None
@@ -74,7 +74,7 @@ mod test {
 
         let test_result = test_code_action(
             test_case.clone(),
-            &Range::default(),
+            Range::default(),
             &CodeActionContext::default(),
             None,
             None,
@@ -101,7 +101,7 @@ mod test {
 
         lspresso_shot!(test_code_action(
             test_case,
-            &Range::default(),
+            Range::default(),
             &CodeActionContext::default(),
             None,
             Some(&resp)
@@ -255,7 +255,7 @@ mod test {
 
         lspresso_shot!(test_code_action(
             test_case,
-            &range,
+            range,
             &CodeActionContext::default(),
             Some(cmp),
             Some(&vec![

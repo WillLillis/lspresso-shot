@@ -35,7 +35,7 @@ mod test {
 
         lspresso_shot!(test_implementation(
             test_case,
-            &Position::default(),
+            Position::default(),
             None,
             None
         ));
@@ -54,7 +54,7 @@ mod test {
         send_capabiltiies(&implementation_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_implementation(test_case.clone(), &Position::default(), None, None);
+        let test_result = test_implementation(test_case.clone(), Position::default(), None, None);
         let mut expected_err =
             TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
         if response_num == 3 {
@@ -85,7 +85,7 @@ mod test {
 
         lspresso_shot!(test_implementation(
             test_case,
-            &Position::default(),
+            Position::default(),
             None,
             Some(&resp)
         ));
@@ -122,7 +122,7 @@ pub fn main() {
 
         lspresso_shot!(test_implementation(
             test_case,
-            &Position::new(14, 10),
+            Position::new(14, 10),
             None,
             Some(&GotoDefinitionResponse::Link(vec![LocationLink {
                 target_uri: Uri::from_str("src/main.rs").unwrap(),

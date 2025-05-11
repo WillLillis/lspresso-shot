@@ -44,7 +44,7 @@ mod test {
 
         lspresso_shot!(test_signature_help(
             test_case,
-            &Position::default(),
+            Position::default(),
             None,
             None,
             None
@@ -66,7 +66,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         let expected_err = TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
-        let test_result = test_signature_help(test_case, &Position::default(), None, None, None);
+        let test_result = test_signature_help(test_case, Position::default(), None, None, None);
         assert_eq!(Err(expected_err), test_result);
     }
 
@@ -86,7 +86,7 @@ mod test {
 
         lspresso_shot!(test_signature_help(
             test_case,
-            &Position::default(),
+            Position::default(),
             None,
             None,
             Some(&resp),
@@ -112,7 +112,7 @@ pub fn main() {
 
         lspresso_shot!(test_signature_help(
             test_case,
-            &Position::new(2, 8),
+            Position::new(2, 8),
             None,
             None,
             Some(&SignatureHelp {
