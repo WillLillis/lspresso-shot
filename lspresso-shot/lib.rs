@@ -19,9 +19,9 @@ use lsp_types::{
 use lsp_types::{
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeActionParams, CompletionParams, DocumentDiagnosticParams, DocumentHighlightParams,
-    GotoDefinitionParams, HoverParams, InlayHintParams, MonikerParams, ReferenceParams,
-    RenameParams, SelectionRangeParams, SemanticTokensRangeParams, SignatureHelpParams,
-    TypeHierarchyPrepareParams, WorkspaceDiagnosticParams,
+    DocumentRangeFormattingParams, GotoDefinitionParams, HoverParams, InlayHintParams,
+    MonikerParams, ReferenceParams, RenameParams, SelectionRangeParams, SemanticTokensRangeParams,
+    SignatureHelpParams, TypeHierarchyPrepareParams, WorkspaceDiagnosticParams,
     request::{GotoDeclarationParams, GotoImplementationParams, GotoTypeDefinitionParams},
 };
 #[allow(unused_imports)]
@@ -54,7 +54,7 @@ use types::{
     document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
     document_symbol::DocumentSymbolMismatchError,
     folding_range::FoldingRangeMismatchError,
-    formatting::{FormattingMismatchError, FormattingResult},
+    formatting::{FormattingMismatchError, FormattingResult, RangeFormattingMismatchError},
     hover::HoverMismatchError,
     implementation::ImplementationMismatchError,
     inlay_hint::InlayHintMismatchError,
@@ -1195,6 +1195,17 @@ pub fn test_folding_range(
     )
 }
 
+fn default_format_opts() -> FormattingOptions {
+    FormattingOptions {
+        tab_size: 4,
+        insert_spaces: true,
+        properties: HashMap::new(),
+        trim_trailing_whitespace: Some(true),
+        insert_final_newline: Some(true),
+        trim_final_newlines: Some(true),
+    }
+}
+
 pub type FormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/formatting`] request.
@@ -1228,21 +1239,17 @@ pub type FormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) ->
 /// [`textDocument/formatting`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting
 pub fn test_formatting(
     mut test_case: TestCase,
-    options: Option<FormattingOptions>,
-    cmp: Option<FormattingComparator>,
+    options: Option<&FormattingOptions>,
+    cmp: Option<&FormattingComparator>,
     expected: Option<&FormattingResult>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::Formatting);
-    let opts = options.unwrap_or_else(|| FormattingOptions {
-        tab_size: 4,
-        insert_spaces: true,
-        properties: HashMap::new(),
-        trim_trailing_whitespace: Some(true),
-        insert_final_newline: Some(true),
-        trim_final_newlines: Some(true),
-    });
-    let format_opts_json = serde_json::to_string_pretty(&opts)
-        .expect("JSON deserialzation of formatting options failed");
+    let options_json = options
+        .map_or_else(
+            || serde_json::to_string_pretty(&default_format_opts()),
+            serde_json::to_string_pretty,
+        )
+        .expect("JSON deserialzation of `options` failed");
     match expected {
         Some(FormattingResult::Response(edits)) => collect_results(
             &test_case,
@@ -1253,7 +1260,7 @@ pub fn test_formatting(
                 },
                 LuaReplacement::ParamDirect {
                     name: "options",
-                    json: format_opts_json,
+                    json: options_json,
                 },
             ],
             Some(edits),
@@ -1282,7 +1289,7 @@ pub fn test_formatting(
                 },
                 LuaReplacement::ParamDirect {
                     name: "options",
-                    json: format_opts_json,
+                    json: options_json,
                 },
             ],
             Some(state),
@@ -1306,7 +1313,7 @@ pub fn test_formatting(
                 },
                 LuaReplacement::ParamDirect {
                     name: "options",
-                    json: format_opts_json,
+                    json: options_json,
                 },
             ],
             None,
@@ -1805,6 +1812,84 @@ pub fn test_publish_diagnostics(
             );
             if !eql {
                 Err(PublishDiagnosticsMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type RangeFormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) -> bool;
+
+/// Tests the server's response to a [`textDocument/rangeFormatting`] request
+///
+/// - `range`: Passed to the client via the request's [`DocumentRangeFormattingParams`]
+/// - `options`:  The formatting options passed to the LSP client. If `None`, then
+///   the following default is used:
+///
+/// ```rust
+/// lsp_types::FormattingOptions {
+///     tab_size: 4,
+///     insert_spaces: true,
+///     properties: std::collections::HashMap::new(),
+///     trim_trailing_whitespace: Some(true),
+///     insert_final_newline: Some(true),
+///     trim_final_newlines: Some(true),
+/// };
+/// ```
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `range` or `options` fails
+///
+/// [`textDocument/rangeFormatting`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting
+pub fn test_range_formatting(
+    mut test_case: TestCase,
+    range: &Range,
+    options: Option<&FormattingOptions>,
+    cmp: Option<RangeFormattingComparator>,
+    expected: Option<&Vec<TextEdit>>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::RangeFormatting);
+    let range_json =
+        serde_json::to_string_pretty(range).expect("JSON deserialzation of `range` failed");
+    let options_json = options
+        .map_or_else(
+            || serde_json::to_string_pretty(&default_format_opts()),
+            serde_json::to_string_pretty,
+        )
+        .expect("JSON deserialzation of `options` failed");
+    collect_results(
+        &test_case,
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamDirect {
+                name: "range",
+                json: range_json,
+            },
+            LuaReplacement::ParamDirect {
+                name: "options",
+                json: options_json,
+            },
+        ],
+        expected,
+        |expected, actual: &Vec<TextEdit>| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(RangeFormattingMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),
