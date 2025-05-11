@@ -1,6 +1,7 @@
 pub mod call_hierarchy;
 pub mod code_action;
 pub mod code_lens;
+pub mod color_presentation;
 pub(crate) mod compare;
 pub mod completion;
 pub mod declaration;
@@ -70,6 +71,7 @@ use std::{
 };
 
 use code_action::CodeActionResolveMismatchError;
+use color_presentation::ColorPresentationMismatchError;
 use document_color::DocumentColorMismatchError;
 use inlay_hint::InlayHintMismatchError;
 use lsp_types::{Position, Uri};
@@ -89,6 +91,8 @@ pub enum TestType {
     CodeLens,
     /// Test `codeLens/resolve` requests
     CodeLensResolve,
+    /// Test `textDocument/colorPresentation` requests
+    ColorPresentation,
     /// Test `textDocument/completion` requests
     Completion,
     /// Test `completionItem/resolve` requests
@@ -161,6 +165,7 @@ impl std::fmt::Display for TestType {
                 Self::CodeActionResolve => "codeAction/resolve",
                 Self::CodeLens => "textDocument/codeLens",
                 Self::CodeLensResolve => "codeLens/resolve",
+                Self::ColorPresentation => "textDocument/colorPresentation",
                 Self::Completion => "textDocument/completion",
                 Self::CompletionResolve => "completionItem/resolve",
                 Self::Declaration => "textDocument/declaration",
@@ -653,6 +658,8 @@ pub enum TestError {
     CodeLensMismatch(#[from] CodeLensMismatchError),
     #[error(transparent)]
     CodeLensResolveMismatch(#[from] Box<CodeLensResolveMismatchError>),
+    #[error(transparent)]
+    ColorPresentationMismatch(#[from] ColorPresentationMismatchError),
     #[error(transparent)]
     CompletionMismatch(#[from] CompletionMismatchError),
     #[error(transparent)]

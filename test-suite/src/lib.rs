@@ -3,6 +3,7 @@ pub mod test_helpers;
 mod code_action;
 mod code_lens;
 mod code_lens_resolve;
+mod color_presentation;
 mod completion;
 mod completion_resolve;
 mod declaration;

@@ -4,10 +4,10 @@ pub mod types;
 use init_dot_lua::LuaReplacement;
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
-    CodeActionContext, CodeActionResponse, CodeLens, ColorInformation, CompletionItem,
-    CompletionResponse, Diagnostic, DocumentDiagnosticReport, DocumentHighlight, DocumentLink,
-    DocumentSymbolResponse, FoldingRange, FormattingOptions, GotoDefinitionResponse, Hover,
-    InlayHint, Location, Moniker, Position, PreviousResultId, Range, SelectionRange,
+    CodeActionContext, CodeActionResponse, CodeLens, Color, ColorInformation, ColorPresentation,
+    CompletionItem, CompletionResponse, Diagnostic, DocumentDiagnosticReport, DocumentHighlight,
+    DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions, GotoDefinitionResponse,
+    Hover, InlayHint, Location, Moniker, Position, PreviousResultId, Range, SelectionRange,
     SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
     SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
     SignatureHelpContext, TextEdit, TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit,
@@ -42,6 +42,7 @@ use types::{
     },
     code_action::{CodeActionMismatchError, CodeActionResolveMismatchError},
     code_lens::{CodeLensMismatchError, CodeLensResolveMismatchError},
+    color_presentation::ColorPresentationMismatchError,
     completion::{CompletionMismatchError, CompletionResolveMismatchError},
     declaration::DeclarationMismatchError,
     definition::DefinitionMismatchError,
@@ -520,6 +521,67 @@ pub fn test_code_lens_resolve(
                     expected: (*expected).clone(),
                     actual: actual.clone(),
                 }))?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type ColorPresentationComparator =
+    fn(&Vec<ColorPresentation>, &Vec<ColorPresentation>, &TestCase) -> bool;
+
+/// Tests the server's response to a [`textDocument/colorPresentation`] request
+///
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `color` or `range` fails
+///
+/// [`textDocument/colorPresentation`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_colorPresentation
+pub fn test_color_presentation(
+    mut test_case: TestCase,
+    color: &Color,
+    range: &Range,
+    cmp: Option<ColorPresentationComparator>,
+    expected: &Vec<ColorPresentation>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::ColorPresentation);
+    let color_json =
+        serde_json::to_string_pretty(color).expect("JSON serialzation of `color` failed");
+    let range_json =
+        serde_json::to_string_pretty(range).expect("JSON serialzation of `range` failed");
+    collect_results(
+        &test_case,
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamDirect {
+                name: "color",
+                json: color_json,
+            },
+            LuaReplacement::ParamDirect {
+                name: "range",
+                json: range_json,
+            },
+        ],
+        Some(expected),
+        |expected, actual: &Vec<ColorPresentation>| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(ColorPresentationMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
             }
             Ok(())
         },
@@ -1455,7 +1517,7 @@ pub fn test_inlay_hint(
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::InlayHint);
     let range_json =
-        serde_json::to_string_pretty(range).expect("JSON serialzation of range failed");
+        serde_json::to_string_pretty(range).expect("JSON serialzation of `range` failed");
     collect_results(
         &test_case,
         &mut vec![

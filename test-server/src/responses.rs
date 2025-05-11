@@ -3,8 +3,8 @@ use std::{collections::HashMap, str::FromStr};
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, ChangeAnnotation,
     CodeAction, CodeActionDisabled, CodeActionKind, CodeActionOrCommand, CodeActionResponse,
-    CodeDescription, CodeLens, ColorInformation, Command, CompletionItem, CompletionItemKind,
-    CompletionItemLabelDetails, CompletionList, CompletionResponse, Diagnostic,
+    CodeDescription, CodeLens, ColorInformation, ColorPresentation, Command, CompletionItem,
+    CompletionItemKind, CompletionItemLabelDetails, CompletionList, CompletionResponse, Diagnostic,
     DiagnosticRelatedInformation, DocumentChanges, DocumentDiagnosticReport,
     DocumentDiagnosticReportKind, DocumentHighlight, DocumentHighlightKind, DocumentLink,
     DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange, FoldingRangeKind,
@@ -81,6 +81,57 @@ pub fn get_code_action_resolve_response(response_num: u32, uri: &Uri) -> Option<
     match response_num {
         0 => Some(action1),
         1 => Some(action2),
+        _ => None,
+    }
+}
+
+/// For use with `test_document_highlight`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_color_presentation_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<Vec<ColorPresentation>> {
+    _ = uri;
+    let pres1 = ColorPresentation {
+        label: "label1".to_string(),
+        text_edit: None,
+        additional_text_edits: None,
+    };
+    let pres2 = ColorPresentation {
+        label: "label2".to_string(),
+        text_edit: Some(TextEdit {
+            range: Range {
+                start: Position::new(1, 2),
+                end: Position::new(3, 4),
+            },
+            new_text: "new text2".to_string(),
+        }),
+        additional_text_edits: None,
+    };
+    let pres3 = ColorPresentation {
+        label: "label3".to_string(),
+        text_edit: Some(TextEdit {
+            range: Range {
+                start: Position::new(5, 6),
+                end: Position::new(7, 8),
+            },
+            new_text: "new text3".to_string(),
+        }),
+        additional_text_edits: Some(vec![TextEdit {
+            range: Range {
+                start: Position::new(9, 10),
+                end: Position::new(11, 12),
+            },
+            new_text: "new text3".to_string(),
+        }]),
+    };
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![pres1]),
+        2 => Some(vec![pres2]),
+        3 => Some(vec![pres3]),
+        4 => Some(vec![pres1, pres2, pres3]),
         _ => None,
     }
 }
