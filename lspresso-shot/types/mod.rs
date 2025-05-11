@@ -73,6 +73,7 @@ use std::{
 use code_action::CodeActionResolveMismatchError;
 use color_presentation::ColorPresentationMismatchError;
 use document_color::DocumentColorMismatchError;
+use formatting::RangeFormattingMismatchError;
 use inlay_hint::InlayHintMismatchError;
 use lsp_types::{Position, Uri};
 use rand::distr::Distribution as _;
@@ -135,6 +136,8 @@ pub enum TestType {
     PrepareTypeHierarchy,
     /// Test `textDocument/publishDiagnostics` requests
     PublishDiagnostics,
+    /// Test `textDocument/rangeFormatting` requests
+    RangeFormatting,
     /// Test `textDocument/references` requests
     References,
     /// Test `textDocument/rename` requests
@@ -187,6 +190,7 @@ impl std::fmt::Display for TestType {
                 Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
                 Self::PrepareTypeHierarchy => "textDocument/prepareTypeHierarchy",
                 Self::PublishDiagnostics => "textDocument/publishDiagnostics",
+                Self::RangeFormatting => "textDocument/rangeFormatting",
                 Self::References => "textDocument/references",
                 Self::Rename => "textDocument/rename",
                 Self::SelectionRange => "textDocument/selectionRange",
@@ -702,6 +706,8 @@ pub enum TestError {
     PrepareCallHierarchyMismatch(#[from] PrepareCallHierachyMismatchError),
     #[error(transparent)]
     PrepareTypeHierarchyMismatch(#[from] PrepareTypeHierarchyMismatchError),
+    #[error(transparent)]
+    RangeFormattingMismatch(#[from] RangeFormattingMismatchError),
     #[error(transparent)]
     ReferencesMismatch(#[from] ReferencesMismatchError),
     #[error(transparent)]

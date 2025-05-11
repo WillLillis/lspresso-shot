@@ -95,6 +95,7 @@ So far, we have:
 - [x] `textDocument/prepareCallHierarchy`
 - [x] `textDocument/prepareTypeHierarchy`
 - [x] `textDocument/publishDiagnostics`
+- [x] `textDocument/rangeFormatting`
 - [x] `textDocument/references`
 - [x] `textDocument/rename`
 - [x] `textDocument/selectionRange`
