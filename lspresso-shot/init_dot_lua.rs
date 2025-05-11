@@ -24,7 +24,7 @@ pub fn get_init_dot_lua(
     raw_init.push_str(include_str!("lua_templates/attach.lua"));
     // This is how we get neovim to actually invoke the action to be tested
     raw_init = match test_type {
-        // Diagnostics are handled via an autocmd, no need to handle `$/progress`
+        // Diagnostics are handled via an autocmd, no need to hook into `$/progress`
         TestType::PublishDiagnostics => raw_init.replace("LSP_ACTION", ""),
         _ => raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type)),
     };
@@ -49,7 +49,7 @@ fn get_standard_replacements(
         .path
         .extension()
         .ok_or_else(|| {
-            // NOTE: use `.unwrap_or("*")` here somehow instead to cover files without extensions?
+            // TODO: use `.unwrap_or("*")` here somehow instead to cover files without extensions?
             TestSetupError::MissingFileExtension(
                 test_case.source_file.path.to_string_lossy().to_string(),
             )
@@ -169,9 +169,8 @@ pub enum LuaReplacement {
         fields: Vec<&'static str>,
         json: String,
     },
-    /// An Object that needs to contain other nested objects. This covers an edge
-    /// case where certain params aren't easily passed from the `test_*` functions
-    /// (i.e. `TextDocumentPositionParams`).
+    /// An object that needs to contain other nested objects. Each replacement in
+    /// `fields` is stored in a parent object `name`.
     ParamNested {
         name: &'static str,
         fields: Vec<LuaReplacement>,
@@ -256,7 +255,9 @@ impl LuaReplacement {
     }
 }
 
-/// Represents the combined replacements of a series of a series of `LuaReplacementType`s.
+/// Represents the combined replacements from a series of `LuaReplacementType`s.
+/// This type can be applied to the raw `init.lua` template to produce a valid
+/// lua file that can be passed to neovim.
 #[derive(Debug, Clone, Default)]
 struct LuaDocumentReplacement {
     /// Represents objects that are passed via a JSON string, converted to a lua
@@ -267,21 +268,19 @@ struct LuaDocumentReplacement {
 }
 
 impl LuaDocumentReplacement {
-    pub fn fill_document(&self, mut doc: String) -> String {
-        for (repl_from, repl_to) in &self.raw {
-            doc = doc.replace(repl_from, repl_to);
-        }
-        doc.replace("PARAM_ASSIGN", &self.params)
-    }
-}
-
-impl LuaDocumentReplacement {
     fn new(repls: &Vec<LuaReplacement>) -> Self {
         let mut doc_repl = Self::default();
         for repl in repls {
             repl.perform_replacement(&mut doc_repl, None);
         }
         doc_repl
+    }
+
+    pub fn fill_document(&self, mut doc: String) -> String {
+        for (repl_from, repl_to) in &self.raw {
+            doc = doc.replace(repl_from, repl_to);
+        }
+        doc.replace("PARAM_ASSIGN", &self.params)
     }
 }
 

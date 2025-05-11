@@ -14,7 +14,7 @@ use lsp_types::{
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
-// These imports are included for the sake of doc comments, they aren't used
+// These imports are included solely for the sake of highlighting in doc comments
 #[allow(unused_imports)]
 use lsp_types::{
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
