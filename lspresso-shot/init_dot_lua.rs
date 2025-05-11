@@ -1,4 +1,4 @@
-use lsp_types::Position;
+use lsp_types::{Position, Range};
 use std::fmt::Write;
 
 use crate::types::{ServerStartType, TestCase, TestSetupError, TestSetupResult, TestType};
@@ -150,8 +150,14 @@ fn invoke_lsp_action(start_type: &ServerStartType) -> String {
 pub enum LuaReplacement {
     /// `textDocument = vim.lsp.util.make_text_document_params(0)`
     ParamTextDocument,
-    /// `position = { line = <line>, character = <character> }`
-    ParamPosition(Position),
+    /// `<name> = { line = <line>, character = <character> }`
+    /// If `name` is `None`, the default name of `position` is used.
+    ParamPosition {
+        pos: Position,
+        name: Option<&'static str>,
+    },
+    /// Equivalent of `range = { start = { line = <start-line>, character = <start-character> }, ["end"] = { line = <end-line>, character = <end-character> } }`
+    ParamRange(Range),
     /// An object that is converted to JSON in order to pass to the lua side. This
     /// object can be inserted directly into `params`.
     ParamDirect { name: &'static str, json: String },
@@ -183,18 +189,35 @@ impl LuaReplacement {
                 writeln!(
                     &mut doc.params,
                     "\tassert(not {parent_name}['textDocument'], \"{parent_name}['textDocument'] already set\")
-{parent_name}['textDocument'] = vim.lsp.util.make_text_document_params(0)"
+\t{parent_name}['textDocument'] = vim.lsp.util.make_text_document_params(0)"
                 )
                 .unwrap();
             }
-            Self::ParamPosition(position) => {
+            Self::ParamPosition { pos, name } => {
+                let name = name.unwrap_or("position");
                 writeln!(
                     &mut doc.params,
-                    "\tassert(not {parent_name}['position'], \"{parent_name}['position'] already set\")
-{parent_name}['position'] = {{ line = {}, character = {} }}",
-                    position.line, position.character
+                    "\tassert(not {parent_name}['{name}'], \"{parent_name}['{name}'] already set\")
+\t{parent_name}['{name}'] = {{ line = {}, character = {} }}",
+                    pos.line, pos.character
                 )
                 .unwrap();
+            }
+            Self::ParamRange(range) => {
+                let range = Self::ParamNested {
+                    name: "range",
+                    fields: vec![
+                        Self::ParamPosition {
+                            pos: range.start,
+                            name: Some("start"),
+                        },
+                        Self::ParamPosition {
+                            pos: range.end,
+                            name: Some("end"),
+                        },
+                    ],
+                };
+                range.perform_replacement(doc, Some(parent_name));
             }
             Self::ParamDirect { name, json } => {
                 writeln!(
@@ -274,20 +297,40 @@ mod test {
         let doc_repl = LuaDocumentReplacement::new(&replacements);
         let expected =
             "\tassert(not params['textDocument'], \"params['textDocument'] already set\")
-params['textDocument'] = vim.lsp.util.make_text_document_params(0)\n";
+\tparams['textDocument'] = vim.lsp.util.make_text_document_params(0)\n";
         assert_eq!(expected, doc_repl.params);
         assert!(doc_repl.raw.is_empty());
     }
 
     #[test]
     fn position_param() {
-        let replacements = vec![LuaReplacement::ParamPosition(lsp_types::Position {
-            line: 1,
-            character: 2,
-        })];
+        let replacements = vec![LuaReplacement::ParamPosition {
+            pos: Position {
+                line: 1,
+                character: 2,
+            },
+            name: None,
+        }];
         let doc_repl = LuaDocumentReplacement::new(&replacements);
         let expected = "\tassert(not params['position'], \"params['position'] already set\")
-params['position'] = { line = 1, character = 2 }\n";
+\tparams['position'] = { line = 1, character = 2 }\n";
+        assert_eq!(expected, doc_repl.params);
+        assert!(doc_repl.raw.is_empty());
+    }
+
+    #[test]
+    fn range_param() {
+        let replacements = vec![LuaReplacement::ParamRange(Range {
+            start: Position::new(1, 2),
+            end: Position::new(3, 4),
+        })];
+        let doc_repl = LuaDocumentReplacement::new(&replacements);
+        let expected = "\tassert(not params['range'], \"params['range'] already set\")
+\tlocal range = {}\n\tassert(not range['start'], \"range['start'] already set\")
+\trange['start'] = { line = 1, character = 2 }
+\tassert(not range['end'], \"range['end'] already set\")
+\trange['end'] = { line = 3, character = 4 }
+\tparams['range'] = range\n";
         assert_eq!(expected, doc_repl.params);
         assert!(doc_repl.raw.is_empty());
     }

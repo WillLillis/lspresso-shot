@@ -296,7 +296,7 @@ pub type CodeActionComparator = fn(&CodeActionResponse, &CodeActionResponse, &Te
 ///
 /// # Panics
 ///
-/// Panics if JSON serialization of `range` or `context` fails
+/// Panics if JSON serialization of `context` fails
 ///
 /// [`textDocument/codeAction`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction
 pub fn test_code_action(
@@ -307,8 +307,6 @@ pub fn test_code_action(
     expected: Option<&CodeActionResponse>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::CodeAction);
-    let range_json =
-        serde_json::to_string_pretty(&range).expect("JSON deserialzation of `range` failed");
     let context_json =
         serde_json::to_string_pretty(context).expect("JSON deserialzation of `params` failed");
 
@@ -316,10 +314,7 @@ pub fn test_code_action(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamDirect {
-                name: "range",
-                json: range_json,
-            },
+            LuaReplacement::ParamRange(range),
             LuaReplacement::ParamDirect {
                 name: "context",
                 json: context_json,
@@ -542,7 +537,7 @@ pub type ColorPresentationComparator =
 ///
 /// # Panics
 ///
-/// Panics if JSON serialization of `color` or `range` fails
+/// Panics if JSON serialization of `color` fails
 ///
 /// [`textDocument/colorPresentation`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_colorPresentation
 pub fn test_color_presentation(
@@ -555,8 +550,6 @@ pub fn test_color_presentation(
     test_case.test_type = Some(TestType::ColorPresentation);
     let color_json =
         serde_json::to_string_pretty(&color).expect("JSON serialzation of `color` failed");
-    let range_json =
-        serde_json::to_string_pretty(&range).expect("JSON serialzation of `range` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -565,10 +558,7 @@ pub fn test_color_presentation(
                 name: "color",
                 json: color_json,
             },
-            LuaReplacement::ParamDirect {
-                name: "range",
-                json: range_json,
-            },
+            LuaReplacement::ParamRange(range),
         ],
         Some(expected),
         |expected, actual: &Vec<ColorPresentation>| {
@@ -614,7 +604,10 @@ pub fn test_completion(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
         ],
         expected,
         |expected, actual| {
@@ -734,7 +727,10 @@ pub fn test_declaration(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
         ],
         expected,
         |expected, actual| {
@@ -801,7 +797,10 @@ pub fn test_definition(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
         ],
         expected,
         |expected, actual| {
@@ -980,7 +979,10 @@ pub fn test_document_highlight(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
         ],
         expected,
         |expected, actual: &Vec<DocumentHighlight>| {
@@ -1357,7 +1359,10 @@ pub fn test_hover(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
         ],
         expected,
         |expected, actual| {
@@ -1404,7 +1409,10 @@ pub fn test_implementation(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
         ],
         expected,
         |expected, actual| {
@@ -1511,10 +1519,6 @@ pub type InlayHintComparator = fn(&Vec<InlayHint>, &Vec<InlayHint>, &TestCase) -
 /// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
-/// # Panics
-///
-/// Panics if JSON serialization of `range` fails
-///
 /// [`textDocument/inlayHint`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlayHint
 pub fn test_inlay_hint(
     mut test_case: TestCase,
@@ -1523,16 +1527,11 @@ pub fn test_inlay_hint(
     expected: Option<&Vec<InlayHint>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::InlayHint);
-    let range_json =
-        serde_json::to_string_pretty(&range).expect("JSON serialzation of `range` failed");
     collect_results(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamDirect {
-                name: "range",
-                json: range_json,
-            },
+            LuaReplacement::ParamRange(range),
         ],
         expected,
         |expected, actual: &Vec<InlayHint>| {
@@ -1582,7 +1581,10 @@ pub fn test_moniker(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
         ],
         expected,
         |expected, actual: &Vec<Moniker>| {
@@ -1681,7 +1683,10 @@ pub fn test_prepare_call_hierarchy(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
         ],
         expected,
         |expected, actual: &Vec<CallHierarchyItem>| {
@@ -1744,7 +1749,10 @@ pub fn test_prepare_type_hierarchy(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
             LuaReplacement::Other {
                 from: "items",
                 to: items_json,
@@ -1850,7 +1858,7 @@ pub type RangeFormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCas
 ///
 /// # Panics
 ///
-/// Panics if JSON serialization of `range` or `options` fails
+/// Panics if JSON serialization of `options` fails
 ///
 /// [`textDocument/rangeFormatting`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting
 pub fn test_range_formatting(
@@ -1861,8 +1869,6 @@ pub fn test_range_formatting(
     expected: Option<&Vec<TextEdit>>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::RangeFormatting);
-    let range_json =
-        serde_json::to_string_pretty(&range).expect("JSON deserialzation of `range` failed");
     let options_json = options
         .map_or_else(
             || serde_json::to_string_pretty(&default_format_opts()),
@@ -1873,10 +1879,7 @@ pub fn test_range_formatting(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamDirect {
-                name: "range",
-                json: range_json,
-            },
+            LuaReplacement::ParamRange(range),
             LuaReplacement::ParamDirect {
                 name: "options",
                 json: options_json,
@@ -1934,7 +1937,10 @@ pub fn test_references(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
             LuaReplacement::ParamNested {
                 name: "context",
                 fields: vec![LuaReplacement::ParamDirect {
@@ -1995,7 +2001,10 @@ pub fn test_rename(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
             LuaReplacement::ParamDirect {
                 name: "newName",
                 json: new_name_json,
@@ -2287,10 +2296,6 @@ pub type SemanticTokensRangeComparator =
 /// Returns [`TestError`] if the test case is invalid, the expected results don't match,
 /// or some other failure occurs
 ///
-/// # Panics
-///
-/// Panics if JSON serialization of `range` fails
-///
 /// [`textDocument/semanticTokens/range`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_rangeRequest
 pub fn test_semantic_tokens_range(
     mut test_case: TestCase,
@@ -2299,16 +2304,11 @@ pub fn test_semantic_tokens_range(
     expected: Option<&SemanticTokensRangeResult>,
 ) -> TestResult<()> {
     test_case.test_type = Some(TestType::SemanticTokensRange);
-    let range_json =
-        serde_json::to_string_pretty(&range).expect("JSON deserialzation of range failed");
     collect_results(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamDirect {
-                name: "range",
-                json: range_json,
-            },
+            LuaReplacement::ParamRange(range),
         ],
         expected,
         |expected, actual| {
@@ -2400,7 +2400,10 @@ pub fn test_signature_help(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
             LuaReplacement::ParamDirect {
                 name: "context",
                 json: context_json,
@@ -2451,7 +2454,10 @@ pub fn test_type_definition(
         &test_case,
         &mut vec![
             LuaReplacement::ParamTextDocument,
-            LuaReplacement::ParamPosition(cursor_pos),
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
         ],
         expected,
         |expected, actual| {
