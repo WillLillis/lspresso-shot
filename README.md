@@ -81,6 +81,7 @@ So far, we have:
 - [x] `textDocument/declaration`
 - [x] `textDocument/definition`
 - [x] `textDocument/diagnostic`
+- [x] `textDocument/documentColor`
 - [x] `textDocument/documentHighlight`
 - [x] `textDocument/documentLink`
 - [x] `textDocument/documentSymbol`

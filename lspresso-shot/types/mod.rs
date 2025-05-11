@@ -6,6 +6,7 @@ pub mod completion;
 pub mod declaration;
 pub mod definition;
 pub mod diagnostic;
+pub mod document_color;
 pub mod document_highlight;
 pub mod document_link;
 pub mod document_symbol;
@@ -69,6 +70,7 @@ use std::{
 };
 
 use code_action::CodeActionResolveMismatchError;
+use document_color::DocumentColorMismatchError;
 use inlay_hint::InlayHintMismatchError;
 use lsp_types::{Position, Uri};
 use rand::distr::Distribution as _;
@@ -97,6 +99,8 @@ pub enum TestType {
     Definition,
     /// Test 'textDocument/diagnostic' requests
     Diagnostic,
+    /// Test `textDocument/documentColor` requests
+    DocumentColor,
     /// Test `textDocument/documentHighlight` requests
     DocumentHighlight,
     /// Test `textDocument/documentLink` requests
@@ -162,6 +166,7 @@ impl std::fmt::Display for TestType {
                 Self::Declaration => "textDocument/declaration",
                 Self::Definition => "textDocument/definition",
                 Self::Diagnostic => "textDocument/diagnostic",
+                Self::DocumentColor => "textDocument/documentColor",
                 Self::DocumentHighlight => "textDocument/documentHighlight",
                 Self::DocumentLink => "textDocument/documentLink",
                 Self::DocumentLinkResolve => "documentLink/resolve",
@@ -634,7 +639,7 @@ impl From<std::io::Error> for TestSetupError {
 pub type TestResult<T> = Result<T, TestError>;
 
 // NOTE: Certain variants' inner types are `Box`ed because they are large
-#[derive(Debug, Error, PartialEq, Eq)]
+#[derive(Debug, Error, PartialEq)]
 pub enum TestError {
     #[error("Test {0}: Expected `None`, got:\n{1}")]
     ExpectedNone(String, String),
@@ -658,6 +663,8 @@ pub enum TestError {
     DefinitionMismatch(#[from] Box<DefinitionMismatchError>),
     #[error(transparent)]
     DiagnosticMismatch(#[from] Box<DiagnosticMismatchError>),
+    #[error(transparent)]
+    DocumentColorMismatch(#[from] DocumentColorMismatchError),
     #[error(transparent)]
     PublishDiagnosticsMismatch(#[from] PublishDiagnosticsMismatchError),
     #[error(transparent)]

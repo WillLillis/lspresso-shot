@@ -6,17 +6,17 @@ use lsp_server::{Connection, Message, Notification, Request, RequestId, Response
 use lsp_types::{
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeAction, CodeActionParams, CodeLens, CodeLensParams, CompletionItem, CompletionParams,
-    DocumentDiagnosticParams, DocumentFormattingParams, DocumentHighlightParams, DocumentLink,
-    DocumentLinkParams, DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams,
-    HoverParams, InlayHintParams, MonikerParams, ReferenceParams, RenameParams,
-    SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
-    SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams, TypeHierarchyPrepareParams,
-    Uri, WorkspaceDiagnosticParams,
+    DocumentColorParams, DocumentDiagnosticParams, DocumentFormattingParams,
+    DocumentHighlightParams, DocumentLink, DocumentLinkParams, DocumentSymbolParams,
+    FoldingRangeParams, GotoDefinitionParams, HoverParams, InlayHintParams, MonikerParams,
+    ReferenceParams, RenameParams, SelectionRangeParams, SemanticTokensDeltaParams,
+    SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams,
+    TypeHierarchyPrepareParams, Uri, WorkspaceDiagnosticParams,
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
         CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare,
         CodeActionRequest, CodeActionResolveRequest, CodeLensRequest, CodeLensResolve, Completion,
-        DocumentDiagnosticRequest, DocumentHighlightRequest, DocumentLinkRequest,
+        DocumentColor, DocumentDiagnosticRequest, DocumentHighlightRequest, DocumentLinkRequest,
         DocumentLinkResolve, DocumentSymbolRequest, FoldingRangeRequest, Formatting,
         GotoDeclaration, GotoDeclarationParams, GotoDefinition, GotoImplementation,
         GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams, HoverRequest,
@@ -33,16 +33,17 @@ use crate::{
         get_code_action_resolve_response, get_code_action_response, get_code_lens_resolve_response,
         get_code_lens_response, get_completion_resolve_response, get_completion_response,
         get_declaration_response, get_definition_response, get_diagnostic_response,
-        get_document_highlight_response, get_document_link_resolve_response,
-        get_document_link_response, get_document_symbol_response, get_folding_range_response,
-        get_formatting_response, get_hover_response, get_implementation_response,
-        get_incoming_calls_response, get_inlay_hint_response, get_moniker_response,
-        get_outgoing_calls_response, get_prepare_call_hierachy_response,
-        get_prepare_type_hierachy_response, get_publish_diagnostics_response,
-        get_references_response, get_rename_response, get_selection_range_response,
-        get_semantic_tokens_full_delta_response, get_semantic_tokens_full_response,
-        get_semantic_tokens_range_response, get_signature_help_response,
-        get_type_definition_response, get_workspace_diagnostics_response,
+        get_document_color_response, get_document_highlight_response,
+        get_document_link_resolve_response, get_document_link_response,
+        get_document_symbol_response, get_folding_range_response, get_formatting_response,
+        get_hover_response, get_implementation_response, get_incoming_calls_response,
+        get_inlay_hint_response, get_moniker_response, get_outgoing_calls_response,
+        get_prepare_call_hierachy_response, get_prepare_type_hierachy_response,
+        get_publish_diagnostics_response, get_references_response, get_rename_response,
+        get_selection_range_response, get_semantic_tokens_full_delta_response,
+        get_semantic_tokens_full_response, get_semantic_tokens_range_response,
+        get_signature_help_response, get_type_definition_response,
+        get_workspace_diagnostics_response,
     },
 };
 
@@ -293,6 +294,15 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: DocumentDiagnosticParams| -> Uri { params.text_document.uri }
+            )?;
+        }
+        DocumentColor::METHOD => {
+            handle_request!(
+                DocumentColor,
+                get_document_color_response,
+                req,
+                conn,
+                |params: DocumentColorParams| -> Uri { params.text_document.uri }
             )?;
         }
         DocumentHighlightRequest::METHOD => {

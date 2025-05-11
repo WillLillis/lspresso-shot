@@ -8,6 +8,7 @@ mod completion_resolve;
 mod declaration;
 mod definition;
 mod diagnostics;
+mod document_color;
 mod document_highlight;
 mod document_link;
 mod document_link_resolve;

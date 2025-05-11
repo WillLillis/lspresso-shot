@@ -40,9 +40,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_document_highlight_simple_expect_none_got_some(
-        #[values(0, 1, 2, 3)] response_num: u32,
-    ) {
+    fn test_server_simple_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let resp =
             test_server::responses::get_document_highlight_response(response_num, &uri).unwrap();
