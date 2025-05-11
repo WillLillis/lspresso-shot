@@ -77,6 +77,7 @@ So far, we have:
 - [x] `documentLink/resolve`
 - [x] `textDocument/codeAction`
 - [x] `textDocument/codeLens`
+- [x] `textDocument/colorPresentation`
 - [x] `textDocument/completion`
 - [x] `textDocument/declaration`
 - [x] `textDocument/definition`
