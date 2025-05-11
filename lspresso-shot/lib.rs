@@ -4,13 +4,13 @@ pub mod types;
 use init_dot_lua::LuaReplacement;
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
-    CodeActionContext, CodeActionResponse, CodeLens, CompletionItem, CompletionResponse,
-    Diagnostic, DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbolResponse,
-    FoldingRange, FormattingOptions, GotoDefinitionResponse, Hover, InlayHint, Location, Moniker,
-    Position, PreviousResultId, Range, SelectionRange, SemanticTokens, SemanticTokensDelta,
-    SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
-    SemanticTokensResult, SignatureHelp, SignatureHelpContext, TextEdit, TypeHierarchyItem,
-    WorkspaceDiagnosticReport, WorkspaceEdit,
+    CodeActionContext, CodeActionResponse, CodeLens, ColorInformation, CompletionItem,
+    CompletionResponse, Diagnostic, DocumentDiagnosticReport, DocumentHighlight, DocumentLink,
+    DocumentSymbolResponse, FoldingRange, FormattingOptions, GotoDefinitionResponse, Hover,
+    InlayHint, Location, Moniker, Position, PreviousResultId, Range, SelectionRange,
+    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
+    SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
+    SignatureHelpContext, TextEdit, TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
@@ -48,6 +48,7 @@ use types::{
     diagnostic::{
         DiagnosticMismatchError, PublishDiagnosticsMismatchError, WorkspaceDiagnosticMismatchError,
     },
+    document_color::DocumentColorMismatchError,
     document_highlight::DocumentHighlightMismatchError,
     document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
     document_symbol::DocumentSymbolMismatchError,
@@ -843,6 +844,47 @@ pub fn test_diagnostic(
                     expected: expected.clone(),
                     actual: actual.clone(),
                 }))?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type DocumentColorComparator =
+    fn(&Vec<ColorInformation>, &Vec<ColorInformation>, &TestCase) -> bool;
+
+/// Tests the server's response to a [`textDocument/documentColor`] request
+///
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// [`textDocument/documentColor`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor
+pub fn test_document_color(
+    mut test_case: TestCase,
+    cmp: Option<DocumentColorComparator>,
+    expected: &Vec<ColorInformation>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::DocumentColor);
+    collect_results(
+        &test_case,
+        &mut vec![LuaReplacement::ParamTextDocument],
+        Some(expected),
+        |expected, actual: &Vec<ColorInformation>| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(DocumentColorMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
             }
             Ok(())
         },

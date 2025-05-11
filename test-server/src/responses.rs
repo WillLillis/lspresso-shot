@@ -3,7 +3,7 @@ use std::{collections::HashMap, str::FromStr};
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, ChangeAnnotation,
     CodeAction, CodeActionDisabled, CodeActionKind, CodeActionOrCommand, CodeActionResponse,
-    CodeDescription, CodeLens, Command, CompletionItem, CompletionItemKind,
+    CodeDescription, CodeLens, ColorInformation, Command, CompletionItem, CompletionItemKind,
     CompletionItemLabelDetails, CompletionList, CompletionResponse, Diagnostic,
     DiagnosticRelatedInformation, DocumentChanges, DocumentDiagnosticReport,
     DocumentDiagnosticReportKind, DocumentHighlight, DocumentHighlightKind, DocumentLink,
@@ -112,6 +112,28 @@ pub fn get_document_highlight_response(
         1 => Some(vec![item1]),
         2 => Some(vec![item2]),
         3 => Some(vec![item1, item2]),
+        _ => None,
+    }
+}
+
+/// For use with `test_document_color`.
+#[must_use]
+pub fn get_document_color_response(response_num: u32, uri: &Uri) -> Option<Vec<ColorInformation>> {
+    _ = uri;
+    match response_num {
+        0 => Some(vec![]),
+        1 => Some(vec![ColorInformation {
+            range: Range {
+                start: Position::new(1, 2),
+                end: Position::new(3, 4),
+            },
+            color: lsp_types::Color {
+                red: 0.1,
+                green: 0.2,
+                blue: 0.3,
+                alpha: 0.4,
+            },
+        }]),
         _ => None,
     }
 }
