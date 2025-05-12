@@ -73,7 +73,7 @@ use std::{
 use code_action::CodeActionResolveMismatchError;
 use color_presentation::ColorPresentationMismatchError;
 use document_color::DocumentColorMismatchError;
-use formatting::RangeFormattingMismatchError;
+use formatting::{OnTypeFormattingMismatchError, RangeFormattingMismatchError};
 use inlay_hint::InlayHintMismatchError;
 use lsp_types::{Position, Uri};
 use rand::distr::Distribution as _;
@@ -128,6 +128,8 @@ pub enum TestType {
     InlayHint,
     /// Test `textDocument/moniker` requests
     Moniker,
+    /// Test `textDocument/onTypeFormatting` requests
+    OnTypeFormatting,
     /// Test `callHierarchy/outgoingCalls` requests
     OutgoingCalls,
     /// Test `textDocument/prepareCallHierarchy` requests
@@ -186,6 +188,7 @@ impl std::fmt::Display for TestType {
                 Self::IncomingCalls => "callHierarchy/incomingCalls",
                 Self::InlayHint => "textDocument/inlayHint",
                 Self::Moniker => "textDocument/moniker",
+                Self::OnTypeFormatting => "textDocument/onTypeFormatting",
                 Self::OutgoingCalls => "callHierarchy/outgoingCalls",
                 Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
                 Self::PrepareTypeHierarchy => "textDocument/prepareTypeHierarchy",
@@ -700,6 +703,8 @@ pub enum TestError {
     IncomingCallsMismatch(#[from] IncomingCallsMismatchError),
     #[error(transparent)]
     MonikerMismatch(#[from] MonikerMismatchError),
+    #[error(transparent)]
+    OnTypeFormattingMismatch(#[from] OnTypeFormattingMismatchError),
     #[error(transparent)]
     OutgoingCallsMismatch(#[from] OutgoingCallsMismatchError),
     #[error(transparent)]

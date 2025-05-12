@@ -19,9 +19,10 @@ use lsp_types::{
 use lsp_types::{
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeActionParams, CompletionParams, DocumentDiagnosticParams, DocumentHighlightParams,
-    DocumentRangeFormattingParams, GotoDefinitionParams, HoverParams, InlayHintParams,
-    MonikerParams, ReferenceParams, RenameParams, SelectionRangeParams, SemanticTokensRangeParams,
-    SignatureHelpParams, TypeHierarchyPrepareParams, WorkspaceDiagnosticParams,
+    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, GotoDefinitionParams,
+    HoverParams, InlayHintParams, MonikerParams, ReferenceParams, RenameParams,
+    SelectionRangeParams, SemanticTokensRangeParams, SignatureHelpParams,
+    TypeHierarchyPrepareParams, WorkspaceDiagnosticParams,
     request::{GotoDeclarationParams, GotoImplementationParams, GotoTypeDefinitionParams},
 };
 #[allow(unused_imports)]
@@ -54,7 +55,10 @@ use types::{
     document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
     document_symbol::DocumentSymbolMismatchError,
     folding_range::FoldingRangeMismatchError,
-    formatting::{FormattingMismatchError, FormattingResult, RangeFormattingMismatchError},
+    formatting::{
+        FormattingMismatchError, FormattingResult, OnTypeFormattingMismatchError,
+        RangeFormattingMismatchError,
+    },
     hover::HoverMismatchError,
     implementation::ImplementationMismatchError,
     inlay_hint::InlayHintMismatchError,
@@ -1594,6 +1598,91 @@ pub fn test_moniker(
             );
             if !eql {
                 Err(MonikerMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type OnTypeFormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) -> bool;
+
+/// Tests the server's response to a [`textDocument/onTypeFormatting`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`DocumentOnTypeFormattingParams`]
+/// - `character`: Passed to the client via the request's [`DocumentOnTypeFormattingParams`]
+/// - `options`:  The formatting options passed to the LSP client. If `None`, then
+///   the following default is used:
+///
+/// ```rust
+/// lsp_types::FormattingOptions {
+///     tab_size: 4,
+///     insert_spaces: true,
+///     properties: std::collections::HashMap::new(),
+///     trim_trailing_whitespace: Some(true),
+///     insert_final_newline: Some(true),
+///     trim_final_newlines: Some(true),
+/// };
+/// ```
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `character` or `options` fails
+///
+/// [`callHierarchy/outgoingCalls`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting
+pub fn test_on_type_formatting(
+    mut test_case: TestCase,
+    cursor_pos: Position,
+    character: &str,
+    options: Option<&FormattingOptions>,
+    cmp: Option<OnTypeFormattingComparator>,
+    expected: Option<&Vec<TextEdit>>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::OnTypeFormatting);
+    let character_json =
+        serde_json::to_string_pretty(character).expect("JSON deserialzation of `character` failed");
+    let options_json = options
+        .map_or_else(
+            || serde_json::to_string_pretty(&default_format_opts()),
+            serde_json::to_string_pretty,
+        )
+        .expect("JSON deserialzation of `options` failed");
+    collect_results(
+        &test_case,
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
+            LuaReplacement::ParamDirect {
+                name: "ch",
+                json: character_json,
+            },
+            LuaReplacement::ParamDirect {
+                name: "options",
+                json: options_json,
+            },
+        ],
+        expected,
+        |expected, actual| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(OnTypeFormattingMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),

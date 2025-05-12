@@ -50,3 +50,21 @@ impl std::fmt::Display for RangeFormattingMismatchError {
         write_fields_comparison(f, "Vec<TextEdit>", &self.expected, &self.actual, 0)
     }
 }
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct OnTypeFormattingMismatchError {
+    pub test_id: String,
+    pub expected: Vec<TextEdit>,
+    pub actual: Vec<TextEdit>,
+}
+
+impl std::fmt::Display for OnTypeFormattingMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect On Type Formatting response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "Vec<TextEdit>", &self.expected, &self.actual, 0)
+    }
+}
