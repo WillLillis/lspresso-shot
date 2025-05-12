@@ -4,12 +4,14 @@ mod test {
 
     use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lspresso_shot::{
-        lspresso_shot, test_formatting, test_range_formatting,
+        lspresso_shot, test_formatting, test_on_type_formatting, test_range_formatting,
         types::{ServerStartType, TestCase, TestError, TestFile, formatting::FormattingResult},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
-    use lsp_types::{OneOf, Position, Range, ServerCapabilities, TextEdit, Uri};
+    use lsp_types::{
+        DocumentOnTypeFormattingOptions, OneOf, Position, Range, ServerCapabilities, TextEdit, Uri,
+    };
     use rstest::rstest;
 
     fn formatting_capabilities_simple() -> ServerCapabilities {
@@ -26,6 +28,16 @@ mod test {
         }
     }
 
+    fn on_type_formatting_capabilities_simple() -> ServerCapabilities {
+        ServerCapabilities {
+            document_on_type_formatting_provider: Some(DocumentOnTypeFormattingOptions {
+                first_trigger_character: String::new(),
+                more_trigger_character: None,
+            }),
+            ..Default::default()
+        }
+    }
+
     #[test]
     fn test_server_state_simple_expect_some_got_some() {
         let contents = "Some source contents";
@@ -35,7 +47,7 @@ mod test {
             .get_lspresso_dir()
             .expect("Failed to get test case's root directory");
         // NOTE: Sending a `None` empty edit response simplifies things here,
-        // since the start and end statesof the source file are the same
+        // since the start and end states of the source file are the same
         send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
         send_capabiltiies(&formatting_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
@@ -60,6 +72,27 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_formatting(test_case, None, None, None));
+    }
+
+    #[test]
+    fn test_server_on_type_simple_expect_none_got_none() {
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&on_type_formatting_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_on_type_formatting(
+            test_case,
+            Position::default(),
+            "",
+            None,
+            None,
+            None
+        ));
     }
 
     #[test]
@@ -97,6 +130,27 @@ mod test {
             .expect("Failed to send capabilities");
 
         let test_result = test_formatting(test_case.clone(), None, None, None);
+        let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{edits:#?}"));
+        assert_eq!(Err(expected_err), test_result);
+    }
+
+    #[rstest]
+    fn test_server_on_type_simple_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let edits =
+            test_server::responses::get_on_type_formatting_response(response_num, &uri).unwrap();
+        let source_file =
+            TestFile::new(test_server::get_dummy_source_path(), "Some source contents");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(response_num, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&on_type_formatting_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        let test_result =
+            test_on_type_formatting(test_case.clone(), Position::default(), "", None, None, None);
         let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{edits:#?}"));
         assert_eq!(Err(expected_err), test_result);
     }
@@ -141,6 +195,31 @@ mod test {
         lspresso_shot!(test_range_formatting(
             test_case,
             Range::default(),
+            None,
+            None,
+            Some(&edits)
+        ));
+    }
+
+    #[rstest]
+    fn test_server_on_type_simple_expect_some_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let edits =
+            test_server::responses::get_on_type_formatting_response(response_num, &uri).unwrap();
+        let source_file =
+            TestFile::new(test_server::get_dummy_source_path(), "Some source contents");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(response_num, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(&on_type_formatting_capabilities_simple(), &test_case_root)
+            .expect("Failed to send capabilities");
+
+        lspresso_shot!(test_on_type_formatting(
+            test_case,
+            Position::default(),
+            "",
             None,
             None,
             Some(&edits)
@@ -217,4 +296,37 @@ let foo = 5;
     }
 
     // NOTE: rust-analyzer doesn't support `textDocument/rangeFormatting` requests
+
+    // With help from https://github.com/rust-lang/rust-analyzer/issues/16192
+    #[test]
+    fn rust_analyzer_on_type() {
+        let source_file = TestFile::new(
+            "src/main.rs",
+            "fn main() {
+    let greeting = \"Hello, World\"
+}",
+        );
+        let test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                NonZeroU32::new(1).unwrap(),
+                "rustAnalyzer/cachePriming".to_string(),
+            ))
+            .timeout(Duration::from_secs(20))
+            .other_file(cargo_dot_toml());
+
+        lspresso_shot!(test_on_type_formatting(
+            test_case,
+            Position::new(1, 18),
+            "=",
+            None,
+            None,
+            Some(&vec![TextEdit {
+                range: Range {
+                    start: Position::new(1, 33),
+                    end: Position::new(1, 33),
+                },
+                new_text: ";".to_string(),
+            }]),
+        ));
+    }
 }

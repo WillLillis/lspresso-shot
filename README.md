@@ -92,6 +92,7 @@ So far, we have:
 - [x] `textDocument/inlayHint`
 - [x] `textDocument/hover`
 - [x] `textDocument/moniker`
+- [x] `textDocument/onTypeFormatting`
 - [x] `textDocument/prepareCallHierarchy`
 - [x] `textDocument/prepareTypeHierarchy`
 - [x] `textDocument/publishDiagnostics`

@@ -1746,7 +1746,6 @@ pub fn get_folding_range_response(response_num: u32, uri: &Uri) -> Option<Vec<Fo
 
 /// For use with `test_formatting`.
 #[must_use]
-#[allow(clippy::missing_panics_doc)]
 pub fn get_formatting_response(response_num: u32, uri: &Uri) -> Option<Vec<TextEdit>> {
     _ = uri;
     match response_num {
@@ -1806,7 +1805,14 @@ pub fn get_formatting_response(response_num: u32, uri: &Uri) -> Option<Vec<TextE
 /// Since `textDocument/formatting` and `textDocument/formattingRange` have the
 /// same response, this just wraps `get_formatting_response`.
 #[must_use]
-#[allow(clippy::missing_panics_doc)]
 pub fn get_formatting_range_response(response_num: u32, uri: &Uri) -> Option<Vec<TextEdit>> {
+    get_formatting_response(response_num, uri)
+}
+
+/// For use with `test_on_type_formatting`.
+/// Since `textDocument/formatting` and `textDocument/onTypeFormatting` have the
+/// same response, this just wraps `get_formatting_response`.
+#[must_use]
+pub fn get_on_type_formatting_response(response_num: u32, uri: &Uri) -> Option<Vec<TextEdit>> {
     get_formatting_response(response_num, uri)
 }
