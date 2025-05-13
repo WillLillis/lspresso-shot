@@ -20,6 +20,7 @@ mod hover;
 mod implementation;
 mod incoming_calls;
 mod inlay_hint;
+mod linked_editing_range;
 mod moniker;
 mod outgoing_calls;
 mod prepare_call_hierarchy;

@@ -9,10 +9,11 @@ use lsp_types::{
     CompletionItem, CompletionParams, DocumentColorParams, DocumentDiagnosticParams,
     DocumentFormattingParams, DocumentHighlightParams, DocumentLink, DocumentLinkParams,
     DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, DocumentSymbolParams,
-    FoldingRangeParams, GotoDefinitionParams, HoverParams, InlayHintParams, MonikerParams,
-    ReferenceParams, RenameParams, SelectionRangeParams, SemanticTokensDeltaParams,
-    SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams,
-    TextDocumentPositionParams, TypeHierarchyPrepareParams, Uri, WorkspaceDiagnosticParams,
+    FoldingRangeParams, GotoDefinitionParams, HoverParams, InlayHintParams,
+    LinkedEditingRangeParams, MonikerParams, ReferenceParams, RenameParams, SelectionRangeParams,
+    SemanticTokensDeltaParams, SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities,
+    SignatureHelpParams, TextDocumentPositionParams, TypeHierarchyPrepareParams, Uri,
+    WorkspaceDiagnosticParams,
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
         CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare,
@@ -21,11 +22,11 @@ use lsp_types::{
         DocumentHighlightRequest, DocumentLinkRequest, DocumentLinkResolve, DocumentSymbolRequest,
         FoldingRangeRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
         GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
-        HoverRequest, InlayHintRequest, MonikerRequest, OnTypeFormatting, PrepareRenameRequest,
-        RangeFormatting, References, Rename, Request as _, ResolveCompletionItem,
-        SelectionRangeRequest, SemanticTokensFullDeltaRequest, SemanticTokensFullRequest,
-        SemanticTokensRangeRequest, SignatureHelpRequest, TypeHierarchyPrepare,
-        WorkspaceDiagnosticRequest,
+        HoverRequest, InlayHintRequest, LinkedEditingRange, MonikerRequest, OnTypeFormatting,
+        PrepareRenameRequest, RangeFormatting, References, Rename, Request as _,
+        ResolveCompletionItem, SelectionRangeRequest, SemanticTokensFullDeltaRequest,
+        SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
+        TypeHierarchyPrepare, WorkspaceDiagnosticRequest,
     },
 };
 
@@ -39,8 +40,8 @@ use crate::{
         get_document_link_resolve_response, get_document_link_response,
         get_document_symbol_response, get_folding_range_response, get_formatting_range_response,
         get_formatting_response, get_hover_response, get_implementation_response,
-        get_incoming_calls_response, get_inlay_hint_response, get_moniker_response,
-        get_on_type_formatting_response, get_outgoing_calls_response,
+        get_incoming_calls_response, get_inlay_hint_response, get_linked_editing_range_response,
+        get_moniker_response, get_on_type_formatting_response, get_outgoing_calls_response,
         get_prepare_call_hierachy_response, get_prepare_rename_response,
         get_prepare_type_hierachy_response, get_publish_diagnostics_response,
         get_references_response, get_rename_response, get_selection_range_response,
@@ -455,6 +456,17 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: InlayHintParams| -> Uri { params.text_document.uri }
+            )?;
+        }
+        LinkedEditingRange::METHOD => {
+            handle_request!(
+                LinkedEditingRange,
+                get_linked_editing_range_response,
+                req,
+                conn,
+                |params: LinkedEditingRangeParams| -> Uri {
+                    params.text_document_position_params.text_document.uri
+                }
             )?;
         }
         MonikerRequest::METHOD => {

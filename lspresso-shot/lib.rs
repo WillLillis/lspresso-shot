@@ -7,10 +7,11 @@ use lsp_types::{
     CodeActionContext, CodeActionResponse, CodeLens, Color, ColorInformation, ColorPresentation,
     CompletionItem, CompletionResponse, Diagnostic, DocumentDiagnosticReport, DocumentHighlight,
     DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions, GotoDefinitionResponse,
-    Hover, InlayHint, Location, Moniker, Position, PrepareRenameResponse, PreviousResultId, Range,
-    SelectionRange, SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
-    SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
-    SignatureHelpContext, TextEdit, TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit,
+    Hover, InlayHint, LinkedEditingRanges, Location, Moniker, Position, PrepareRenameResponse,
+    PreviousResultId, Range, SelectionRange, SemanticTokens, SemanticTokensDelta,
+    SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
+    SemanticTokensResult, SignatureHelp, SignatureHelpContext, TextEdit, TypeHierarchyItem,
+    WorkspaceDiagnosticReport, WorkspaceEdit,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
@@ -62,6 +63,7 @@ use types::{
     hover::HoverMismatchError,
     implementation::ImplementationMismatchError,
     inlay_hint::InlayHintMismatchError,
+    linked_editing_range::LinkedEditingRangeMismatchError,
     moniker::MonikerMismatchError,
     references::ReferencesMismatchError,
     rename::{PrepareRenameMismatchError, RenameMismatchError},
@@ -1545,6 +1547,60 @@ pub fn test_inlay_hint(
             );
             if !eql {
                 Err(InlayHintMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type LinkedEditingRangeComparator =
+    fn(&LinkedEditingRanges, &LinkedEditingRanges, &TestCase) -> bool;
+
+/// Tests the server's response to a [`textDocument/linkedEditingRange`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`MonikerParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `call_item` fails
+///
+/// [`textDocument/moniker`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange
+pub fn test_linked_editing_range(
+    mut test_case: TestCase,
+    cursor_pos: Position,
+    cmp: Option<LinkedEditingRangeComparator>,
+    expected: Option<&LinkedEditingRanges>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::LinkedEditingRange);
+    collect_results(
+        &test_case,
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
+        ],
+        expected,
+        |expected, actual: &LinkedEditingRanges| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(LinkedEditingRangeMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),

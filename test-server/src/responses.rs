@@ -9,16 +9,17 @@ use lsp_types::{
     DocumentDiagnosticReportKind, DocumentHighlight, DocumentHighlightKind, DocumentLink,
     DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange, FoldingRangeKind,
     FullDocumentDiagnosticReport, GotoDefinitionResponse, Hover, HoverContents, InlayHint,
-    InlayHintKind, InlayHintLabel, InlayHintTooltip, LanguageString, Location, LocationLink,
-    MarkedString, MarkupContent, MarkupKind, Moniker, MonikerKind, ParameterInformation,
-    ParameterLabel, Position, PrepareRenameResponse, PublishDiagnosticsParams, Range,
-    RelatedFullDocumentDiagnosticReport, SelectionRange, SemanticToken, SemanticTokens,
-    SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
-    SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
-    SignatureInformation, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit,
-    TypeHierarchyItem, UnchangedDocumentDiagnosticReport, UniquenessLevel, Uri,
-    WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport, WorkspaceEdit,
-    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
+    InlayHintKind, InlayHintLabel, InlayHintTooltip, LanguageString, LinkedEditingRanges, Location,
+    LocationLink, MarkedString, MarkupContent, MarkupKind, Moniker, MonikerKind,
+    ParameterInformation, ParameterLabel, Position, PrepareRenameResponse,
+    PublishDiagnosticsParams, Range, RelatedFullDocumentDiagnosticReport, SelectionRange,
+    SemanticToken, SemanticTokens, SemanticTokensDelta, SemanticTokensEdit,
+    SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
+    SemanticTokensResult, SignatureHelp, SignatureInformation, SymbolInformation, SymbolKind,
+    SymbolTag, TextDocumentEdit, TextEdit, TypeHierarchyItem, UnchangedDocumentDiagnosticReport,
+    UniquenessLevel, Uri, WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
+    WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport,
+    WorkspaceUnchangedDocumentDiagnosticReport,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
@@ -713,6 +714,42 @@ pub fn get_incoming_calls_response(
         1 => Some(vec![item1]),
         2 => Some(vec![item2]),
         3 => Some(vec![item1, item2]),
+        _ => None,
+    }
+}
+
+/// For use with `test_moniker`.
+#[must_use]
+pub fn get_linked_editing_range_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<LinkedEditingRanges> {
+    let range1 = Range {
+        start: Position::new(1, 2),
+        end: Position::new(3, 4),
+    };
+    let range2 = Range {
+        start: Position::new(5, 6),
+        end: Position::new(7, 8),
+    };
+    _ = uri;
+    match response_num {
+        0 => Some(LinkedEditingRanges {
+            ranges: vec![],
+            word_pattern: None,
+        }),
+        1 => Some(LinkedEditingRanges {
+            ranges: vec![range1],
+            word_pattern: None,
+        }),
+        2 => Some(LinkedEditingRanges {
+            ranges: vec![range2],
+            word_pattern: Some("word pattern 2".to_string()),
+        }),
+        3 => Some(LinkedEditingRanges {
+            ranges: vec![range1, range2],
+            word_pattern: Some("word pattern 3".to_string()),
+        }),
         _ => None,
     }
 }

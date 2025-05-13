@@ -16,6 +16,7 @@ pub mod formatting;
 pub mod hover;
 pub mod implementation;
 pub mod inlay_hint;
+pub mod linked_editing_range;
 pub mod moniker;
 pub mod references;
 pub mod rename;
@@ -75,6 +76,7 @@ use color_presentation::ColorPresentationMismatchError;
 use document_color::DocumentColorMismatchError;
 use formatting::{OnTypeFormattingMismatchError, RangeFormattingMismatchError};
 use inlay_hint::InlayHintMismatchError;
+use linked_editing_range::LinkedEditingRangeMismatchError;
 use lsp_types::{Position, Uri};
 use rand::distr::Distribution as _;
 use rename::PrepareRenameMismatchError;
@@ -127,6 +129,8 @@ pub enum TestType {
     IncomingCalls,
     /// Test `textDocument/inlayHint` requests
     InlayHint,
+    /// Test `textDocument/linkedEditingRange` requests
+    LinkedEditingRange,
     /// Test `textDocument/moniker` requests
     Moniker,
     /// Test `textDocument/onTypeFormatting` requests
@@ -190,6 +194,7 @@ impl std::fmt::Display for TestType {
                 Self::Implementation => "textDocument/implementation",
                 Self::IncomingCalls => "callHierarchy/incomingCalls",
                 Self::InlayHint => "textDocument/inlayHint",
+                Self::LinkedEditingRange => "textDocument/linkedEditingRange",
                 Self::Moniker => "textDocument/moniker",
                 Self::OnTypeFormatting => "textDocument/onTypeFormatting",
                 Self::OutgoingCalls => "callHierarchy/outgoingCalls",
@@ -705,6 +710,8 @@ pub enum TestError {
     InlayHintMismatch(#[from] InlayHintMismatchError),
     #[error(transparent)]
     IncomingCallsMismatch(#[from] IncomingCallsMismatchError),
+    #[error(transparent)]
+    LinkedEditingRangeMismatch(#[from] LinkedEditingRangeMismatchError),
     #[error(transparent)]
     MonikerMismatch(#[from] MonikerMismatchError),
     #[error(transparent)]
