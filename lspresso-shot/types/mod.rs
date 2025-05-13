@@ -77,6 +77,7 @@ use formatting::{OnTypeFormattingMismatchError, RangeFormattingMismatchError};
 use inlay_hint::InlayHintMismatchError;
 use lsp_types::{Position, Uri};
 use rand::distr::Distribution as _;
+use rename::PrepareRenameMismatchError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use type_hierarchy::PrepareTypeHierarchyMismatchError;
@@ -134,6 +135,8 @@ pub enum TestType {
     OutgoingCalls,
     /// Test `textDocument/prepareCallHierarchy` requests
     PrepareCallHierarchy,
+    /// Test `textDocument/prepareRename` requests
+    PrepareRename,
     /// Test `textDocument/prepareTypeHierarchy` requests
     PrepareTypeHierarchy,
     /// Test `textDocument/publishDiagnostics` requests
@@ -191,6 +194,7 @@ impl std::fmt::Display for TestType {
                 Self::OnTypeFormatting => "textDocument/onTypeFormatting",
                 Self::OutgoingCalls => "callHierarchy/outgoingCalls",
                 Self::PrepareCallHierarchy => "textDocument/prepareCallHierarchy",
+                Self::PrepareRename => "textDocument/prepareRename",
                 Self::PrepareTypeHierarchy => "textDocument/prepareTypeHierarchy",
                 Self::PublishDiagnostics => "textDocument/publishDiagnostics",
                 Self::RangeFormatting => "textDocument/rangeFormatting",
@@ -709,6 +713,8 @@ pub enum TestError {
     OutgoingCallsMismatch(#[from] OutgoingCallsMismatchError),
     #[error(transparent)]
     PrepareCallHierarchyMismatch(#[from] PrepareCallHierachyMismatchError),
+    #[error(transparent)]
+    PrepareRenameMismatch(#[from] PrepareRenameMismatchError),
     #[error(transparent)]
     PrepareTypeHierarchyMismatch(#[from] PrepareTypeHierarchyMismatchError),
     #[error(transparent)]

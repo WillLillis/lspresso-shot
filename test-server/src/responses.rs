@@ -11,14 +11,14 @@ use lsp_types::{
     FullDocumentDiagnosticReport, GotoDefinitionResponse, Hover, HoverContents, InlayHint,
     InlayHintKind, InlayHintLabel, InlayHintTooltip, LanguageString, Location, LocationLink,
     MarkedString, MarkupContent, MarkupKind, Moniker, MonikerKind, ParameterInformation,
-    ParameterLabel, Position, PublishDiagnosticsParams, Range, RelatedFullDocumentDiagnosticReport,
-    SelectionRange, SemanticToken, SemanticTokens, SemanticTokensDelta, SemanticTokensEdit,
-    SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
-    SemanticTokensResult, SignatureHelp, SignatureInformation, SymbolInformation, SymbolKind,
-    SymbolTag, TextDocumentEdit, TextEdit, TypeHierarchyItem, UnchangedDocumentDiagnosticReport,
-    UniquenessLevel, Uri, WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
-    WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceUnchangedDocumentDiagnosticReport,
+    ParameterLabel, Position, PrepareRenameResponse, PublishDiagnosticsParams, Range,
+    RelatedFullDocumentDiagnosticReport, SelectionRange, SemanticToken, SemanticTokens,
+    SemanticTokensDelta, SemanticTokensEdit, SemanticTokensFullDeltaResult,
+    SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
+    SignatureInformation, SymbolInformation, SymbolKind, SymbolTag, TextDocumentEdit, TextEdit,
+    TypeHierarchyItem, UnchangedDocumentDiagnosticReport, UniquenessLevel, Uri,
+    WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport, WorkspaceEdit,
+    WorkspaceFullDocumentDiagnosticReport, WorkspaceUnchangedDocumentDiagnosticReport,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
@@ -848,6 +848,27 @@ pub fn get_prepare_call_hierachy_response(
         1 => Some(vec![item1]),
         2 => Some(vec![item2]),
         3 => Some(vec![item1, item2]),
+        _ => None,
+    }
+}
+
+/// For use with `test_prepare_rename`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_prepare_rename_response(response_num: u32, uri: &Uri) -> Option<PrepareRenameResponse> {
+    _ = uri;
+    match response_num {
+        0 => Some(PrepareRenameResponse::Range(Range::default())),
+        1 => Some(PrepareRenameResponse::DefaultBehavior {
+            default_behavior: false,
+        }),
+        2 => Some(PrepareRenameResponse::DefaultBehavior {
+            default_behavior: true,
+        }),
+        3 => Some(PrepareRenameResponse::RangeWithPlaceholder {
+            range: Range::default(),
+            placeholder: "placeholder".to_string(),
+        }),
         _ => None,
     }
 }

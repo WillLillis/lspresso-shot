@@ -94,6 +94,7 @@ So far, we have:
 - [x] `textDocument/moniker`
 - [x] `textDocument/onTypeFormatting`
 - [x] `textDocument/prepareCallHierarchy`
+- [x] `textDocument/prepareRename`
 - [x] `textDocument/prepareTypeHierarchy`
 - [x] `textDocument/publishDiagnostics`
 - [x] `textDocument/rangeFormatting`
