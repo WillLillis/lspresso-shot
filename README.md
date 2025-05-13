@@ -91,6 +91,7 @@ So far, we have:
 - [x] `textDocument/implementation`
 - [x] `textDocument/inlayHint`
 - [x] `textDocument/hover`
+- [x] `textDocument/linkedEditingRange`
 - [x] `textDocument/moniker`
 - [x] `textDocument/onTypeFormatting`
 - [x] `textDocument/prepareCallHierarchy`
