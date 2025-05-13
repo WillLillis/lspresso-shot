@@ -660,7 +660,7 @@ pub enum TestError {
     #[error(transparent)]
     CodeActionMismatch(#[from] CodeActionMismatchError),
     #[error(transparent)]
-    CodeActionResolveMismatch(#[from] CodeActionResolveMismatchError),
+    CodeActionResolveMismatch(#[from] Box<CodeActionResolveMismatchError>),
     #[error(transparent)]
     CodeLensMismatch(#[from] CodeLensMismatchError),
     #[error(transparent)]

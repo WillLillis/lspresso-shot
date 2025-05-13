@@ -393,11 +393,11 @@ pub fn test_code_action_resolve(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(CodeActionResolveMismatchError {
+                Err(Box::new(CodeActionResolveMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: (*expected).clone(),
                     actual: actual.clone(),
-                })?;
+                }))?;
             }
             Ok(())
         },
