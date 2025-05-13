@@ -7,8 +7,8 @@ use lsp_types::{
     CodeActionContext, CodeActionResponse, CodeLens, Color, ColorInformation, ColorPresentation,
     CompletionItem, CompletionResponse, Diagnostic, DocumentDiagnosticReport, DocumentHighlight,
     DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions, GotoDefinitionResponse,
-    Hover, InlayHint, Location, Moniker, Position, PreviousResultId, Range, SelectionRange,
-    SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
+    Hover, InlayHint, Location, Moniker, Position, PrepareRenameResponse, PreviousResultId, Range,
+    SelectionRange, SemanticTokens, SemanticTokensDelta, SemanticTokensFullDeltaResult,
     SemanticTokensPartialResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
     SignatureHelpContext, TextEdit, TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
@@ -22,7 +22,7 @@ use lsp_types::{
     DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, GotoDefinitionParams,
     HoverParams, InlayHintParams, MonikerParams, ReferenceParams, RenameParams,
     SelectionRangeParams, SemanticTokensRangeParams, SignatureHelpParams,
-    TypeHierarchyPrepareParams, WorkspaceDiagnosticParams,
+    TextDocumentPositionParams, TypeHierarchyPrepareParams, WorkspaceDiagnosticParams,
     request::{GotoDeclarationParams, GotoImplementationParams, GotoTypeDefinitionParams},
 };
 #[allow(unused_imports)]
@@ -64,7 +64,7 @@ use types::{
     inlay_hint::InlayHintMismatchError,
     moniker::MonikerMismatchError,
     references::ReferencesMismatchError,
-    rename::RenameMismatchError,
+    rename::{PrepareRenameMismatchError, RenameMismatchError},
     selection_range::SelectionRangeMismatchError,
     semantic_tokens::{
         SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError,
@@ -1785,6 +1785,56 @@ pub fn test_prepare_call_hierarchy(
             );
             if !eql {
                 Err(PrepareCallHierachyMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type PrepareRenameComparator =
+    fn(&PrepareRenameResponse, &PrepareRenameResponse, &TestCase) -> bool;
+
+/// Tests the server's response to a [`textDocument/prepareRename`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`TextDocumentPositionParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// [`textDocument/prepareCallHierarchy`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareRename
+pub fn test_prepare_rename(
+    mut test_case: TestCase,
+    cursor_pos: Position,
+    cmp: Option<PrepareRenameComparator>,
+    expected: Option<&PrepareRenameResponse>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::PrepareRename);
+    collect_results(
+        &test_case,
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamPosition {
+                pos: cursor_pos,
+                name: None,
+            },
+        ],
+        expected,
+        |expected, actual: &PrepareRenameResponse| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(PrepareRenameMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: expected.clone(),
                     actual: actual.clone(),

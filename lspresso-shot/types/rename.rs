@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
-use lsp_types::{DocumentChangeOperation, DocumentChanges, ResourceOp, WorkspaceEdit};
+use lsp_types::{
+    DocumentChangeOperation, DocumentChanges, PrepareRenameResponse, ResourceOp, WorkspaceEdit,
+};
 use thiserror::Error;
 
 use super::{
@@ -8,6 +10,7 @@ use super::{
 };
 
 impl Empty for WorkspaceEdit {}
+impl Empty for PrepareRenameResponse {}
 
 impl CleanResponse for WorkspaceEdit {
     fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
@@ -52,6 +55,8 @@ impl CleanResponse for WorkspaceEdit {
     }
 }
 
+impl CleanResponse for PrepareRenameResponse {}
+
 #[derive(Debug, Error, PartialEq, Eq)]
 pub struct RenameMismatchError {
     pub test_id: String,
@@ -63,5 +68,23 @@ impl std::fmt::Display for RenameMismatchError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Test {}: Incorrect Rename response:", self.test_id)?;
         write_fields_comparison(f, "WorkspaceEdit", &self.expected, &self.actual, 0)
+    }
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct PrepareRenameMismatchError {
+    pub test_id: String,
+    pub expected: PrepareRenameResponse,
+    pub actual: PrepareRenameResponse,
+}
+
+impl std::fmt::Display for PrepareRenameMismatchError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Test {}: Incorrect Prepare Rename response:",
+            self.test_id
+        )?;
+        write_fields_comparison(f, "PrepareRenameResponse", &self.expected, &self.actual, 0)
     }
 }
