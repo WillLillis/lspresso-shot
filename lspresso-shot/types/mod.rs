@@ -25,6 +25,7 @@ pub mod semantic_tokens;
 pub mod signature_help;
 pub mod type_definition;
 pub mod type_hierarchy;
+pub mod workspace_symbol;
 
 use crate::{
     init_dot_lua::{LuaReplacement, get_init_dot_lua},
@@ -83,6 +84,7 @@ use rename::PrepareRenameMismatchError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use type_hierarchy::PrepareTypeHierarchyMismatchError;
+use workspace_symbol::WorkspaceSymbolMismatchError;
 
 /// Specifies the type of test to run
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -165,6 +167,8 @@ pub enum TestType {
     TypeDefinition,
     /// Test `workspace/diagnostic` requests
     WorkspaceDiagnostic,
+    /// Test `workspace/symbol` requests
+    WorkspaceSymbol,
 }
 
 impl std::fmt::Display for TestType {
@@ -212,6 +216,7 @@ impl std::fmt::Display for TestType {
                 Self::SignatureHelp => "textDocument/signatureHelp",
                 Self::TypeDefinition => "textDocument/typeDefinition",
                 Self::WorkspaceDiagnostic => "workspace/diagnostic",
+                Self::WorkspaceSymbol => "workspace/symbol",
             }
         )?;
         Ok(())
@@ -744,6 +749,8 @@ pub enum TestError {
     TypeDefinitionMismatch(#[from] Box<TypeDefinitionMismatchError>),
     #[error(transparent)]
     WorkspaceDiagnosticMismatch(#[from] Box<WorkspaceDiagnosticMismatchError>),
+    #[error(transparent)]
+    WorkspaceSymbolMismatch(#[from] WorkspaceSymbolMismatchError),
     #[error("Test {0}: No results were written")]
     NoResults(String),
     #[error(transparent)]
@@ -833,3 +840,14 @@ where
 
 impl CleanResponse for EmptyResult {}
 impl CleanResponse for String {}
+
+/// This trait implements a comparison method that accounts for issues w.r.t. JSON
+/// serialization/deserialization of types used in the LSP protocol.
+pub trait ApproximateEq
+where
+    Self: Serialize + PartialEq,
+{
+    fn approx_eq(a: &Self, b: &Self) -> bool {
+        a == b
+    }
+}

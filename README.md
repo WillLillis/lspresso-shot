@@ -108,6 +108,7 @@ So far, we have:
 - [x] `textDocument/signatureHelp`
 - [x] `textDocument/typeDefinition`
 - [x] `workspace/diagnostic`
+- [x] `workspace/symbol`
 
 ## Gotchas/Known Issues
 

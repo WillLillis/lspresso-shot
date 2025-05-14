@@ -11,7 +11,7 @@ use lsp_types::{
     PreviousResultId, Range, SelectionRange, SemanticTokens, SemanticTokensDelta,
     SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
     SemanticTokensResult, SignatureHelp, SignatureHelpContext, TextEdit, TypeHierarchyItem,
-    WorkspaceDiagnosticReport, WorkspaceEdit,
+    WorkspaceDiagnosticReport, WorkspaceEdit, WorkspaceSymbolResponse,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
@@ -24,6 +24,7 @@ use lsp_types::{
     HoverParams, InlayHintParams, MonikerParams, ReferenceParams, RenameParams,
     SelectionRangeParams, SemanticTokensRangeParams, SignatureHelpParams,
     TextDocumentPositionParams, TypeHierarchyPrepareParams, WorkspaceDiagnosticParams,
+    WorkspaceSymbolParams,
     request::{GotoDeclarationParams, GotoImplementationParams, GotoTypeDefinitionParams},
 };
 #[allow(unused_imports)]
@@ -38,7 +39,8 @@ use std::{
 };
 
 use types::{
-    CleanResponse, Empty, EmptyResult, TestCase, TestError, TestResult, TestType, TimeoutError,
+    ApproximateEq as _, CleanResponse, Empty, EmptyResult, TestCase, TestError, TestResult,
+    TestType, TimeoutError,
     call_hierarchy::{
         IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
     },
@@ -75,6 +77,7 @@ use types::{
     signature_help::SignatureHelpMismatchError,
     type_definition::TypeDefinitionMismatchError,
     type_hierarchy::PrepareTypeHierarchyMismatchError,
+    workspace_symbol::WorkspaceSymbolMismatchError,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -2752,6 +2755,67 @@ pub fn test_workspace_diagnostic(
                     expected: expected.clone(),
                     actual: actual.clone(),
                 }))?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type WorkspaceSymbolComparator =
+    fn(&WorkspaceSymbolResponse, &WorkspaceSymbolResponse, &TestCase) -> bool;
+
+/// Tests the server's response to a [`workspace/symbol`] request
+///
+/// - `query`: Passed to the client via the request's [`WorkspaceSymbolParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// NOTE: Because of issues inherent to the definition of `WorkspaceSymbolResponse` and JSON
+/// serialization/deserialization, the default equality check performed in this test is somewhat
+/// "looser" than normal. If the expected and actual results match in fields but are different
+/// variants of `WorkspaceSymbolResponse`, then the test will pass. This behavior can be overriden
+/// via `cmp`.
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `query` fails
+///
+/// [`workspace/symbol`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol
+pub fn test_workspace_symbol(
+    mut test_case: TestCase,
+    query: &str,
+    cmp: Option<WorkspaceSymbolComparator>,
+    expected: Option<&WorkspaceSymbolResponse>,
+) -> TestResult<()> {
+    test_case.test_type = Some(TestType::WorkspaceSymbol);
+    let query_json =
+        serde_json::to_string_pretty(query).expect("JSON deserialzation of `query` failed");
+    collect_results(
+        &test_case,
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::ParamDirect {
+                name: "query",
+                json: query_json,
+            },
+        ],
+        expected,
+        |expected: &WorkspaceSymbolResponse, actual: &WorkspaceSymbolResponse| {
+            let eql = cmp.as_ref().map_or_else(
+                || WorkspaceSymbolResponse::approx_eq(expected, actual),
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(WorkspaceSymbolMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: expected.clone(),
+                    actual: actual.clone(),
+                })?;
             }
             Ok(())
         },
