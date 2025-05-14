@@ -10,7 +10,7 @@ use lsp_types::{
     DocumentSymbol, DocumentSymbolResponse, Documentation, FoldingRange, FoldingRangeKind,
     FullDocumentDiagnosticReport, GotoDefinitionResponse, Hover, HoverContents, InlayHint,
     InlayHintKind, InlayHintLabel, InlayHintTooltip, LanguageString, LinkedEditingRanges, Location,
-    LocationLink, MarkedString, MarkupContent, MarkupKind, Moniker, MonikerKind,
+    LocationLink, MarkedString, MarkupContent, MarkupKind, Moniker, MonikerKind, OneOf,
     ParameterInformation, ParameterLabel, Position, PrepareRenameResponse,
     PublishDiagnosticsParams, Range, RelatedFullDocumentDiagnosticReport, SelectionRange,
     SemanticToken, SemanticTokens, SemanticTokensDelta, SemanticTokensEdit,
@@ -18,8 +18,8 @@ use lsp_types::{
     SemanticTokensResult, SignatureHelp, SignatureInformation, SymbolInformation, SymbolKind,
     SymbolTag, TextDocumentEdit, TextEdit, TypeHierarchyItem, UnchangedDocumentDiagnosticReport,
     UniquenessLevel, Uri, WorkspaceDiagnosticReport, WorkspaceDocumentDiagnosticReport,
-    WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport,
-    WorkspaceUnchangedDocumentDiagnosticReport,
+    WorkspaceEdit, WorkspaceFullDocumentDiagnosticReport, WorkspaceLocation, WorkspaceSymbol,
+    WorkspaceSymbolResponse, WorkspaceUnchangedDocumentDiagnosticReport,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
@@ -1873,4 +1873,73 @@ pub fn get_formatting_range_response(response_num: u32, uri: &Uri) -> Option<Vec
 #[must_use]
 pub fn get_on_type_formatting_response(response_num: u32, uri: &Uri) -> Option<Vec<TextEdit>> {
     get_formatting_response(response_num, uri)
+}
+
+pub fn get_workspace_symbol_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<WorkspaceSymbolResponse> {
+    #[allow(deprecated)]
+    let sym_info_1 = SymbolInformation {
+        name: "name1".to_string(),
+        kind: SymbolKind::FILE,
+        tags: None,
+        deprecated: None,
+        location: Location {
+            uri: uri.clone(),
+            range: Range {
+                start: Position::new(1, 2),
+                end: Position::new(3, 4),
+            },
+        },
+        container_name: None,
+    };
+    #[allow(deprecated)]
+    let sym_info_2 = SymbolInformation {
+        name: "name2".to_string(),
+        kind: SymbolKind::FILE,
+        tags: Some(vec![SymbolTag::DEPRECATED]),
+        deprecated: Some(true),
+        location: Location {
+            uri: uri.clone(),
+            range: Range {
+                start: Position::new(5, 6),
+                end: Position::new(7, 8),
+            },
+        },
+        container_name: Some("container_name 2".to_string()),
+    };
+    let workspace_sym_1 = WorkspaceSymbol {
+        name: "name1".to_string(),
+        kind: SymbolKind::FILE,
+        tags: Some(vec![SymbolTag::DEPRECATED]),
+        container_name: None,
+        data: None,
+        location: OneOf::Left(Location {
+            uri: uri.clone(),
+            range: Range::default(),
+        }),
+    };
+    let workspace_sym_2 = WorkspaceSymbol {
+        name: "name2".to_string(),
+        kind: SymbolKind::FILE,
+        tags: Some(vec![SymbolTag::DEPRECATED]),
+        container_name: Some("container_name 2".to_string()),
+        data: None,
+        location: OneOf::Right(WorkspaceLocation { uri: uri.clone() }),
+    };
+    match response_num {
+        0 => Some(WorkspaceSymbolResponse::Flat(vec![])),
+        1 => Some(WorkspaceSymbolResponse::Nested(vec![])),
+        2 => Some(WorkspaceSymbolResponse::Flat(vec![sym_info_1])),
+        3 => Some(WorkspaceSymbolResponse::Flat(vec![sym_info_2])),
+        4 => Some(WorkspaceSymbolResponse::Flat(vec![sym_info_1, sym_info_2])),
+        5 => Some(WorkspaceSymbolResponse::Nested(vec![workspace_sym_1])),
+        6 => Some(WorkspaceSymbolResponse::Nested(vec![workspace_sym_2])),
+        7 => Some(WorkspaceSymbolResponse::Nested(vec![
+            workspace_sym_1,
+            workspace_sym_2,
+        ])),
+        _ => None,
+    }
 }

@@ -13,7 +13,7 @@ use lsp_types::{
     LinkedEditingRangeParams, MonikerParams, ReferenceParams, RenameParams, SelectionRangeParams,
     SemanticTokensDeltaParams, SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities,
     SignatureHelpParams, TextDocumentPositionParams, TypeHierarchyPrepareParams, Uri,
-    WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticParams, WorkspaceSymbolParams,
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
         CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare,
@@ -26,7 +26,7 @@ use lsp_types::{
         PrepareRenameRequest, RangeFormatting, References, Rename, Request as _,
         ResolveCompletionItem, SelectionRangeRequest, SemanticTokensFullDeltaRequest,
         SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
-        TypeHierarchyPrepare, WorkspaceDiagnosticRequest,
+        TypeHierarchyPrepare, WorkspaceDiagnosticRequest, WorkspaceSymbolRequest,
     },
 };
 
@@ -48,6 +48,7 @@ use crate::{
         get_semantic_tokens_full_delta_response, get_semantic_tokens_full_response,
         get_semantic_tokens_range_response, get_signature_help_response,
         get_type_definition_response, get_workspace_diagnostics_response,
+        get_workspace_symbol_response,
     },
 };
 
@@ -577,6 +578,15 @@ pub fn handle_request(
                     let raw_uri = params.identifier.unwrap();
                     Uri::from_str(&raw_uri).unwrap()
                 }
+            )?;
+        }
+        WorkspaceSymbolRequest::METHOD => {
+            handle_request!(
+                WorkspaceSymbolRequest,
+                get_workspace_symbol_response,
+                req,
+                conn,
+                |params: WorkspaceSymbolParams| -> Uri { Uri::from_str(&params.query).unwrap() }
             )?;
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),

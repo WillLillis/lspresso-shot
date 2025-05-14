@@ -85,5 +85,5 @@ mod test {
         ));
     }
 
-    // NOTE: rust-analyzer doesn't support `textDocument/prepareTypeHierarchy` yet
+    // NOTE: rust-analyzer doesn't support `textDocument/prepareTypeHierarchy` requests
 }
