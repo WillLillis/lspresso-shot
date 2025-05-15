@@ -5,7 +5,7 @@ mod test {
     use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lspresso_shot::{
         lspresso_shot, test_prepare_rename, test_rename,
-        types::{ServerStartType, TestCase, TestError, TestFile},
+        types::{ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
@@ -71,7 +71,7 @@ mod test {
     #[rstest]
     fn test_server_simple_expect_none_got_some(#[values(0, 1, 2, 3, 4, 5)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
-        let edits = test_server::responses::get_rename_response(response_num, &uri).unwrap();
+        let resp = test_server::responses::get_rename_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
@@ -82,7 +82,11 @@ mod test {
             .expect("Failed to send capabilities");
 
         let test_result = test_rename(test_case.clone(), Position::default(), "", None, None);
-        let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{edits:#?}"));
+        let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id,
+            expected: None,
+            actual: Some(resp),
+        });
         assert_eq!(Err(expected_err), test_result);
     }
 
@@ -100,7 +104,11 @@ mod test {
             .expect("Failed to send capabilities");
 
         let test_result = test_prepare_rename(test_case.clone(), Position::default(), None, None);
-        let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
+        let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id,
+            expected: None,
+            actual: Some(resp),
+        });
         assert_eq!(Err(expected_err), test_result);
     }
 

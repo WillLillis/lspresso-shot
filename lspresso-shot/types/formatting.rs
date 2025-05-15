@@ -1,11 +1,7 @@
 use lsp_types::TextEdit;
 use serde::Serialize;
-use thiserror::Error;
 
-use super::{CleanResponse, Empty, compare::write_fields_comparison};
-
-impl Empty for FormattingResult {}
-impl Empty for Vec<TextEdit> {}
+use super::{CleanResponse, ResponseMismatchError, TestError, TestResult};
 
 impl CleanResponse for FormattingResult {}
 impl CleanResponse for Vec<TextEdit> {}
@@ -18,53 +14,62 @@ pub enum FormattingResult {
     Response(Vec<TextEdit>),
 }
 
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct FormattingMismatchError {
-    pub test_id: String,
-    pub expected: FormattingResult,
-    pub actual: FormattingResult,
-}
-
-impl std::fmt::Display for FormattingMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Formatting response:", self.test_id)?;
-        // TODO: This may need some touch up
-        write_fields_comparison(f, "FormattingResult", &self.expected, &self.actual, 0)
+/// Converts a `TestResult<(), String>` or `TestResult<(), Vec<TextEdit>>` to `TestResult<(), FormattingResult>`.
+/// This is necessary to satisfy the generic constraints introduced by `test_formatting` calling
+/// `test_formatting_resp` and `test_formatting_state`.
+///
+/// Note that we can't implement this logic directly via the `From` trait because `TestResult` is just an alias
+/// for `Result`, and thus a foreign type.
+pub(crate) fn to_parent_err_type<T>(result: TestResult<(), T>) -> TestResult<(), FormattingResult>
+where
+    TestError<FormattingResult>: From<TestError<T>>,
+{
+    match result {
+        Ok(()) => Ok(()),
+        Err(e) => Err(e.into()),
     }
 }
 
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct RangeFormattingMismatchError {
-    pub test_id: String,
-    pub expected: Vec<TextEdit>,
-    pub actual: Vec<TextEdit>,
-}
-
-impl std::fmt::Display for RangeFormattingMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Range Formatting response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Vec<TextEdit>", &self.expected, &self.actual, 0)
+impl From<TestError<Vec<TextEdit>>> for TestError<FormattingResult> {
+    fn from(value: TestError<Vec<TextEdit>>) -> Self {
+        match value {
+            TestError::ResponseMismatch(ResponseMismatchError {
+                test_id,
+                expected,
+                actual,
+            }) => {
+                let expected = expected.map(FormattingResult::Response);
+                let actual = actual.map(FormattingResult::Response);
+                Self::ResponseMismatch(ResponseMismatchError {
+                    test_id,
+                    expected,
+                    actual,
+                })
+            }
+            TestError::TestSetup(e) => Self::TestSetup(e),
+            TestError::TestExecution(e) => Self::TestExecution(e),
+        }
     }
 }
 
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct OnTypeFormattingMismatchError {
-    pub test_id: String,
-    pub expected: Vec<TextEdit>,
-    pub actual: Vec<TextEdit>,
-}
-
-impl std::fmt::Display for OnTypeFormattingMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect On Type Formatting response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Vec<TextEdit>", &self.expected, &self.actual, 0)
+impl From<TestError<String>> for TestError<FormattingResult> {
+    fn from(value: TestError<String>) -> Self {
+        match value {
+            TestError::ResponseMismatch(ResponseMismatchError {
+                test_id,
+                expected,
+                actual,
+            }) => {
+                let expected = expected.map(FormattingResult::EndState);
+                let actual = actual.map(FormattingResult::EndState);
+                Self::ResponseMismatch(ResponseMismatchError {
+                    test_id,
+                    expected,
+                    actual,
+                })
+            }
+            TestError::TestExecution(e) => Self::TestExecution(e),
+            TestError::TestSetup(e) => Self::TestSetup(e),
+        }
     }
 }

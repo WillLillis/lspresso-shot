@@ -27,41 +27,7 @@ pub mod type_definition;
 pub mod type_hierarchy;
 pub mod workspace_symbol;
 
-use crate::{
-    init_dot_lua::{LuaReplacement, get_init_dot_lua},
-    types::{
-        call_hierarchy::{
-            IncomingCallsMismatchError, OutgoingCallsMismatchError,
-            PrepareCallHierachyMismatchError,
-        },
-        code_action::CodeActionMismatchError,
-        code_lens::{CodeLensMismatchError, CodeLensResolveMismatchError},
-        completion::{CompletionMismatchError, CompletionResolveMismatchError},
-        declaration::DeclarationMismatchError,
-        definition::DefinitionMismatchError,
-        diagnostic::{
-            DiagnosticMismatchError, PublishDiagnosticsMismatchError,
-            WorkspaceDiagnosticMismatchError,
-        },
-        document_highlight::DocumentHighlightMismatchError,
-        document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
-        document_symbol::DocumentSymbolMismatchError,
-        folding_range::FoldingRangeMismatchError,
-        formatting::FormattingMismatchError,
-        hover::HoverMismatchError,
-        implementation::ImplementationMismatchError,
-        moniker::MonikerMismatchError,
-        references::ReferencesMismatchError,
-        rename::RenameMismatchError,
-        selection_range::SelectionRangeMismatchError,
-        semantic_tokens::{
-            SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError,
-            SemanticTokensRangeMismatchError,
-        },
-        signature_help::SignatureHelpMismatchError,
-        type_definition::TypeDefinitionMismatchError,
-    },
-};
+use crate::init_dot_lua::{LuaReplacement, get_init_dot_lua};
 
 use std::{
     env::temp_dir,
@@ -72,19 +38,11 @@ use std::{
     time::Duration,
 };
 
-use code_action::CodeActionResolveMismatchError;
-use color_presentation::ColorPresentationMismatchError;
-use document_color::DocumentColorMismatchError;
-use formatting::{OnTypeFormattingMismatchError, RangeFormattingMismatchError};
-use inlay_hint::InlayHintMismatchError;
-use linked_editing_range::LinkedEditingRangeMismatchError;
+use compare::write_fields_comparison;
 use lsp_types::{Position, Uri};
 use rand::distr::Distribution as _;
-use rename::PrepareRenameMismatchError;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use type_hierarchy::PrepareTypeHierarchyMismatchError;
-use workspace_symbol::WorkspaceSymbolMismatchError;
 
 /// Specifies the type of test to run
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -662,95 +620,60 @@ impl From<std::io::Error> for TestSetupError {
     }
 }
 
-pub type TestResult<T> = Result<T, TestError>;
+macro_rules! type_name {
+    ($t:ty) => {{
+        let full_name = std::any::type_name::<$t>();
+        full_name.rsplit("::").next().unwrap_or(full_name)
+    }};
+}
 
-// NOTE: Certain variants' inner types are `Box`ed because they are large
-#[derive(Debug, Error, PartialEq)]
-pub enum TestError {
-    #[error("Test {0}: Expected `None`, got:\n{1}")]
-    ExpectedNone(String, String),
-    #[error("Test {0}: Expected valid results, got `None`")]
-    ExpectedSome(String),
+#[derive(Debug, Error, PartialEq, Eq)]
+pub struct ResponseMismatchError<T> {
+    pub test_id: String,
+    pub expected: Option<T>,
+    pub actual: Option<T>,
+}
+
+// TODO: Add a `display` field to `ResponseMismatchError` to allow for different
+// error displays. We can have the existing JSON-ish diffing logic, debug prints
+// of `actual` and `expected`, or a JSON print of the two.
+impl<T: Serialize> std::fmt::Display for ResponseMismatchError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Test {}: Incorrect {} response:",
+            self.test_id,
+            type_name!(T)
+        )?;
+        match (self.expected.as_ref(), self.actual.as_ref()) {
+            (Some(_), Some(_)) => writeln!(f)?,
+            (None, Some(_)) => writeln!(f, "Expected `None`, got `Some`")?,
+            (Some(_), None) => writeln!(f, "Expected `Some`, got `None`")?,
+            (None, None) => unreachable!(),
+        }
+        write_fields_comparison(f, "", &self.expected, &self.actual, 0)?;
+
+        Ok(())
+    }
+}
+
+pub type TestResult<T, V> = Result<T, TestError<V>>;
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum TestError<T> {
+    #[allow(clippy::result_large_err)]
     #[error(transparent)]
-    CodeActionMismatch(#[from] CodeActionMismatchError),
+    ResponseMismatch(#[from] ResponseMismatchError<T>),
     #[error(transparent)]
-    CodeActionResolveMismatch(#[from] Box<CodeActionResolveMismatchError>),
+    TestExecution(#[from] TestExecutionError),
     #[error(transparent)]
-    CodeLensMismatch(#[from] CodeLensMismatchError),
-    #[error(transparent)]
-    CodeLensResolveMismatch(#[from] Box<CodeLensResolveMismatchError>),
-    #[error(transparent)]
-    ColorPresentationMismatch(#[from] ColorPresentationMismatchError),
-    #[error(transparent)]
-    CompletionMismatch(#[from] CompletionMismatchError),
-    #[error(transparent)]
-    CompletionResolveMismatch(#[from] Box<CompletionResolveMismatchError>),
-    #[error(transparent)]
-    DeclarationMismatch(#[from] Box<DeclarationMismatchError>),
-    #[error(transparent)]
-    DefinitionMismatch(#[from] Box<DefinitionMismatchError>),
-    #[error(transparent)]
-    DiagnosticMismatch(#[from] Box<DiagnosticMismatchError>),
-    #[error(transparent)]
-    DocumentColorMismatch(#[from] DocumentColorMismatchError),
-    #[error(transparent)]
-    PublishDiagnosticsMismatch(#[from] PublishDiagnosticsMismatchError),
-    #[error(transparent)]
-    DocumentHighlightMismatch(#[from] DocumentHighlightMismatchError),
-    #[error(transparent)]
-    DocumentLinkMismatch(#[from] DocumentLinkMismatchError),
-    #[error(transparent)]
-    DocumentLinkResolveMismatch(#[from] Box<DocumentLinkResolveMismatchError>),
-    #[error(transparent)]
-    DocumentSymbolMismatch(#[from] DocumentSymbolMismatchError),
-    #[error(transparent)]
-    FoldingRangeMismatch(#[from] FoldingRangeMismatchError),
-    #[error(transparent)]
-    FormattingMismatch(#[from] FormattingMismatchError),
-    #[error(transparent)]
-    HoverMismatch(#[from] Box<HoverMismatchError>),
-    #[error(transparent)]
-    ImplementationMismatch(#[from] Box<ImplementationMismatchError>),
-    #[error(transparent)]
-    InlayHintMismatch(#[from] InlayHintMismatchError),
-    #[error(transparent)]
-    IncomingCallsMismatch(#[from] IncomingCallsMismatchError),
-    #[error(transparent)]
-    LinkedEditingRangeMismatch(#[from] LinkedEditingRangeMismatchError),
-    #[error(transparent)]
-    MonikerMismatch(#[from] MonikerMismatchError),
-    #[error(transparent)]
-    OnTypeFormattingMismatch(#[from] OnTypeFormattingMismatchError),
-    #[error(transparent)]
-    OutgoingCallsMismatch(#[from] OutgoingCallsMismatchError),
-    #[error(transparent)]
-    PrepareCallHierarchyMismatch(#[from] PrepareCallHierachyMismatchError),
-    #[error(transparent)]
-    PrepareRenameMismatch(#[from] PrepareRenameMismatchError),
-    #[error(transparent)]
-    PrepareTypeHierarchyMismatch(#[from] PrepareTypeHierarchyMismatchError),
-    #[error(transparent)]
-    RangeFormattingMismatch(#[from] RangeFormattingMismatchError),
-    #[error(transparent)]
-    ReferencesMismatch(#[from] ReferencesMismatchError),
-    #[error(transparent)]
-    RenameMismatch(#[from] Box<RenameMismatchError>),
-    #[error(transparent)]
-    SelectionRangeMismatch(#[from] SelectionRangeMismatchError),
-    #[error(transparent)]
-    SematicTokensFullMismatch(#[from] SemanticTokensFullMismatchError),
-    #[error(transparent)]
-    SematicTokensFullDeltaMismatch(#[from] Box<SemanticTokensFullDeltaMismatchError>),
-    #[error(transparent)]
-    SemanticTokensRangeMismatch(#[from] SemanticTokensRangeMismatchError),
-    #[error(transparent)]
-    SignatureHelpMismatch(#[from] SignatureHelpMismatchError),
-    #[error(transparent)]
-    TypeDefinitionMismatch(#[from] Box<TypeDefinitionMismatchError>),
-    #[error(transparent)]
-    WorkspaceDiagnosticMismatch(#[from] Box<WorkspaceDiagnosticMismatchError>),
-    #[error(transparent)]
-    WorkspaceSymbolMismatch(#[from] WorkspaceSymbolMismatchError),
+    TestSetup(#[from] TestSetupError),
+}
+
+pub type TestExecutionResult<T> = Result<T, TestExecutionError>;
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum TestExecutionError {
     #[error("Test {0}: No results were written")]
     NoResults(String),
     #[error(transparent)]
@@ -786,23 +709,6 @@ impl std::fmt::Display for TimeoutError {
     }
 }
 
-pub(crate) trait Empty {
-    fn is_empty() -> bool {
-        false
-    }
-}
-
-#[derive(Debug, serde::Deserialize)]
-pub(crate) struct EmptyResult;
-
-impl Empty for EmptyResult {
-    fn is_empty() -> bool {
-        true
-    }
-}
-
-impl Empty for String {}
-
 /// Cleans a given `Uri` object of any information internal to the case
 ///
 /// # Examples
@@ -814,10 +720,10 @@ impl Empty for String {}
 /// Returns `TestError::IO` on failure to get the root source file path from
 /// `test_case`, or `TestSetupError::InvalidFilePath` if the root source file path
 /// cannot be converted betwen a `Uri` and a `String`
-pub fn clean_uri(uri: &Uri, test_case: &TestCase) -> TestResult<Uri> {
+pub fn clean_uri(uri: &Uri, test_case: &TestCase) -> TestExecutionResult<Uri> {
     let root = test_case
         .get_source_file_path("") // "/tmp/lspresso-shot/<test-id>/src/"
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+        .map_err(|e| TestExecutionError::IO(test_case.test_id.clone(), e.to_string()))?;
     let test_case_root = root
         .to_str()
         .ok_or_else(|| TestSetupError::InvalidFilePath(format!("{}", root.display())))?
@@ -827,18 +733,17 @@ pub fn clean_uri(uri: &Uri, test_case: &TestCase) -> TestResult<Uri> {
     Ok(Uri::from_str(cleaned).map_err(|_| TestSetupError::InvalidFilePath(path))?)
 }
 
-pub(crate) trait CleanResponse
+pub trait CleanResponse
 where
     Self: Sized,
 {
     /// Cleans a given resonse object of any Uri information related to the test case
-    #[allow(unused_variables, unused_mut)]
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+    #[allow(unused_variables, unused_mut, clippy::missing_errors_doc)]
+    fn clean_response(mut self, test_case: &TestCase) -> TestExecutionResult<Self> {
         Ok(self)
     }
 }
 
-impl CleanResponse for EmptyResult {}
 impl CleanResponse for String {}
 
 /// This trait implements a comparison method that accounts for issues w.r.t. JSON
