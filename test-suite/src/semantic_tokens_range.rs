@@ -5,14 +5,14 @@ mod test {
     use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lspresso_shot::{
         lspresso_shot, test_semantic_tokens_range,
-        types::{ServerStartType, TestCase, TestError, TestFile},
+        types::{ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
     use lsp_types::{
         Position, Range, SemanticToken, SemanticTokens, SemanticTokensLegend,
-        SemanticTokensOptions, SemanticTokensRangeResult, SemanticTokensServerCapabilities,
-        ServerCapabilities, Uri, WorkDoneProgressOptions,
+        SemanticTokensOptions, SemanticTokensPartialResult, SemanticTokensRangeResult,
+        SemanticTokensServerCapabilities, ServerCapabilities, Uri, WorkDoneProgressOptions,
     };
     use rstest::rstest;
 
@@ -61,6 +61,12 @@ mod test {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let resp =
             test_server::responses::get_semantic_tokens_range_response(response_num, &uri).unwrap();
+        let resp_data = match &resp {
+            SemanticTokensRangeResult::Tokens(SemanticTokens { data, .. }) => data.clone(),
+            SemanticTokensRangeResult::Partial(SemanticTokensPartialResult { data }) => {
+                data.clone()
+            }
+        };
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
         let test_case_root = test_case
@@ -74,63 +80,24 @@ mod test {
         .expect("Failed to send capabilities");
         let test_result =
             test_semantic_tokens_range(test_case.clone(), Range::default(), None, None);
-        let mut expected_err =
-            TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
+        let mut expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id.clone(),
+            expected: None,
+            actual: Some(resp),
+        });
 
-        // TODO: See if we can clean this up...
         match response_num {
-            5 => {
-                assert_eq!(
-                    expected_err,
-                    TestError::ExpectedNone(
-                        test_case.test_id.clone(),
-                        "Partial(\n    SemanticTokensPartialResult {\n        data: [],\n    },\n)"
-                            .to_string(),
-                    )
-                );
-                expected_err = TestError::ExpectedNone(
-                    test_case.test_id,
-                    "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [],\n    },\n)".to_string()
-                );
-            }
-            6 => {
-                assert_eq!(
-                    expected_err,
-                    TestError::ExpectedNone(
-                        test_case.test_id.clone(),
-                        "Partial(\n    SemanticTokensPartialResult {\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n        ],\n    },\n)".to_string(),
-                    )
-                );
-                expected_err = TestError::ExpectedNone(
-                    test_case.test_id,
-                    "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n        ],\n    },\n)".to_string(),
-                );
-            }
-            7 => {
-                assert_eq!(
-                    expected_err,
-                    TestError::ExpectedNone(
-                        test_case.test_id.clone(),
-                        "Partial(\n    SemanticTokensPartialResult {\n        data: [\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string(),
-                    )
-                );
-                expected_err = TestError::ExpectedNone(
-                    test_case.test_id,
-                    "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string(),
-                );
-            }
-            8 => {
-                assert_eq!(
-                    expected_err,
-                    TestError::ExpectedNone(
-                        test_case.test_id.clone(),
-                        "Partial(\n    SemanticTokensPartialResult {\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string(),
-                    )
-                );
-                expected_err = TestError::ExpectedNone(
-                    test_case.test_id,
-                    "Tokens(\n    SemanticTokens {\n        result_id: None,\n        data: [\n            SemanticToken {\n                delta_line: 1,\n                delta_start: 2,\n                length: 3,\n                token_type: 4,\n                token_modifiers_bitset: 5,\n            },\n            SemanticToken {\n                delta_line: 5,\n                delta_start: 7,\n                length: 8,\n                token_type: 9,\n                token_modifiers_bitset: 10,\n            },\n        ],\n    },\n)".to_string(),
-                );
+            // HACK: Because of the serialization issues with `SemanticTokensRangeResult`,
+            // we have to work around
+            5..=8 => {
+                expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+                    test_id: test_case.test_id,
+                    expected: None,
+                    actual: Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
+                        result_id: None,
+                        data: resp_data,
+                    })),
+                });
             }
             _ => {}
         }

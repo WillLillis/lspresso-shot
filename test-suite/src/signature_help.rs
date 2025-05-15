@@ -7,7 +7,7 @@ mod test {
     use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lspresso_shot::{
         lspresso_shot, test_signature_help,
-        types::{ServerStartType, TestCase, TestError, TestFile},
+        types::{ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
@@ -65,8 +65,13 @@ mod test {
         send_capabiltiies(&signature_help_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let expected_err = TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
-        let test_result = test_signature_help(test_case, Position::default(), None, None, None);
+        let test_result =
+            test_signature_help(test_case.clone(), Position::default(), None, None, None);
+        let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id,
+            expected: None,
+            actual: Some(resp),
+        });
         assert_eq!(Err(expected_err), test_result);
     }
 

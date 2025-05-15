@@ -6,8 +6,6 @@ use serde::Serialize;
 pub const GREEN: Option<Color> = Some(anstyle::Color::Ansi(AnsiColor::Green));
 pub const RED: Option<Color> = Some(anstyle::Color::Ansi(AnsiColor::Red));
 
-// TODO: Our rendering logic could probably use some cleanup/fxes
-
 fn compare_fields(
     f: &mut std::fmt::Formatter<'_>,
     indent: usize,

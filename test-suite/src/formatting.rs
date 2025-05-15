@@ -5,7 +5,10 @@ mod test {
     use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lspresso_shot::{
         lspresso_shot, test_formatting, test_on_type_formatting, test_range_formatting,
-        types::{ServerStartType, TestCase, TestError, TestFile, formatting::FormattingResult},
+        types::{
+            ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile,
+            formatting::FormattingResult,
+        },
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
@@ -118,7 +121,9 @@ mod test {
     #[rstest]
     fn test_server_response_simple_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
-        let edits = test_server::responses::get_formatting_response(response_num, &uri).unwrap();
+        let resp = FormattingResult::Response(
+            test_server::responses::get_formatting_response(response_num, &uri).unwrap(),
+        );
         let source_file =
             TestFile::new(test_server::get_dummy_source_path(), "Some source contents");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
@@ -130,14 +135,18 @@ mod test {
             .expect("Failed to send capabilities");
 
         let test_result = test_formatting(test_case.clone(), None, None, None);
-        let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{edits:#?}"));
+        let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id,
+            expected: None,
+            actual: Some(resp),
+        });
         assert_eq!(Err(expected_err), test_result);
     }
 
     #[rstest]
     fn test_server_on_type_simple_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
-        let edits =
+        let resp =
             test_server::responses::get_on_type_formatting_response(response_num, &uri).unwrap();
         let source_file =
             TestFile::new(test_server::get_dummy_source_path(), "Some source contents");
@@ -151,7 +160,11 @@ mod test {
 
         let test_result =
             test_on_type_formatting(test_case.clone(), Position::default(), "", None, None, None);
-        let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{edits:#?}"));
+        let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id,
+            expected: None,
+            actual: Some(resp),
+        });
         assert_eq!(Err(expected_err), test_result);
     }
 

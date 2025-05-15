@@ -5,13 +5,13 @@ mod test {
     use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lspresso_shot::{
         lspresso_shot, test_type_definition,
-        types::{ServerStartType, TestCase, TestError, TestFile},
+        types::{ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
     use lsp_types::{
         GotoDefinitionResponse, LocationLink, Position, Range, ServerCapabilities,
-        TypeDefinitionProviderCapability, Uri,
+        TypeDefinitionProviderCapability, Uri, request::GotoTypeDefinitionResponse,
     };
     use rstest::rstest;
 
@@ -56,17 +56,28 @@ mod test {
             .expect("Failed to send capabilities");
 
         let test_result = test_type_definition(test_case.clone(), Position::default(), None, None);
-        let mut expected_err =
-            TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
+        let mut expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id.clone(),
+            expected: None,
+            actual: Some(resp),
+        });
         if response_num == 3 {
             // HACK: Because of the deserialization issues with empty vector results,
-            // this error rendered incorrectly as `Link` rather than `Array`
+            // this error is constructed incorrectly with `expected` as `Link` rather
+            // than `Array`
             assert_eq!(
                 expected_err,
-                TestError::ExpectedNone(test_case.test_id.clone(), "Link(\n    [],\n)".to_string())
+                TestError::ResponseMismatch(ResponseMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: None,
+                    actual: Some(GotoTypeDefinitionResponse::Link(vec![])),
+                })
             );
-            expected_err =
-                TestError::ExpectedNone(test_case.test_id, "Array(\n    [],\n)".to_string());
+            expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+                test_id: test_case.test_id,
+                expected: None,
+                actual: Some(GotoTypeDefinitionResponse::Array(vec![])),
+            });
         }
         assert_eq!(Err(expected_err), test_result);
     }

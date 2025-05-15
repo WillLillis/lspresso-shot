@@ -5,7 +5,7 @@ mod test {
     use crate::test_helpers::NON_RESPONSE_NUM;
     use lspresso_shot::{
         lspresso_shot, test_document_link,
-        types::{TestCase, TestError, TestFile},
+        types::{ResponseMismatchError, TestCase, TestError, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
@@ -54,7 +54,11 @@ mod test {
             .expect("Failed to send capabilities");
 
         let test_result = test_document_link(test_case.clone(), None, None);
-        let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
+        let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id,
+            expected: None,
+            actual: Some(resp),
+        });
         assert_eq!(Err(expected_err), test_result);
     }
 

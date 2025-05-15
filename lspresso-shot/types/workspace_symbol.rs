@@ -1,14 +1,9 @@
 use lsp_types::{OneOf, SymbolInformation, WorkspaceSymbol, WorkspaceSymbolResponse};
-use thiserror::Error;
 
-use super::{
-    ApproximateEq, CleanResponse, Empty, TestResult, clean_uri, compare::write_fields_comparison,
-};
-
-impl Empty for WorkspaceSymbolResponse {}
+use super::{ApproximateEq, CleanResponse, TestExecutionResult, clean_uri};
 
 impl CleanResponse for WorkspaceSymbolResponse {
-    fn clean_response(mut self, test_case: &super::TestCase) -> TestResult<Self> {
+    fn clean_response(mut self, test_case: &super::TestCase) -> TestExecutionResult<Self> {
         match &mut self {
             Self::Flat(symbols) => {
                 for symbol in symbols.iter_mut() {
@@ -32,30 +27,6 @@ impl CleanResponse for WorkspaceSymbolResponse {
             }
         }
         Ok(self)
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct WorkspaceSymbolMismatchError {
-    pub test_id: String,
-    pub expected: WorkspaceSymbolResponse,
-    pub actual: WorkspaceSymbolResponse,
-}
-
-impl std::fmt::Display for WorkspaceSymbolMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Workspace Symbol response:",
-            self.test_id
-        )?;
-        write_fields_comparison(
-            f,
-            "WorkspaceSymbolResponse",
-            &self.expected,
-            &self.actual,
-            0,
-        )
     }
 }
 

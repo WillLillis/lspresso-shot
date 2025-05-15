@@ -3,13 +3,16 @@ mod test {
     use std::str::FromStr as _;
 
     use crate::test_helpers::NON_RESPONSE_NUM;
+    use lsp_types::{
+        Location, OneOf, Range, ServerCapabilities, SymbolInformation, SymbolKind, SymbolTag, Uri,
+        WorkspaceSymbolResponse,
+    };
     use lspresso_shot::{
         lspresso_shot, test_workspace_symbol,
-        types::{TestCase, TestError, TestFile},
+        types::{CleanResponse as _, ResponseMismatchError, TestCase, TestError, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
-    use lsp_types::{OneOf, ServerCapabilities, Uri};
     use rstest::rstest;
 
     fn workspace_symbol_capabilities_simple() -> ServerCapabilities {
@@ -71,34 +74,39 @@ mod test {
         let uri = get_dummy_uri(&test_case);
 
         let test_result = test_workspace_symbol(test_case.clone(), &uri, None, None);
-        let mut expected_err =
-            TestError::ExpectedNone(test_case.test_id.clone(), format!("{resp:#?}"));
+        let resp = WorkspaceSymbolResponse::clean_response(resp, &test_case).unwrap();
+        let mut expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id.clone(),
+            expected: None,
+            actual: Some(resp),
+        });
         match response_num {
             // HACK: Because of the serialization issues with `WorkspaceSymbolResponse`, we have
             // to work around
             1 => {
-                assert_eq!(
-                    expected_err,
-                    TestError::ExpectedNone(
-                        test_case.test_id.clone(),
-                        "Nested(\n    [],\n)".to_string()
-                    ),
-                );
-                expected_err =
-                    TestError::ExpectedNone(test_case.test_id, "Flat(\n    [],\n)".to_string());
+                expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+                    test_id: test_case.test_id,
+                    expected: None,
+                    actual: Some(WorkspaceSymbolResponse::Flat(vec![])),
+                });
             }
+            #[allow(deprecated)]
             5 => {
-                assert_eq!(
-                    expected_err,
-                    TestError::ExpectedNone(
-                        test_case.test_id.clone(),
-                        "Nested(\n    [\n        WorkspaceSymbol {\n            name: \"name1\",\n            kind: File,\n            tags: Some(\n                [\n                    Deprecated,\n                ],\n            ),\n            container_name: None,\n            location: Left(\n                Location {\n                    uri: Uri(\n                        Uri {\n                            scheme: None,\n                            authority: None,\n                            path: \"main.dummy\",\n                            query: None,\n                            fragment: None,\n                        },\n                    ),\n                    range: Range {\n                        start: Position {\n                            line: 0,\n                            character: 0,\n                        },\n                        end: Position {\n                            line: 0,\n                            character: 0,\n                        },\n                    },\n                },\n            ),\n            data: None,\n        },\n    ],\n)".to_string(),
-                    ),
-                );
-                expected_err = TestError::ExpectedNone(
-                    test_case.test_id,
-                    "Flat(\n    [\n        SymbolInformation {\n            name: \"name1\",\n            kind: File,\n            tags: Some(\n                [\n                    Deprecated,\n                ],\n            ),\n            deprecated: None,\n            location: Location {\n                uri: Uri(\n                    Uri {\n                        scheme: None,\n                        authority: None,\n                        path: \"main.dummy\",\n                        query: None,\n                        fragment: None,\n                    },\n                ),\n                range: Range {\n                    start: Position {\n                        line: 0,\n                        character: 0,\n                    },\n                    end: Position {\n                        line: 0,\n                        character: 0,\n                    },\n                },\n            },\n            container_name: None,\n        },\n    ],\n)".to_string(),
-                );
+                expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+                    test_id: test_case.test_id,
+                    expected: None,
+                    actual: Some(WorkspaceSymbolResponse::Flat(vec![SymbolInformation {
+                        name: "name1".to_string(),
+                        kind: SymbolKind::FILE,
+                        tags: Some(vec![SymbolTag::DEPRECATED]),
+                        container_name: None,
+                        location: Location {
+                            uri: Uri::from_str("main.dummy").unwrap(),
+                            range: Range::default(),
+                        },
+                        deprecated: None,
+                    }])),
+                });
             }
             _ => {}
         }

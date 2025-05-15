@@ -5,7 +5,7 @@ mod test {
     use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lspresso_shot::{
         lspresso_shot, test_outgoing_calls,
-        types::{ServerStartType, TestCase, TestError, TestFile},
+        types::{ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile},
     };
     use test_server::{
         get_dummy_server_path, get_dummy_source_path,
@@ -85,7 +85,11 @@ mod test {
         let mut call_item = get_prepare_call_hierachy_response(1, &uri).unwrap()[0].clone();
         call_item.uri = get_full_dummy_source_path(&test_case);
         let test_result = test_outgoing_calls(test_case.clone(), &call_item, None, None);
-        let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
+        let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id,
+            expected: None,
+            actual: Some(resp),
+        });
         assert_eq!(Err(expected_err), test_result);
     }
 

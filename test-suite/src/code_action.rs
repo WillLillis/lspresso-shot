@@ -8,7 +8,7 @@ mod test {
     };
     use lspresso_shot::{
         lspresso_shot, test_code_action, test_code_action_resolve,
-        types::{ServerStartType, TestCase, TestError, TestFile},
+        types::{ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile},
     };
     use std::{collections::HashMap, num::NonZeroU32, str::FromStr as _, time::Duration};
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
@@ -36,7 +36,7 @@ mod test {
     }
 
     #[test]
-    fn test_server_code_action_simple_expect_none_got_none() {
+    fn test_server_simple_expect_none_got_none() {
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
 
@@ -57,9 +57,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_code_action_simple_expect_none_got_some(
-        #[values(0, 1, 2, 3)] response_num: u32,
-    ) {
+    fn test_server_simple_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let resp = test_server::responses::get_code_action_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
@@ -79,14 +77,16 @@ mod test {
             None,
             None,
         );
-        let expected_err = TestError::ExpectedNone(test_case.test_id, format!("{resp:#?}"));
+        let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id,
+            expected: None,
+            actual: Some(resp),
+        });
         assert_eq!(Err(expected_err), test_result);
     }
 
     #[rstest]
-    fn test_server_code_action_simple_expect_some_got_some(
-        #[values(0, 1, 2, 3)] response_num: u32,
-    ) {
+    fn test_server_simple_expect_some_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let resp = test_server::responses::get_code_action_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
@@ -109,9 +109,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_server_code_action_resolve_simple_expect_some_got_some(
-        #[values(0, 1)] response_num: u32,
-    ) {
+    fn test_server_resolve_simple_expect_some_got_some(#[values(0, 1)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
         let resp =
             test_server::responses::get_code_action_resolve_response(response_num, &uri).unwrap();
@@ -154,7 +152,7 @@ mod test {
 
     #[allow(clippy::too_many_lines)]
     #[test]
-    fn rust_analyzer_code_action() {
+    fn rust_analyzer() {
         let source_file = TestFile::new(
             "src/main.rs",
             "pub fn main() {

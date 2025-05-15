@@ -39,45 +39,9 @@ use std::{
 };
 
 use types::{
-    ApproximateEq as _, CleanResponse, Empty, EmptyResult, TestCase, TestError, TestResult,
-    TestType, TimeoutError,
-    call_hierarchy::{
-        IncomingCallsMismatchError, OutgoingCallsMismatchError, PrepareCallHierachyMismatchError,
-    },
-    code_action::{CodeActionMismatchError, CodeActionResolveMismatchError},
-    code_lens::{CodeLensMismatchError, CodeLensResolveMismatchError},
-    color_presentation::ColorPresentationMismatchError,
-    completion::{CompletionMismatchError, CompletionResolveMismatchError},
-    declaration::DeclarationMismatchError,
-    definition::DefinitionMismatchError,
-    diagnostic::{
-        DiagnosticMismatchError, PublishDiagnosticsMismatchError, WorkspaceDiagnosticMismatchError,
-    },
-    document_color::DocumentColorMismatchError,
-    document_highlight::DocumentHighlightMismatchError,
-    document_link::{DocumentLinkMismatchError, DocumentLinkResolveMismatchError},
-    document_symbol::DocumentSymbolMismatchError,
-    folding_range::FoldingRangeMismatchError,
-    formatting::{
-        FormattingMismatchError, FormattingResult, OnTypeFormattingMismatchError,
-        RangeFormattingMismatchError,
-    },
-    hover::HoverMismatchError,
-    implementation::ImplementationMismatchError,
-    inlay_hint::InlayHintMismatchError,
-    linked_editing_range::LinkedEditingRangeMismatchError,
-    moniker::MonikerMismatchError,
-    references::ReferencesMismatchError,
-    rename::{PrepareRenameMismatchError, RenameMismatchError},
-    selection_range::SelectionRangeMismatchError,
-    semantic_tokens::{
-        SemanticTokensFullDeltaMismatchError, SemanticTokensFullMismatchError,
-        SemanticTokensRangeMismatchError,
-    },
-    signature_help::SignatureHelpMismatchError,
-    type_definition::TypeDefinitionMismatchError,
-    type_hierarchy::PrepareTypeHierarchyMismatchError,
-    workspace_symbol::WorkspaceSymbolMismatchError,
+    ApproximateEq as _, CleanResponse, ResponseMismatchError, TestCase, TestError,
+    TestExecutionError, TestExecutionResult, TestResult, TestType, TimeoutError,
+    formatting::FormattingResult,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -140,31 +104,32 @@ impl Drop for RunnerGuard<'_> {
     }
 }
 
-/// This handles the validating the test case, running the test, and gathering/deserializing
-/// results.
+/// This is the main workhorse for the testing framework. This function
+/// validates the test case and runs the actual test case. If there are results,
+/// it deserializes them and compares them to the expected results. The type parameter
+/// `R` is the type of the expected results.
 ///
-/// `R2` is *always* the expected response type for the given test case. If the test case is
-/// expecting `Some(_)` results, then `R1 == R2`. If `None` is expected, `R1` is [`EmptyResult`]
-///
-/// If `R1` is `Empty`, we expect empty results and this will only return `Err`
-/// or `Ok(None)`.
-///
-/// Otherwise, we expect some results, and this function will return `Ok(Some(_))` or `Err`.
-fn test_inner<R1, R2>(
+/// Note that even if a given request doesn't
+/// support an `Option` response, `expected` is always an `Option` here. For these
+/// cases, the expected result should be passed as `Some(expected)` unconditionally.
+fn collect_results<T>(
     test_case: &TestCase,
     replacements: &mut Vec<LuaReplacement>,
-) -> TestResult<Option<R2>>
+    expected: Option<&T>,
+    cmp: impl Fn(&T, &T) -> TestResult<(), T>,
+) -> TestResult<(), T>
 where
-    R1: serde::de::DeserializeOwned + std::fmt::Debug + Empty + CleanResponse,
-    R2: serde::de::DeserializeOwned + std::fmt::Debug + Empty + CleanResponse,
+    T: Clone + serde::de::DeserializeOwned + std::fmt::Debug + CleanResponse,
 {
-    let get_results = |path: &Path| -> TestResult<R2> {
+    let get_results = |path: &Path| -> TestExecutionResult<T> {
         let raw_results = String::from_utf8(
-            fs::read(path).map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?,
+            fs::read(path)
+                .map_err(|e| TestExecutionError::IO(test_case.test_id.clone(), e.to_string()))?,
         )
-        .map_err(|e| TestError::Utf8(test_case.test_id.clone(), e.to_string()))?;
-        let raw_resp: R2 = serde_json::from_str(&raw_results)
-            .map_err(|e| TestError::Serialization(test_case.test_id.clone(), e.to_string()))?;
+        .map_err(|e| TestExecutionError::Utf8(test_case.test_id.clone(), e.to_string()))?;
+        let raw_resp: T = serde_json::from_str(&raw_results).map_err(|e| {
+            TestExecutionError::Serialization(test_case.test_id.clone(), e.to_string())
+        })?;
         let cleaned = raw_resp.clean_response(test_case)?;
         Ok(cleaned)
     };
@@ -178,52 +143,52 @@ where
 
     let empty_result_path = test_case
         .get_empty_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+        .map_err(|e| TestExecutionError::IO(test_case.test_id.clone(), e.to_string()))?;
     let results_file_path = test_case
         .get_results_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+        .map_err(|e| TestExecutionError::IO(test_case.test_id.clone(), e.to_string()))?;
 
     match (
-        R1::is_empty(),
+        expected,
         empty_result_path.exists(),
         results_file_path.exists(),
     ) {
         // Expected and got empty results
-        (true, true, false) => Ok(None),
+        (None, true, false) => Ok(()),
         // Expected empty results, got some
-        (true, false, true) => {
-            // Don't propagate errors up here, as it's better for the user to see
-            // that they expected empty results but got some instead
-            let results: TestResult<R2> = get_results(&results_file_path);
-            let actual_str = match results {
-                Ok(res) => format!("{res:#?}"),
-                Err(e) => format!("Invalid results: {e}"),
-            };
-            Err(TestError::ExpectedNone(
-                test_case.test_id.clone(),
-                actual_str,
-            ))?
+        (None, false, true) => {
+            // NOTE: We may need to handle deserialization errors here
+            let results: T = get_results(&results_file_path)?;
+            Err(TestError::ResponseMismatch(ResponseMismatchError {
+                test_id: test_case.test_id.clone(),
+                expected: None,
+                actual: Some(results),
+            }))?
         }
         // Invariant: `results.json` and `empty` should never both exist
         (_, true, true) => unreachable!(),
         // No results
-        (_, false, false) => Err(TestError::NoResults(test_case.test_id.clone()))?,
+        (_, false, false) => Err(TestExecutionError::NoResults(test_case.test_id.clone()))?,
         // Expected some results, got none
-        (false, true, false) => Err(TestError::ExpectedSome(test_case.test_id.clone()))?,
+        (Some(_), true, false) => Err(TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id.clone(),
+            expected: expected.cloned(),
+            actual: None,
+        }))?,
         // Expected and got some results
-        (false, false, true) => {
-            let actual: R2 = get_results(&results_file_path)?;
-            Ok(Some(actual))
+        (Some(exp), false, true) => {
+            let actual: T = get_results(&results_file_path)?;
+            Ok(cmp(exp, &actual)?)
         }
     }
 }
 
 /// Invokes neovim to run the test with `test_case`'s associated `init.lua` file,
 /// opening `source_path`
-fn run_test(test_case: &TestCase, source_path: &Path) -> TestResult<()> {
+fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()> {
     let init_dot_lua_path = test_case
         .get_init_lua_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+        .map_err(|e| TestExecutionError::IO(test_case.test_id.clone(), e.to_string()))?;
 
     // Restrict the number of tests invoking neovim at a given time to prevent timeout issues
     let (lock, cvar) = &*get_runner_count();
@@ -238,55 +203,39 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestResult<()> {
         .arg("--headless")
         .arg("-n") // disable swap files
         .stdout(Stdio::null()) // Commenting these out can be helpful for local
-        .stderr(Stdio::null()) // debugging, can print some rust-analyzer logs
+        .stderr(Stdio::null()) // debugging, can print some logs from the server
         .spawn()
-        .map_err(|e| TestError::Neovim(test_case.test_id.clone(), e.to_string()))?;
+        .map_err(|e| TestExecutionError::Neovim(test_case.test_id.clone(), e.to_string()))?;
 
     while start.elapsed() < test_case.timeout {
         match child.try_wait() {
             Ok(Some(_)) => return Ok(()),
             Ok(None) => {} // still running
-            Err(e) => Err(TestError::Neovim(test_case.test_id.clone(), e.to_string()))?,
+            Err(e) => Err(TestExecutionError::Neovim(
+                test_case.test_id.clone(),
+                e.to_string(),
+            ))?,
         }
     }
+    // TODO: Should we add a way to have neovim gracefully exit in the case of a
+    // timeout?
 
     // A test can timeout due to neovim encountering an error (i.e. a malformed
     // `init.lua` file). If we have an error recorded, it's better to report that
     // than the timeout
     let error_path = test_case
         .get_error_file_path()
-        .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
+        .map_err(|e| TestExecutionError::IO(test_case.test_id.clone(), e.to_string()))?;
     if error_path.exists() {
         let error = fs::read_to_string(&error_path)
-            .map_err(|e| TestError::IO(test_case.test_id.clone(), e.to_string()))?;
-        Err(TestError::Neovim(test_case.test_id.clone(), error))?;
+            .map_err(|e| TestExecutionError::IO(test_case.test_id.clone(), e.to_string()))?;
+        Err(TestExecutionError::Neovim(test_case.test_id.clone(), error))?;
     }
 
-    Err(TestError::TimeoutExceeded(TimeoutError {
+    Err(TestExecutionError::TimeoutExceeded(TimeoutError {
         test_id: test_case.test_id.clone(),
         timeout: test_case.timeout,
     }))?
-}
-
-fn collect_results<R1, R2>(
-    test_case: &TestCase,
-    replacements: &mut Vec<LuaReplacement>,
-    expected: Option<&R1>,
-    cmp: impl Fn(&R1, &R2) -> TestResult<()>,
-) -> TestResult<()>
-where
-    R1: std::fmt::Debug,
-    R2: serde::de::DeserializeOwned + std::fmt::Debug + Empty + CleanResponse,
-{
-    if let Some(expected) = expected {
-        let actual =
-            test_inner::<R2, R2>(test_case, replacements)?.expect("Expected results, got `None`");
-        Ok(cmp(expected, &actual)?)
-    } else {
-        let empty = test_inner::<EmptyResult, R2>(test_case, replacements)?;
-        assert!(empty.is_none());
-        Ok(())
-    }
 }
 
 pub type CodeActionComparator = fn(&CodeActionResponse, &CodeActionResponse, &TestCase) -> bool;
@@ -314,7 +263,7 @@ pub fn test_code_action(
     context: &CodeActionContext,
     cmp: Option<CodeActionComparator>,
     expected: Option<&CodeActionResponse>,
-) -> TestResult<()> {
+) -> TestResult<(), CodeActionResponse> {
     test_case.test_type = Some(TestType::CodeAction);
     let context_json =
         serde_json::to_string_pretty(context).expect("JSON deserialzation of `params` failed");
@@ -336,10 +285,10 @@ pub fn test_code_action(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(CodeActionMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: (*expected).clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -370,7 +319,7 @@ pub fn test_code_action_resolve(
     params: &CodeAction,
     cmp: Option<CodeActionResolveComparator>,
     expected: &CodeAction,
-) -> TestResult<()> {
+) -> TestResult<(), CodeAction> {
     test_case.test_type = Some(TestType::CodeActionResolve);
     let code_action_json =
         serde_json::to_string_pretty(params).expect("JSON deserialzation of params failed");
@@ -398,11 +347,11 @@ pub fn test_code_action_resolve(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(CodeActionResolveMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: (*expected).clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -430,7 +379,7 @@ pub fn test_code_lens(
     commands: Option<&Vec<String>>,
     cmp: Option<CodeLensComparator>,
     expected: Option<&Vec<CodeLens>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<CodeLens>> {
     test_case.test_type = Some(TestType::CodeLens);
     let command_str = commands.map_or_else(String::new, |cmds| {
         cmds.iter()
@@ -453,10 +402,10 @@ pub fn test_code_lens(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(CodeLensMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: (*expected).clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -491,7 +440,7 @@ pub fn test_code_lens_resolve(
     code_lens: &CodeLens,
     cmp: Option<CodeLensResolveComparator>,
     expected: Option<&CodeLens>,
-) -> TestResult<()> {
+) -> TestResult<(), CodeLens> {
     test_case.test_type = Some(TestType::CodeLensResolve);
     let command_str = commands.map_or_else(String::new, |cmds| {
         cmds.iter()
@@ -520,11 +469,11 @@ pub fn test_code_lens_resolve(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(CodeLensResolveMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: (*expected).clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -555,7 +504,7 @@ pub fn test_color_presentation(
     range: Range,
     cmp: Option<ColorPresentationComparator>,
     expected: &Vec<ColorPresentation>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<ColorPresentation>> {
     test_case.test_type = Some(TestType::ColorPresentation);
     let color_json =
         serde_json::to_string_pretty(&color).expect("JSON serialzation of `color` failed");
@@ -576,10 +525,10 @@ pub fn test_color_presentation(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(ColorPresentationMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -607,7 +556,7 @@ pub fn test_completion(
     cursor_pos: Position,
     cmp: Option<CompletionComparator>,
     expected: Option<&CompletionResponse>,
-) -> TestResult<()> {
+) -> TestResult<(), CompletionResponse> {
     test_case.test_type = Some(TestType::Completion);
     collect_results(
         &test_case,
@@ -625,10 +574,10 @@ pub fn test_completion(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(CompletionMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: (*expected).clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -659,7 +608,7 @@ pub fn test_completion_resolve(
     completion_item: &CompletionItem,
     cmp: Option<CompletionResolveComparator>,
     expected: Option<&CompletionItem>,
-) -> TestResult<()> {
+) -> TestResult<(), CompletionItem> {
     test_case.test_type = Some(TestType::CompletionResolve);
 
     let completion_item_json = serde_json::to_string_pretty(completion_item)
@@ -698,11 +647,11 @@ pub fn test_completion_resolve(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(CompletionResolveMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: (*expected).clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -725,12 +674,13 @@ pub type DeclarationComparator =
 /// or some other failure occurs
 ///
 /// [`textDocument/declaration`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration
+#[allow(clippy::result_large_err)]
 pub fn test_declaration(
     mut test_case: TestCase,
     cursor_pos: Position,
     cmp: Option<DeclarationComparator>,
     expected: Option<&GotoDeclarationResponse>,
-) -> TestResult<()> {
+) -> TestResult<(), GotoDeclarationResponse> {
     test_case.test_type = Some(TestType::Declaration);
     collect_results(
         &test_case,
@@ -769,11 +719,11 @@ pub fn test_declaration(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(DeclarationMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -795,12 +745,13 @@ pub type DefinitionComparator =
 /// Returns [`TestError`] if the expected results don't match, or if some other failure occurs
 ///
 /// [`textDocument/definition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition
+#[allow(clippy::result_large_err)]
 pub fn test_definition(
     mut test_case: TestCase,
     cursor_pos: Position,
     cmp: Option<DefinitionComparator>,
     expected: Option<&GotoDefinitionResponse>,
-) -> TestResult<()> {
+) -> TestResult<(), GotoDefinitionResponse> {
     test_case.test_type = Some(TestType::Definition);
     collect_results(
         &test_case,
@@ -839,11 +790,11 @@ pub fn test_definition(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(DefinitionMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -870,13 +821,14 @@ pub type DiagnosticComparator =
 /// Panics if JSON serialization of `identifier` or `previous_result_id` fails
 ///
 /// [`textDocument/diagnostic`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_diagnostic
+#[allow(clippy::result_large_err)]
 pub fn test_diagnostic(
     mut test_case: TestCase,
     identifier: Option<&str>,
     previous_result_id: Option<&str>,
     cmp: Option<DiagnosticComparator>,
     expected: &DocumentDiagnosticReport,
-) -> TestResult<()> {
+) -> TestResult<(), DocumentDiagnosticReport> {
     test_case.test_type = Some(TestType::Diagnostic);
     let identifier_json = identifier.map_or_else(
         || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
@@ -909,11 +861,11 @@ pub fn test_diagnostic(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(DiagnosticMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -938,7 +890,7 @@ pub fn test_document_color(
     mut test_case: TestCase,
     cmp: Option<DocumentColorComparator>,
     expected: &Vec<ColorInformation>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<ColorInformation>> {
     test_case.test_type = Some(TestType::DocumentColor);
     collect_results(
         &test_case,
@@ -950,10 +902,10 @@ pub fn test_document_color(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(DocumentColorMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -982,7 +934,7 @@ pub fn test_document_highlight(
     cursor_pos: Position,
     cmp: Option<DocumentHighlightComparator>,
     expected: Option<&Vec<DocumentHighlight>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<DocumentHighlight>> {
     test_case.test_type = Some(TestType::DocumentHighlight);
     collect_results(
         &test_case,
@@ -1000,10 +952,10 @@ pub fn test_document_highlight(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(DocumentHighlightMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -1028,7 +980,7 @@ pub fn test_document_link(
     mut test_case: TestCase,
     cmp: Option<DocumentLinkComparator>,
     expected: Option<&Vec<DocumentLink>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<DocumentLink>> {
     test_case.test_type = Some(TestType::DocumentLink);
     collect_results(
         &test_case,
@@ -1040,10 +992,10 @@ pub fn test_document_link(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(DocumentLinkMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -1074,7 +1026,7 @@ pub fn test_document_link_resolve(
     params: &DocumentLink,
     cmp: Option<DocumentLinkResolveComparator>,
     expected: Option<&DocumentLink>,
-) -> TestResult<()> {
+) -> TestResult<(), DocumentLink> {
     let document_link_json =
         serde_json::to_string_pretty(params).expect("JSON deserialzation of document link failed");
     test_case.test_type = Some(TestType::DocumentLinkResolve);
@@ -1092,11 +1044,11 @@ pub fn test_document_link_resolve(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(DocumentLinkResolveMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -1121,7 +1073,7 @@ pub fn test_document_symbol(
     mut test_case: TestCase,
     cmp: Option<DocumentSymbolComparator>,
     expected: Option<&DocumentSymbolResponse>,
-) -> TestResult<()> {
+) -> TestResult<(), DocumentSymbolResponse> {
     test_case.test_type = Some(TestType::DocumentSymbol);
     collect_results(
         &test_case,
@@ -1154,10 +1106,10 @@ pub fn test_document_symbol(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(DocumentSymbolMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
 
@@ -1183,7 +1135,7 @@ pub fn test_folding_range(
     mut test_case: TestCase,
     cmp: Option<FoldingRangeComparator>,
     expected: Option<&Vec<FoldingRange>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<FoldingRange>> {
     test_case.test_type = Some(TestType::FoldingRange);
     collect_results(
         &test_case,
@@ -1195,10 +1147,10 @@ pub fn test_folding_range(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(FoldingRangeMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -1253,93 +1205,102 @@ pub fn test_formatting(
     options: Option<&FormattingOptions>,
     cmp: Option<&FormattingComparator>,
     expected: Option<&FormattingResult>,
-) -> TestResult<()> {
+) -> TestResult<(), FormattingResult> {
+    use types::formatting::to_parent_err_type;
     test_case.test_type = Some(TestType::Formatting);
     let options_json = options
         .map_or_else(
             || serde_json::to_string_pretty(&default_format_opts()),
             serde_json::to_string_pretty,
         )
-        .expect("JSON deserialzation of `options` failed");
+        .expect("JSON serialzation of `options` failed");
+    // map the child error types of `test_formatting_*` to `TestError<FormattingResult>`
     match expected {
-        Some(FormattingResult::Response(edits)) => collect_results(
+        Some(FormattingResult::Response(edits)) => to_parent_err_type(test_formatting_resp(
             &test_case,
-            &mut vec![
-                LuaReplacement::Other {
-                    from: "INVOKE_FORMAT",
-                    to: "false".to_string(),
-                },
-                LuaReplacement::ParamDirect {
-                    name: "options",
-                    json: options_json,
-                },
-            ],
+            options_json,
+            cmp,
             Some(edits),
-            |expected, actual: &Vec<TextEdit>| {
-                let eql = cmp.as_ref().map_or_else(
-                    || expected == actual,
-                    |cmp_fn| cmp_fn(expected, actual, &test_case),
-                );
-                if !eql {
-                    Err(FormattingMismatchError {
-                        test_id: test_case.test_id.clone(),
-                        expected: FormattingResult::Response(expected.clone()),
-                        actual: FormattingResult::Response(actual.clone()),
-                    })?;
-                }
-                Ok(())
-            },
-        ),
-        Some(FormattingResult::EndState(state)) => collect_results(
+        )),
+        Some(FormattingResult::EndState(state)) => to_parent_err_type(test_formatting_state(
             &test_case,
-            &mut vec![
-                LuaReplacement::ParamTextDocument,
-                LuaReplacement::Other {
-                    from: "INVOKE_FORMAT",
-                    to: "true".to_string(),
-                },
-                LuaReplacement::ParamDirect {
-                    name: "options",
-                    json: options_json,
-                },
-            ],
-            Some(state),
-            |expected, actual: &String| {
-                if expected != actual {
-                    Err(FormattingMismatchError {
-                        test_id: test_case.test_id.clone(),
-                        expected: FormattingResult::EndState(expected.clone()),
-                        actual: FormattingResult::EndState(actual.clone()),
-                    })?;
-                }
-                Ok(())
-            },
-        ),
-        None => collect_results(
-            &test_case,
-            &mut vec![
-                LuaReplacement::Other {
-                    from: "INVOKE_FORMAT",
-                    to: "false".to_string(),
-                },
-                LuaReplacement::ParamDirect {
-                    name: "options",
-                    json: options_json,
-                },
-            ],
-            None,
-            |expected: &Vec<TextEdit>, actual: &Vec<TextEdit>| {
-                if expected != actual {
-                    Err(FormattingMismatchError {
-                        test_id: test_case.test_id.clone(),
-                        expected: FormattingResult::Response(expected.clone()),
-                        actual: FormattingResult::Response(actual.clone()),
-                    })?;
-                }
-                Ok(())
-            },
-        ),
+            options_json,
+            state.clone(),
+        )),
+        None => to_parent_err_type(test_formatting_resp(&test_case, options_json, cmp, None)),
     }
+}
+
+/// Performs the test for [`test_formatting`] when the expected result is `Some(Vec<TextEdit>)` or
+/// `None`.
+fn test_formatting_resp(
+    test_case: &TestCase,
+    options_json: String,
+    cmp: Option<&FormattingComparator>,
+    expected: Option<&Vec<TextEdit>>,
+) -> TestResult<(), Vec<TextEdit>> {
+    collect_results(
+        test_case,
+        &mut vec![
+            LuaReplacement::Other {
+                from: "INVOKE_FORMAT",
+                to: "false".to_string(),
+            },
+            LuaReplacement::ParamDirect {
+                name: "options",
+                json: options_json,
+            },
+        ],
+        expected,
+        |expected, actual: &Vec<TextEdit>| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| cmp_fn(expected, actual, test_case),
+            );
+            if !eql {
+                Err(ResponseMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+/// Performs the test for [`test_formatting`] when the expected result is `String`.
+#[allow(clippy::needless_pass_by_value)]
+fn test_formatting_state(
+    test_case: &TestCase,
+    options_json: String,
+    expected: String,
+) -> TestResult<(), String> {
+    collect_results(
+        test_case,
+        &mut vec![
+            LuaReplacement::ParamTextDocument,
+            LuaReplacement::Other {
+                from: "INVOKE_FORMAT",
+                to: "true".to_string(),
+            },
+            LuaReplacement::ParamDirect {
+                name: "options",
+                json: options_json,
+            },
+        ],
+        Some(&expected),
+        |expected, actual: &String| {
+            if expected != actual {
+                Err(ResponseMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
+            }
+            Ok(())
+        },
+    )
 }
 
 pub type HoverComparator = fn(&Hover, &Hover, &TestCase) -> bool;
@@ -1357,12 +1318,13 @@ pub type HoverComparator = fn(&Hover, &Hover, &TestCase) -> bool;
 /// or some other failure occurs
 ///
 /// [`textDocument/hover`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover
+#[allow(clippy::result_large_err)]
 pub fn test_hover(
     mut test_case: TestCase,
     cursor_pos: Position,
     cmp: Option<HoverComparator>,
     expected: Option<&Hover>,
-) -> TestResult<()> {
+) -> TestResult<(), Hover> {
     test_case.test_type = Some(TestType::Hover);
     collect_results(
         &test_case,
@@ -1380,11 +1342,11 @@ pub fn test_hover(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(HoverMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -1407,12 +1369,13 @@ pub type ImplementationComparator =
 /// or some other failure occurs
 ///
 /// [`textDocument/implementation`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation
+#[allow(clippy::result_large_err)]
 pub fn test_implementation(
     mut test_case: TestCase,
     cursor_pos: Position,
     cmp: Option<ImplementationComparator>,
     expected: Option<&GotoImplementationResponse>,
-) -> TestResult<()> {
+) -> TestResult<(), GotoImplementationResponse> {
     test_case.test_type = Some(TestType::Implementation);
     collect_results(
         &test_case,
@@ -1452,11 +1415,11 @@ pub fn test_implementation(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(ImplementationMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -1487,7 +1450,7 @@ pub fn test_incoming_calls(
     call_item: &CallHierarchyItem,
     cmp: Option<IncomingCallsComparator>,
     expected: Option<&Vec<CallHierarchyIncomingCall>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<CallHierarchyIncomingCall>> {
     test_case.test_type = Some(TestType::IncomingCalls);
     let call_item_json =
         serde_json::to_string_pretty(call_item).expect("JSON deserialzation of call item failed");
@@ -1504,10 +1467,10 @@ pub fn test_incoming_calls(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(IncomingCallsMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -1534,7 +1497,7 @@ pub fn test_inlay_hint(
     range: Range,
     cmp: Option<InlayHintComparator>,
     expected: Option<&Vec<InlayHint>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<InlayHint>> {
     test_case.test_type = Some(TestType::InlayHint);
     collect_results(
         &test_case,
@@ -1549,10 +1512,10 @@ pub fn test_inlay_hint(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(InlayHintMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -1585,7 +1548,7 @@ pub fn test_linked_editing_range(
     cursor_pos: Position,
     cmp: Option<LinkedEditingRangeComparator>,
     expected: Option<&LinkedEditingRanges>,
-) -> TestResult<()> {
+) -> TestResult<(), LinkedEditingRanges> {
     test_case.test_type = Some(TestType::LinkedEditingRange);
     collect_results(
         &test_case,
@@ -1603,10 +1566,10 @@ pub fn test_linked_editing_range(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(LinkedEditingRangeMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -1638,7 +1601,7 @@ pub fn test_moniker(
     cursor_pos: Position,
     cmp: Option<MonikerComparator>,
     expected: Option<&Vec<Moniker>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<Moniker>> {
     test_case.test_type = Some(TestType::Moniker);
     collect_results(
         &test_case,
@@ -1656,10 +1619,10 @@ pub fn test_moniker(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(MonikerMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -1707,7 +1670,7 @@ pub fn test_on_type_formatting(
     options: Option<&FormattingOptions>,
     cmp: Option<OnTypeFormattingComparator>,
     expected: Option<&Vec<TextEdit>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<TextEdit>> {
     test_case.test_type = Some(TestType::OnTypeFormatting);
     let character_json =
         serde_json::to_string_pretty(character).expect("JSON deserialzation of `character` failed");
@@ -1741,10 +1704,10 @@ pub fn test_on_type_formatting(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(OnTypeFormattingMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -1776,7 +1739,7 @@ pub fn test_outgoing_calls(
     call_item: &CallHierarchyItem,
     cmp: Option<OutgoingCallsComparator>,
     expected: Option<&Vec<CallHierarchyOutgoingCall>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<CallHierarchyOutgoingCall>> {
     test_case.test_type = Some(TestType::OutgoingCalls);
     let call_item_json =
         serde_json::to_string_pretty(call_item).expect("JSON deserialzation of call item failed");
@@ -1793,10 +1756,10 @@ pub fn test_outgoing_calls(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(OutgoingCallsMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -1825,7 +1788,7 @@ pub fn test_prepare_call_hierarchy(
     cursor_pos: Position,
     cmp: Option<PrepareCallHierarchyComparator>,
     expected: Option<&Vec<CallHierarchyItem>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<CallHierarchyItem>> {
     test_case.test_type = Some(TestType::PrepareCallHierarchy);
     collect_results(
         &test_case,
@@ -1843,10 +1806,10 @@ pub fn test_prepare_call_hierarchy(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(PrepareCallHierachyMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -1875,7 +1838,7 @@ pub fn test_prepare_rename(
     cursor_pos: Position,
     cmp: Option<PrepareRenameComparator>,
     expected: Option<&PrepareRenameResponse>,
-) -> TestResult<()> {
+) -> TestResult<(), PrepareRenameResponse> {
     test_case.test_type = Some(TestType::PrepareRename);
     collect_results(
         &test_case,
@@ -1893,10 +1856,10 @@ pub fn test_prepare_rename(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(PrepareRenameMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -1933,7 +1896,7 @@ pub fn test_prepare_type_hierarchy(
     items: Option<&Vec<TypeHierarchyItem>>,
     cmp: Option<PrepareTypeHierarchyComparator>,
     expected: Option<&Vec<TypeHierarchyItem>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<TypeHierarchyItem>> {
     test_case.test_type = Some(TestType::PrepareTypeHierarchy);
     // TODO: We may need to prepend the relative paths in `items` with the test case root
     let items_json = items.map_or_else(
@@ -1963,10 +1926,10 @@ pub fn test_prepare_type_hierarchy(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(PrepareTypeHierarchyMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -2005,7 +1968,7 @@ pub fn test_publish_diagnostics(
     mut test_case: TestCase,
     cmp: Option<PublishDiagnosticsComparator>,
     expected: &Vec<Diagnostic>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<Diagnostic>> {
     test_case.test_type = Some(TestType::PublishDiagnostics);
     collect_results(
         &test_case,
@@ -2017,10 +1980,10 @@ pub fn test_publish_diagnostics(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(PublishDiagnosticsMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -2065,7 +2028,7 @@ pub fn test_range_formatting(
     options: Option<&FormattingOptions>,
     cmp: Option<RangeFormattingComparator>,
     expected: Option<&Vec<TextEdit>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<TextEdit>> {
     test_case.test_type = Some(TestType::RangeFormatting);
     let options_json = options
         .map_or_else(
@@ -2090,10 +2053,10 @@ pub fn test_range_formatting(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(RangeFormattingMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -2127,7 +2090,7 @@ pub fn test_references(
     include_declaration: bool,
     cmp: Option<ReferencesComparator>,
     expected: Option<&Vec<Location>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<Location>> {
     test_case.test_type = Some(TestType::References);
     let include_decl_json = serde_json::to_string_pretty(&include_declaration)
         .expect("JSON deserialzation of include declaration failed");
@@ -2154,10 +2117,10 @@ pub fn test_references(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(ReferencesMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -2185,13 +2148,14 @@ pub type RenameComparator = fn(&WorkspaceEdit, &WorkspaceEdit, &TestCase) -> boo
 /// Panics if JSON serialization of `new_name` fails
 ///
 /// [`textDocument/rename`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename
+#[allow(clippy::result_large_err)]
 pub fn test_rename(
     mut test_case: TestCase,
     cursor_pos: Position,
     new_name: &str,
     cmp: Option<RenameComparator>,
     expected: Option<&WorkspaceEdit>,
-) -> TestResult<()> {
+) -> TestResult<(), WorkspaceEdit> {
     test_case.test_type = Some(TestType::Rename);
     let new_name_json =
         serde_json::to_string_pretty(new_name).expect("JSON deserialzation of new name failed");
@@ -2215,11 +2179,11 @@ pub fn test_rename(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(RenameMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -2250,7 +2214,7 @@ pub fn test_selection_range(
     positions: &Vec<Position>,
     cmp: Option<SelectionRangeComparator>,
     expected: Option<&Vec<SelectionRange>>,
-) -> TestResult<()> {
+) -> TestResult<(), Vec<SelectionRange>> {
     test_case.test_type = Some(TestType::SelectionRange);
     let positions_json =
         serde_json::to_string_pretty(positions).expect("JSON deserialzation of `positions` failed");
@@ -2270,10 +2234,10 @@ pub fn test_selection_range(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(SelectionRangeMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -2299,7 +2263,7 @@ pub fn test_semantic_tokens_full(
     mut test_case: TestCase,
     cmp: Option<SemanticTokensFullComparator>,
     expected: Option<&SemanticTokensResult>,
-) -> TestResult<()> {
+) -> TestResult<(), SemanticTokensResult> {
     test_case.test_type = Some(TestType::SemanticTokensFull);
     collect_results(
         &test_case,
@@ -2344,10 +2308,10 @@ pub fn test_semantic_tokens_full(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(SemanticTokensFullMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -2374,11 +2338,12 @@ pub type SemanticTokensFullDeltaComparator =
 ///
 /// [`textDocument/semanticTokens/full`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_fullRequest
 /// [`textDocument/semanticTokens/full/delta`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_deltaRequest
+#[allow(clippy::result_large_err)]
 pub fn test_semantic_tokens_full_delta(
     mut test_case: TestCase,
     cmp: Option<SemanticTokensFullDeltaComparator>,
     expected: Option<&SemanticTokensFullDeltaResult>,
-) -> TestResult<()> {
+) -> TestResult<(), SemanticTokensFullDeltaResult> {
     test_case.test_type = Some(TestType::SemanticTokensFullDelta);
     collect_results(
         &test_case,
@@ -2469,11 +2434,11 @@ pub fn test_semantic_tokens_full_delta(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(SemanticTokensFullDeltaMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -2500,7 +2465,7 @@ pub fn test_semantic_tokens_range(
     range: Range,
     cmp: Option<SemanticTokensRangeComparator>,
     expected: Option<&SemanticTokensRangeResult>,
-) -> TestResult<()> {
+) -> TestResult<(), SemanticTokensRangeResult> {
     test_case.test_type = Some(TestType::SemanticTokensRange);
     collect_results(
         &test_case,
@@ -2548,10 +2513,10 @@ pub fn test_semantic_tokens_range(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(SemanticTokensRangeMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -2585,7 +2550,7 @@ pub fn test_signature_help(
     context: Option<&SignatureHelpContext>,
     cmp: Option<SignatureHelpComparator>,
     expected: Option<&SignatureHelp>,
-) -> TestResult<()> {
+) -> TestResult<(), SignatureHelp> {
     test_case.test_type = Some(TestType::SignatureHelp);
     let context_json = context.map_or_else(
         || "null".to_string(),
@@ -2614,10 +2579,10 @@ pub fn test_signature_help(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(SignatureHelpMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())
@@ -2641,12 +2606,13 @@ pub type TypeDefinitionComparator =
 /// or some other failure occurs
 ///
 /// [`textDocument/typeDefinition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition
+#[allow(clippy::result_large_err)]
 pub fn test_type_definition(
     mut test_case: TestCase,
     cursor_pos: Position,
     cmp: Option<TypeDefinitionComparator>,
     expected: Option<&GotoTypeDefinitionResponse>,
-) -> TestResult<()> {
+) -> TestResult<(), GotoTypeDefinitionResponse> {
     test_case.test_type = Some(TestType::TypeDefinition);
     collect_results(
         &test_case,
@@ -2685,11 +2651,11 @@ pub fn test_type_definition(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(TypeDefinitionMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -2722,7 +2688,7 @@ pub fn test_workspace_diagnostic(
     previous_result_ids: &Vec<PreviousResultId>,
     cmp: Option<WorkspaceDiagnosticComparator>,
     expected: &WorkspaceDiagnosticReport,
-) -> TestResult<()> {
+) -> TestResult<(), WorkspaceDiagnosticReport> {
     test_case.test_type = Some(TestType::WorkspaceDiagnostic);
     let identifier_json = identifier.map_or_else(
         || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
@@ -2750,11 +2716,11 @@ pub fn test_workspace_diagnostic(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(Box::new(WorkspaceDiagnosticMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
-                }))?;
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
             }
             Ok(())
         },
@@ -2791,7 +2757,7 @@ pub fn test_workspace_symbol(
     query: &str,
     cmp: Option<WorkspaceSymbolComparator>,
     expected: Option<&WorkspaceSymbolResponse>,
-) -> TestResult<()> {
+) -> TestResult<(), WorkspaceSymbolResponse> {
     test_case.test_type = Some(TestType::WorkspaceSymbol);
     let query_json =
         serde_json::to_string_pretty(query).expect("JSON deserialzation of `query` failed");
@@ -2811,10 +2777,10 @@ pub fn test_workspace_symbol(
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
-                Err(WorkspaceSymbolMismatchError {
+                Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
-                    expected: expected.clone(),
-                    actual: actual.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
                 })?;
             }
             Ok(())

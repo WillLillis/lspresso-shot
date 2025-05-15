@@ -5,7 +5,7 @@ mod test {
     use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lspresso_shot::{
         lspresso_shot, test_document_symbol,
-        types::{ServerStartType, TestCase, TestError, TestFile},
+        types::{ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
@@ -39,7 +39,7 @@ mod test {
     #[rstest]
     fn test_server_simple_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
-        let syms =
+        let resp =
             test_server::responses::get_document_symbol_response(response_num, &uri).unwrap();
         let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
         let test_case = TestCase::new(get_dummy_server_path(), source_file);
@@ -51,20 +51,28 @@ mod test {
             .expect("Failed to send capabilities");
 
         let test_result = test_document_symbol(test_case.clone(), None, None);
-        let mut expected_err =
-            TestError::ExpectedNone(test_case.test_id.clone(), format!("{syms:#?}"));
+        let mut expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id.clone(),
+            expected: None,
+            actual: Some(resp),
+        });
         if response_num == 1 {
             // HACK: Because of the deserialization issues with empty vector results,
-            // this error rendered incorrectly as `Flat` rather than `Nested`
+            // this error is constructed incorrectly with `expected` as `Nested` rather
+            // than `Flat`
             assert_eq!(
                 expected_err,
-                TestError::ExpectedNone(
-                    test_case.test_id.clone(),
-                    "Nested(\n    [],\n)".to_string()
-                )
+                TestError::ResponseMismatch(ResponseMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: None,
+                    actual: Some(DocumentSymbolResponse::Nested(vec![])),
+                })
             );
-            expected_err =
-                TestError::ExpectedNone(test_case.test_id, "Flat(\n    [],\n)".to_string());
+            expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+                test_id: test_case.test_id,
+                expected: None,
+                actual: Some(DocumentSymbolResponse::Flat(vec![])),
+            });
         }
         assert_eq!(Err(expected_err), test_result);
     }

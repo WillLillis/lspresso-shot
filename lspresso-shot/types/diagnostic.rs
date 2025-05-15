@@ -4,18 +4,11 @@ use lsp_types::{
     Diagnostic, DocumentDiagnosticReport, DocumentDiagnosticReportKind, WorkspaceDiagnosticReport,
     WorkspaceDocumentDiagnosticReport,
 };
-use thiserror::Error;
 
-use super::{
-    CleanResponse, Empty, TestCase, TestResult, clean_uri, compare::write_fields_comparison,
-};
-
-impl Empty for Vec<Diagnostic> {}
-impl Empty for DocumentDiagnosticReport {}
-impl Empty for WorkspaceDiagnosticReport {}
+use super::{CleanResponse, TestCase, TestExecutionResult, clean_uri};
 
 impl CleanResponse for Vec<Diagnostic> {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestExecutionResult<Self> {
         for diagnostic in &mut self {
             if let Some(info) = diagnostic.related_information.as_mut() {
                 for related in info {
@@ -28,7 +21,7 @@ impl CleanResponse for Vec<Diagnostic> {
 }
 
 impl CleanResponse for DocumentDiagnosticReportKind {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestExecutionResult<Self> {
         match &mut self {
             Self::Full(report) => {
                 report.items = report.items.clone().clean_response(test_case)?;
@@ -41,7 +34,7 @@ impl CleanResponse for DocumentDiagnosticReportKind {
 }
 
 impl CleanResponse for DocumentDiagnosticReport {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestExecutionResult<Self> {
         match &mut self {
             Self::Full(report) => {
                 if let Some(ref mut related_documents) = report.related_documents {
@@ -70,7 +63,7 @@ impl CleanResponse for DocumentDiagnosticReport {
 }
 
 impl CleanResponse for WorkspaceDiagnosticReport {
-    fn clean_response(mut self, test_case: &TestCase) -> TestResult<Self> {
+    fn clean_response(mut self, test_case: &TestCase) -> TestExecutionResult<Self> {
         for report in &mut self.items {
             match report {
                 WorkspaceDocumentDiagnosticReport::Full(report) => {
@@ -90,67 +83,5 @@ impl CleanResponse for WorkspaceDiagnosticReport {
         }
 
         Ok(self)
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct PublishDiagnosticsMismatchError {
-    pub test_id: String,
-    pub expected: Vec<Diagnostic>,
-    pub actual: Vec<Diagnostic>,
-}
-
-impl std::fmt::Display for PublishDiagnosticsMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Publish Diagnostics response:",
-            self.test_id
-        )?;
-        write_fields_comparison(f, "Vec<Diagnostic>", &self.expected, &self.actual, 0)
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct DiagnosticMismatchError {
-    pub test_id: String,
-    pub expected: DocumentDiagnosticReport,
-    pub actual: DocumentDiagnosticReport,
-}
-
-impl std::fmt::Display for DiagnosticMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "Test {}: Incorrect Diagnostic response:", self.test_id)?;
-        write_fields_comparison(
-            f,
-            "DocumentDiagnosticReport",
-            &self.expected,
-            &self.actual,
-            0,
-        )
-    }
-}
-
-#[derive(Debug, Error, PartialEq, Eq)]
-pub struct WorkspaceDiagnosticMismatchError {
-    pub test_id: String,
-    pub expected: WorkspaceDiagnosticReport,
-    pub actual: WorkspaceDiagnosticReport,
-}
-
-impl std::fmt::Display for WorkspaceDiagnosticMismatchError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "Test {}: Incorrect Workspace Diagnostic response:",
-            self.test_id
-        )?;
-        write_fields_comparison(
-            f,
-            "WorkspaceDiagnosticReport",
-            &self.expected,
-            &self.actual,
-            0,
-        )
     }
 }
