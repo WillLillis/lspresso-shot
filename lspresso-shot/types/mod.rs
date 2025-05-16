@@ -476,6 +476,33 @@ impl TestCase {
         Ok(lspresso_dir)
     }
 
+    /// Returns the path to the timeout file for test `test_id`,
+    /// creating parent directories along the way. If the neovim
+    /// instance exited because the timeout was exceeded, this
+    /// file will be created as a marker.
+    ///
+    /// `/tmp/lspresso-shot/<test_id>/timeout`
+    ///
+    /// # Errors
+    ///
+    /// Returns `std::io::Error` if the the test directory can't be created
+    pub fn get_timeout_file_path(&self) -> std::io::Result<PathBuf> {
+        let mut lspresso_dir = self.get_lspresso_dir()?;
+        lspresso_dir.push("timeout");
+        Ok(lspresso_dir)
+    }
+
+    /// Indicates if the test case's neovim instance exited because
+    /// the case's timeout was exceeded.
+    #[must_use]
+    pub fn did_exceed_timeout(&self) -> bool {
+        let timeout_file = self.get_timeout_file_path();
+        if let Ok(timeout_file) = timeout_file {
+            return timeout_file.exists();
+        }
+        false
+    }
+
     /// Creates a test directory for `test_id` based on `self`. Returns the full
     /// path to the source file to be opened.
     ///

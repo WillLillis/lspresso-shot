@@ -207,9 +207,22 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()>
         .spawn()
         .map_err(|e| TestExecutionError::Neovim(test_case.test_id.clone(), e.to_string()))?;
 
-    while start.elapsed() < test_case.timeout {
+    // In theory, the timeout set in `init.lua` should be sufficient to prevent
+    // the neovim process from hanging. However, if `init.lua` is malformed (an
+    // error for this library), then the timer will never start. Add the same
+    // timeout (with an arbitrary cushion) here as a fallback
+    let timeout_cushion = std::time::Duration::from_millis(500);
+    while start.elapsed() < test_case.timeout + timeout_cushion {
         match child.try_wait() {
-            Ok(Some(_)) => return Ok(()),
+            Ok(Some(_)) => {
+                if test_case.did_exceed_timeout() {
+                    Err(TestExecutionError::TimeoutExceeded(TimeoutError {
+                        test_id: test_case.test_id.clone(),
+                        timeout: test_case.timeout,
+                    }))?;
+                }
+                return Ok(());
+            }
             Ok(None) => {} // still running
             Err(e) => Err(TestExecutionError::Neovim(
                 test_case.test_id.clone(),
@@ -217,10 +230,8 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()>
             ))?,
         }
     }
-    // TODO: Should we add a way to have neovim gracefully exit in the case of a
-    // timeout?
 
-    // A test can timeout due to neovim encountering an error (i.e. a malformed
+    // A test can also timeout due to neovim encountering an error (i.e. a malformed
     // `init.lua` file). If we have an error recorded, it's better to report that
     // than the timeout
     let error_path = test_case

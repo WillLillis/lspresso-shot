@@ -49,6 +49,21 @@ local function exit()
     vim.cmd('qa!')
 end
 
+---@diagnostic disable-next-line: unused-local, unused-function
+local function timeout_exit()
+    report_error('Timeout of `TIMEOUT_MS`ms exceeded')
+    local timeout_file, err = io.open('TIMEOUT_PATH', 'w')
+    if not timeout_file then
+        report_error('Failed not open timeout file: ' .. err)
+        exit()
+    else
+        timeout_file:write('')
+        timeout_file:close()
+    end
+    exit()
+end
+
+
 local capabilities = vim.lsp.protocol.make_client_capabilities()
 capabilities.experimental = {
     commands = {
@@ -59,7 +74,15 @@ capabilities.experimental = {
     },
 }
 
-vim.lsp.log.set_format_func(function (msg)
+vim.lsp.log.set_format_func(function(msg)
     report_log('LSP LOG: ' .. msg)
     return msg
 end)
+
+local timer, err = vim.uv.new_timer()
+if err then
+    report_log('Failed to create timeout timer: ' .. tostring(err)) ---@diagnostic disable-line: undefined-global
+elseif timer then
+    ---@diagnostic disable-next-line: undefined-global
+    timer:start(TIMEOUT_MS, 0, vim.schedule_wrap(timeout_exit))
+end
