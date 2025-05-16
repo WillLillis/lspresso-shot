@@ -38,7 +38,7 @@ fn get_standard_replacements(
     test_case: &TestCase,
     test_type: TestType,
 ) -> TestSetupResult<Vec<LuaReplacement>> {
-    let mut replacements = Vec::with_capacity(11);
+    let mut replacements = Vec::with_capacity(13);
     let results_file_path = test_case.get_results_file_path()?;
     let root_path = test_case.get_lspresso_dir()?;
     let error_path = test_case.get_error_file_path()?;
@@ -108,6 +108,19 @@ fn get_standard_replacements(
             .to_str()
             .unwrap()
             .to_string(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "TIMEOUT_PATH",
+        to: test_case
+            .get_timeout_file_path()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "TIMEOUT_MS",
+        to: test_case.timeout.as_millis().to_string(),
     });
     Ok(replacements)
 }
