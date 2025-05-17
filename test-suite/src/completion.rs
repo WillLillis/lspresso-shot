@@ -122,7 +122,7 @@ writeln!(lock, "hello world").unwrap();
 Use `println!` only for the primary output of your program. Use
 [`eprintln!`] instead to print error and progress messages.
 
-See [the formatting documentation in `std::fmt`](../std/fmt/index.html)
+See the formatting documentation in [`std::fmt`](crate::fmt)
 for details of the macro argument syntax.
 
 [`std::fmt`]: crate::fmt
@@ -150,7 +150,7 @@ println!("format {local_variable} arguments");
                     .to_string(),
             })),
             deprecated: None,
-            preselect: Some(true),
+            preselect: None,
             sort_text: Some("7fffffff".to_string()),
             filter_text: Some("println!".to_string()),
             insert_text: None,

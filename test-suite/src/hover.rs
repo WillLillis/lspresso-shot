@@ -163,7 +163,7 @@ writeln!(lock, \"hello world\").unwrap();
 Use `println!` only for the primary output of your program. Use
 [`eprintln`] instead to print error and progress messages.
 
-See [the formatting documentation in `std::fmt`](https://doc.rust-lang.org/stable/std/std/fmt/index.html)
+See the formatting documentation in [`std::fmt`](https://doc.rust-lang.org/stable/alloc/fmt/index.html)
 for details of the macro argument syntax.
 
 # Panics
