@@ -1,6 +1,6 @@
 use lsp_types::GotoDefinitionResponse;
 
-use super::{CleanResponse, TestCase, TestExecutionResult, clean_uri};
+use super::{ApproximateEq, CleanResponse, TestCase, TestExecutionResult, clean_uri};
 
 impl CleanResponse for GotoDefinitionResponse {
     fn clean_response(mut self, test_case: &TestCase) -> TestExecutionResult<Self> {
@@ -20,5 +20,23 @@ impl CleanResponse for GotoDefinitionResponse {
             }
         }
         Ok(self)
+    }
+}
+
+// NOTE: The following other requests' response types are simply aliased to this type:
+//  - `GotoDeclarationResponse`
+//  - `GotoTypeDefinitionResponse`
+//  - `GotoImplementationResponse`
+impl ApproximateEq for GotoDefinitionResponse {
+    fn approx_eq(a: &Self, b: &Self) -> bool {
+        match (a, b) {
+            (Self::Scalar(a), Self::Scalar(b)) => a == b,
+            (Self::Array(a), Self::Array(b)) => a == b,
+            (Self::Link(a), Self::Link(b)) => a == b,
+            (Self::Array(array), Self::Link(link)) | (Self::Link(link), Self::Array(array)) => {
+                link.is_empty() && array.is_empty()
+            }
+            _ => false,
+        }
     }
 }

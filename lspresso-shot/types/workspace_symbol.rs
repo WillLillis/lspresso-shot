@@ -50,29 +50,27 @@ impl ApproximateEq for WorkspaceSymbolResponse {
 }
 
 fn cmp_inner(sym_info: &SymbolInformation, workspace_sym: &WorkspaceSymbol) -> bool {
-    {
-        // The two are structurally identical in their JSON representations iff:
-        //   - `sym.deprecated` is `None`
-        //   - `workspace_sym.location` is the `Location` variant
-        //   - `workspace_sym.data` is `None`
-        #[allow(deprecated)]
-        if sym_info.deprecated.is_some() {
+    // The two are structurally identical in their JSON representations iff:
+    //   - `sym_info.deprecated` is `None`
+    //   - `workspace_sym.location` is the `OneOf::Left(Location)` variant
+    //   - `workspace_sym.data` is `None`
+    #[allow(deprecated)]
+    if sym_info.deprecated.is_some() {
+        return false;
+    }
+    if workspace_sym.data.is_some() {
+        return false;
+    }
+    if let OneOf::Left(location) = &workspace_sym.location {
+        if sym_info.location != *location {
             return false;
         }
-        if workspace_sym.data.is_some() {
-            return false;
-        }
-        if let OneOf::Left(location) = &workspace_sym.location {
-            if sym_info.location != *location {
-                return false;
-            }
-        } else {
-            return false;
-        }
+    } else {
+        return false;
     }
 
-    // If we've confirmed the two are *structurally* identical, we now compare
-    // the remaining common fields
+    // If we've confirmed the two are *structurally* identical, compare the
+    // remaining common fields
     if sym_info.name != workspace_sym.name {
         return false;
     }
