@@ -1,6 +1,6 @@
 use lsp_types::DocumentSymbolResponse;
 
-use super::{CleanResponse, TestCase, TestExecutionResult, clean_uri};
+use super::{ApproximateEq, CleanResponse, TestCase, TestExecutionResult, clean_uri};
 
 impl CleanResponse for DocumentSymbolResponse {
     fn clean_response(mut self, test_case: &TestCase) -> TestExecutionResult<Self> {
@@ -13,5 +13,17 @@ impl CleanResponse for DocumentSymbolResponse {
             Self::Nested(_) => {}
         }
         Ok(self)
+    }
+}
+
+impl ApproximateEq for DocumentSymbolResponse {
+    fn approx_eq(a: &Self, b: &Self) -> bool {
+        match (a, b) {
+            (Self::Flat(sym_info), Self::Nested(doc_syms))
+            | (Self::Nested(doc_syms), Self::Flat(sym_info)) => {
+                sym_info.is_empty() && doc_syms.is_empty()
+            }
+            _ => a == b,
+        }
     }
 }

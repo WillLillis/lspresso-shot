@@ -8,10 +8,9 @@ use lsp_types::{
     CompletionItem, CompletionResponse, Diagnostic, DocumentDiagnosticReport, DocumentHighlight,
     DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions, GotoDefinitionResponse,
     Hover, InlayHint, LinkedEditingRanges, Location, Moniker, Position, PrepareRenameResponse,
-    PreviousResultId, Range, SelectionRange, SemanticTokens, SemanticTokensDelta,
-    SemanticTokensFullDeltaResult, SemanticTokensPartialResult, SemanticTokensRangeResult,
-    SemanticTokensResult, SignatureHelp, SignatureHelpContext, TextEdit, TypeHierarchyItem,
-    WorkspaceDiagnosticReport, WorkspaceEdit, WorkspaceSymbolResponse,
+    PreviousResultId, Range, SelectionRange, SemanticTokensFullDeltaResult,
+    SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, SignatureHelpContext, TextEdit,
+    TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit, WorkspaceSymbolResponse,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
@@ -39,9 +38,8 @@ use std::{
 };
 
 use types::{
-    ApproximateEq as _, CleanResponse, ResponseMismatchError, TestCase, TestError,
-    TestExecutionError, TestExecutionResult, TestResult, TestType, TimeoutError,
-    formatting::FormattingResult,
+    ApproximateEq, CleanResponse, ResponseMismatchError, TestCase, TestError, TestExecutionError,
+    TestExecutionResult, TestResult, TestType, TimeoutError, formatting::FormattingResult,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -677,6 +675,14 @@ pub type DeclarationComparator =
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
+/// # Warnings
+///
+/// Different values of `GotoDeclarationResponse` can be serialized to the same JSON
+/// representation. Because the LSP specification is defined over JSON RPC, this means
+/// that the value received by the LSP client may not match the value sent by your
+/// server. This ambiguity is handled in the this function's default comparison logic,
+/// but can be overriden by providing your own `cmp` function.
+///
 /// # Errors
 ///
 /// Returns [`TestError`] if the test case is invalid, the expected results don't match,
@@ -703,28 +709,7 @@ pub fn test_declaration(
         expected,
         |expected, actual| {
             let eql = cmp.as_ref().map_or_else(
-                || {
-                    // HACK: Since the `GotoDeclarationResponse` is untagged, there's no way to differentiate
-                    // between the `Array` and `Link` if we get an empty vector in response. Just
-                    // treat this as a special case and say it's ok.
-                    let mut eql_result = false;
-                    match (expected, actual) {
-                        (
-                            GotoDeclarationResponse::Array(array_items),
-                            GotoDeclarationResponse::Link(link_items),
-                        )
-                        | (
-                            GotoDeclarationResponse::Link(link_items),
-                            GotoDeclarationResponse::Array(array_items),
-                        ) => {
-                            if array_items.is_empty() && link_items.is_empty() {
-                                eql_result = true;
-                            }
-                        }
-                        _ => eql_result = expected == actual,
-                    }
-                    eql_result
-                },
+                || GotoDeclarationResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
@@ -748,6 +733,14 @@ pub type DefinitionComparator =
 ///   to the client via the request's [`GotoDefinitionParams`]
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
+///
+/// # Warnings
+///
+/// Different values of `GotoDefinitionResponse` can be serialized to the same JSON
+/// representation. Because the LSP specification is defined over JSON RPC, this means
+/// that the value received by the LSP client may not match the value sent by your
+/// server. This ambiguity is handled in the this function's default comparison logic,
+/// but can be overriden by providing your own `cmp` function.
 ///
 /// # Errors
 ///
@@ -774,28 +767,7 @@ pub fn test_definition(
         expected,
         |expected, actual| {
             let eql = cmp.as_ref().map_or_else(
-                || {
-                    // HACK: Since the `GotoDefinitionResponse` is untagged, there's no way to differentiate
-                    // between the `Array` and `Link` if we get an empty vector in response. Just
-                    // treat this as a special case and say it's ok.
-                    let mut eql_result = false;
-                    match (expected, actual) {
-                        (
-                            GotoDefinitionResponse::Array(array_items),
-                            GotoDefinitionResponse::Link(link_items),
-                        )
-                        | (
-                            GotoDefinitionResponse::Link(link_items),
-                            GotoDefinitionResponse::Array(array_items),
-                        ) => {
-                            if array_items.is_empty() && link_items.is_empty() {
-                                eql_result = true;
-                            }
-                        }
-                        _ => eql_result = expected == actual,
-                    }
-                    eql_result
-                },
+                || GotoDefinitionResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
@@ -1073,6 +1045,12 @@ pub type DocumentSymbolComparator =
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
+/// Different values of `DocumentSymbolResponse` can be serialized to the same JSON
+/// representation. Because the LSP specification is defined over JSON RPC, this means
+/// that the value received by the LSP client may not match the value sent by your
+/// server. This ambiguity is handled in the this function's default comparison logic,
+/// but can be overriden by providing your own `cmp` function.
+///
 /// # Errors
 ///
 /// Returns [`TestError`] if the test case is invalid, the expected results don't match,
@@ -1091,28 +1069,7 @@ pub fn test_document_symbol(
         expected,
         |expected, actual| {
             let eql = cmp.as_ref().map_or_else(
-                || {
-                    // HACK: Since the two types of DocumentSymbolResponse are untagged, there's no
-                    // way to differentiate between the two if we get an empty vector in response.
-                    // Just treat this as a special case and say it's ok.
-                    let mut eql_result = false;
-                    match (expected, actual) {
-                        (
-                            DocumentSymbolResponse::Flat(flat_items),
-                            DocumentSymbolResponse::Nested(nested_items),
-                        )
-                        | (
-                            DocumentSymbolResponse::Nested(nested_items),
-                            DocumentSymbolResponse::Flat(flat_items),
-                        ) => {
-                            if flat_items.is_empty() && nested_items.is_empty() {
-                                eql_result = true;
-                            }
-                        }
-                        _ => eql_result = expected == actual,
-                    }
-                    eql_result
-                },
+                || DocumentSymbolResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
@@ -1373,6 +1330,14 @@ pub type ImplementationComparator =
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
+/// # Warnings
+///
+/// Different values of `GotoImplementationResponse` can be serialized to the same JSON
+/// representation. Because the LSP specification is defined over JSON RPC, this means
+/// that the value received by the LSP client may not match the value sent by your
+/// server. This ambiguity is handled in the this function's default comparison logic,
+/// but can be overriden by providing your own `cmp` function.
+///
 /// # Errors
 ///
 /// Returns [`TestError`] if the test case is invalid, the expected results don't match,
@@ -1399,29 +1364,7 @@ pub fn test_implementation(
         expected,
         |expected, actual| {
             let eql = cmp.as_ref().map_or_else(
-                || {
-                    // HACK: Since `GotoImplementationResponse` is untagged, there is no way to
-                    // differentiate between the `Array` and `Link` variants if we get an empty
-                    // vector in response.
-                    // Just treat this as a special case and say it's ok.
-                    let mut eql_result = false;
-                    match (expected, actual) {
-                        (
-                            GotoImplementationResponse::Array(array_items),
-                            GotoImplementationResponse::Link(link_items),
-                        )
-                        | (
-                            GotoImplementationResponse::Link(link_items),
-                            GotoImplementationResponse::Array(array_items),
-                        ) => {
-                            if array_items.is_empty() && link_items.is_empty() {
-                                eql_result = true;
-                            }
-                        }
-                        _ => eql_result = expected == actual,
-                    }
-                    eql_result
-                },
+                || GotoImplementationResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
@@ -2260,6 +2203,14 @@ pub type SemanticTokensFullComparator =
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
+/// # Warnings
+///
+/// Different values of `SemanticTokensResult` can be serialized to the same JSON
+/// representation. Because the LSP specification is defined over JSON RPC, this means
+/// that the value received by the LSP client may not match the value sent by your
+/// server. This ambiguity is handled in the this function's default comparison logic,
+/// but can be overriden by providing your own `cmp` function.
+///
 /// # Errors
 ///
 /// Returns [`TestError`] if the test case is invalid, the expected results don't match,
@@ -2278,40 +2229,7 @@ pub fn test_semantic_tokens_full(
         expected,
         |expected, actual| {
             let eql = cmp.as_ref().map_or_else(
-                || {
-                    // HACK: Since the `SemanticTokensResult` is untagged, there's no way to differentiate
-                    // between `SemanticTokensResult::Tokens` and `SemanticTokensResult::Partial`, as they
-                    // are structurally identical when we have
-                    // `SemanticTokensResult::Tokens(SemanticTokens { result_id: None, ...)`
-                    // Treat this as a special case and say it's ok.
-                    let mut eql_result = false;
-                    match (expected, actual) {
-                        (
-                            SemanticTokensResult::Tokens(SemanticTokens {
-                                result_id: None,
-                                data: token_data,
-                            }),
-                            SemanticTokensResult::Partial(SemanticTokensPartialResult {
-                                data: partial_data,
-                            }),
-                        )
-                        | (
-                            SemanticTokensResult::Partial(SemanticTokensPartialResult {
-                                data: partial_data,
-                            }),
-                            SemanticTokensResult::Tokens(SemanticTokens {
-                                result_id: None,
-                                data: token_data,
-                            }),
-                        ) => {
-                            if token_data == partial_data {
-                                eql_result = true;
-                            }
-                        }
-                        _ => eql_result = expected == actual,
-                    }
-                    eql_result
-                },
+                || SemanticTokensResult::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
@@ -2338,6 +2256,14 @@ pub type SemanticTokensFullDeltaComparator =
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
+/// # Warnings
+///
+/// Different values of `SemanticTokensFullDeltaResult` can be serialized to the same JSON
+/// representation. Because the LSP specification is defined over JSON RPC, this means
+/// that the value received by the LSP client may not match the value sent by your
+/// server. This ambiguity is handled in the this function's default comparison logic,
+/// but can be overriden by providing your own `cmp` function.
+///
 /// # Errors
 ///
 /// Returns [`TestError`] if the test case is invalid, the expected results don't match,
@@ -2358,86 +2284,7 @@ pub fn test_semantic_tokens_full_delta(
         expected,
         |expected, actual| {
             let eql = cmp.as_ref().map_or_else(
-                || {
-                    // HACK: Since the `SemanticTokensFullDeltaResult` is untagged, there's no way
-                    // to differentiate between the `Tokens`, `TokensDelta`, and `PartialTokensDelta`
-                    // variants if we get an empty vector in response. Just treat this as a special
-                    // case and say it's ok.
-                    // #[allow(unused_assignments)] // false positive?
-                    match (expected, actual) {
-                        (
-                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                                result_id: None,
-                                data: token_data,
-                            }),
-                            SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                                result_id: None,
-                                edits: edit_data,
-                            }),
-                        )
-                        | (
-                            SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                                result_id: None,
-                                edits: edit_data,
-                            }),
-                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                                result_id: None,
-                                data: token_data,
-                            }),
-                        ) if token_data.is_empty() && edit_data.is_empty() => true,
-                        (
-                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                                result_id: None,
-                                data: token_data,
-                            }),
-                            SemanticTokensFullDeltaResult::PartialTokensDelta {
-                                edits: partial_data,
-                            },
-                        )
-                        | (
-                            SemanticTokensFullDeltaResult::PartialTokensDelta {
-                                edits: partial_data,
-                            },
-                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                                result_id: None,
-                                data: token_data,
-                            }),
-                        ) if token_data.is_empty() && partial_data.is_empty() => true,
-                        (
-                            SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                                result_id: None,
-                                edits: edit_data,
-                            }),
-                            SemanticTokensFullDeltaResult::PartialTokensDelta {
-                                edits: partial_data,
-                            },
-                        )
-                        | (
-                            SemanticTokensFullDeltaResult::PartialTokensDelta {
-                                edits: partial_data,
-                            },
-                            SemanticTokensFullDeltaResult::TokensDelta(SemanticTokensDelta {
-                                result_id: None,
-                                edits: edit_data,
-                            }),
-                        ) if edit_data.is_empty() && partial_data.is_empty() => true,
-                        (
-                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                                result_id: None,
-                                data: token_data,
-                            }),
-                            SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
-                        )
-                        | (
-                            SemanticTokensFullDeltaResult::PartialTokensDelta { edits: edit_data },
-                            SemanticTokensFullDeltaResult::Tokens(SemanticTokens {
-                                result_id: None,
-                                data: token_data,
-                            }),
-                        ) if edit_data.is_empty() && token_data.is_empty() => true,
-                        _ => expected == actual,
-                    }
-                },
+                || SemanticTokensFullDeltaResult::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
@@ -2461,6 +2308,14 @@ pub type SemanticTokensRangeComparator =
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
+/// # Warnings
+///
+/// Different values of `SemanticTokensRangeResult` can be serialized to the same JSON
+/// representation. Because the LSP specification is defined over JSON RPC, this means
+/// that the value received by the LSP client may not match the value sent by your
+/// server. This ambiguity is handled in the this function's default comparison logic,
+/// but can be overriden by providing your own `cmp` function.
+///
 /// # Errors
 ///
 /// Returns [`TestError`] if the test case is invalid, the expected results don't match,
@@ -2483,40 +2338,7 @@ pub fn test_semantic_tokens_range(
         expected,
         |expected, actual| {
             let eql = cmp.as_ref().map_or_else(
-                || {
-                    // HACK: Since the `SemanticTokensRangeResult` is untagged, there's no way
-                    // to differentiate between `SemanticTokensRangeResult::Tokens` and
-                    // `SemanticTokensRangeResult::Partial`, as they are structurally identical
-                    // when we have `SemanticTokensResult::Tokens(SemanticTokens { result_id: None, ...)`
-                    // Treat this as a special case and say it's ok.
-                    let mut eql_result = false;
-                    match (expected, actual) {
-                        (
-                            SemanticTokensRangeResult::Tokens(SemanticTokens {
-                                result_id: None,
-                                data: token_data,
-                            }),
-                            SemanticTokensRangeResult::Partial(SemanticTokensPartialResult {
-                                data: partial_data,
-                            }),
-                        )
-                        | (
-                            SemanticTokensRangeResult::Partial(SemanticTokensPartialResult {
-                                data: partial_data,
-                            }),
-                            SemanticTokensRangeResult::Tokens(SemanticTokens {
-                                result_id: None,
-                                data: token_data,
-                            }),
-                        ) => {
-                            if token_data == partial_data {
-                                eql_result = true;
-                            }
-                        }
-                        _ => eql_result = expected == actual,
-                    }
-                    eql_result
-                },
+                || SemanticTokensRangeResult::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
@@ -2604,6 +2426,14 @@ pub type TypeDefinitionComparator =
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
+/// # Warnings
+///
+/// Different values of `GotoTypeDefinitionResponse` can be serialized to the same JSON
+/// representation. Because the LSP specification is defined over JSON RPC, this means
+/// that the value received by the LSP client may not match the value sent by your
+/// server. This ambiguity is handled in the this function's default comparison logic,
+/// but can be overriden by providing your own `cmp` function.
+///
 /// # Errors
 ///
 /// Returns [`TestError`] if the test case is invalid, the expected results don't match,
@@ -2630,28 +2460,7 @@ pub fn test_type_definition(
         expected,
         |expected, actual| {
             let eql = cmp.as_ref().map_or_else(
-                || {
-                    // HACK: Since the `GotoTypeDefinitionResponse` is untagged, there's no way
-                    // to differentiate between the `Array` and `Link` if we get an empty vector
-                    // in response. Just treat this as a special case and say it's ok.
-                    let mut eql_result = false;
-                    match (expected, actual) {
-                        (
-                            GotoTypeDefinitionResponse::Array(array_items),
-                            GotoTypeDefinitionResponse::Link(link_items),
-                        )
-                        | (
-                            GotoTypeDefinitionResponse::Link(link_items),
-                            GotoTypeDefinitionResponse::Array(array_items),
-                        ) => {
-                            if array_items.is_empty() && link_items.is_empty() {
-                                eql_result = true;
-                            }
-                        }
-                        _ => eql_result = expected == actual,
-                    }
-                    eql_result
-                },
+                || GotoTypeDefinitionResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
@@ -2740,11 +2549,13 @@ pub type WorkspaceSymbolComparator =
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
-/// NOTE: Because of issues inherent to the definition of `WorkspaceSymbolResponse` and JSON
-/// serialization/deserialization, the default equality check performed in this test is somewhat
-/// "looser" than normal. If the expected and actual results match in fields but are different
-/// variants of `WorkspaceSymbolResponse`, then the test will pass. This behavior can be overriden
-/// via `cmp`.
+/// # Warnings
+///
+/// Different values of `GotoTypeDefinitionResponse` can be serialized to the same JSON
+/// representation. Because the LSP specification is defined over JSON RPC, this means
+/// that the value received by the LSP client may not match the value sent by your
+/// server. This ambiguity is handled in the this function's default comparison logic,
+/// but can be overriden by providing your own `cmp` function.
 ///
 /// # Errors
 ///
