@@ -80,26 +80,24 @@ mod test {
         .expect("Failed to send capabilities");
         let test_result =
             test_semantic_tokens_range(test_case.clone(), Range::default(), None, None);
+        #[allow(clippy::useless_let_if_seq)]
         let mut expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id.clone(),
             expected: None,
             actual: Some(resp),
         });
 
-        match response_num {
-            // HACK: Because of the serialization issues with `SemanticTokensRangeResult`,
-            // we have to work around
-            5..=8 => {
-                expected_err = TestError::ResponseMismatch(ResponseMismatchError {
-                    test_id: test_case.test_id,
-                    expected: None,
-                    actual: Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
-                        result_id: None,
-                        data: resp_data,
-                    })),
-                });
-            }
-            _ => {}
+        // HACK: Because of the serialization issues with `SemanticTokensRangeResult`,
+        // we have to work around
+        if (5..=8).contains(&response_num) {
+            expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+                test_id: test_case.test_id,
+                expected: None,
+                actual: Some(SemanticTokensRangeResult::Tokens(SemanticTokens {
+                    result_id: None,
+                    data: resp_data,
+                })),
+            });
         }
         assert_eq!(Err(expected_err), test_result);
     }
