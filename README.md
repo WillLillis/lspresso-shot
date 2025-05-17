@@ -140,7 +140,7 @@ during deserialization.
 ## Contributing
 
 - In addition to [neovim][nvim-repo], working on this project also requires having having
-[rust-analyzer][rust-analyzer] 1.86.0 (05f9846 2025-03-31) on your `$PATH`, as it is used in the project's test suite.
+[rust-analyzer][rust-analyzer] rust-analyzer 1.87.0 (17067e9 2025-05-09) on your `$PATH`, as it is used in the project's test suite.
 
 [lsp-spec]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/
 [progress-token]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#progress
