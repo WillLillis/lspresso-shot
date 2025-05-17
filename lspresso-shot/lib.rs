@@ -39,9 +39,8 @@ use std::{
 };
 
 use types::{
-    ApproximateEq as _, CleanResponse, ResponseMismatchError, TestCase, TestError,
-    TestExecutionError, TestExecutionResult, TestResult, TestType, TimeoutError,
-    formatting::FormattingResult,
+    ApproximateEq, CleanResponse, ResponseMismatchError, TestCase, TestError, TestExecutionError,
+    TestExecutionResult, TestResult, TestType, TimeoutError, formatting::FormattingResult,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -677,6 +676,14 @@ pub type DeclarationComparator =
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
+/// # Warnings
+///
+/// Different values of `GotoDeclarationResponse` can be serialized to the same JSON
+/// representation. Because the LSP specification is defined over JSON RPC, this means
+/// that the value received by the LSP client may not match the value sent by your
+/// server. This ambiguity is handled in the this function's default comparison logic,
+/// but can be overriden by providing your own `cmp` function.
+///
 /// # Errors
 ///
 /// Returns [`TestError`] if the test case is invalid, the expected results don't match,
@@ -703,28 +710,7 @@ pub fn test_declaration(
         expected,
         |expected, actual| {
             let eql = cmp.as_ref().map_or_else(
-                || {
-                    // HACK: Since the `GotoDeclarationResponse` is untagged, there's no way to differentiate
-                    // between the `Array` and `Link` if we get an empty vector in response. Just
-                    // treat this as a special case and say it's ok.
-                    let mut eql_result = false;
-                    match (expected, actual) {
-                        (
-                            GotoDeclarationResponse::Array(array_items),
-                            GotoDeclarationResponse::Link(link_items),
-                        )
-                        | (
-                            GotoDeclarationResponse::Link(link_items),
-                            GotoDeclarationResponse::Array(array_items),
-                        ) => {
-                            if array_items.is_empty() && link_items.is_empty() {
-                                eql_result = true;
-                            }
-                        }
-                        _ => eql_result = expected == actual,
-                    }
-                    eql_result
-                },
+                || GotoDeclarationResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
