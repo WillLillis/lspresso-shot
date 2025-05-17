@@ -20,7 +20,6 @@ pub fn get_init_dot_lua(
         }
         _ => include_str!("lua_templates/request_action.lua"),
     });
-    let replacement_set = LuaDocumentReplacement::new(replacements);
     raw_init.push_str(include_str!("lua_templates/attach.lua"));
     // This is how we get neovim to actually invoke the action to be tested
     raw_init = match test_type {
@@ -28,6 +27,7 @@ pub fn get_init_dot_lua(
         TestType::PublishDiagnostics => raw_init.replace("LSP_ACTION", ""),
         _ => raw_init.replace("LSP_ACTION", &invoke_lsp_action(&test_case.start_type)),
     };
+    let replacement_set = LuaDocumentReplacement::new(replacements);
     let final_init = replacement_set.fill_document(raw_init);
 
     Ok(final_init)
