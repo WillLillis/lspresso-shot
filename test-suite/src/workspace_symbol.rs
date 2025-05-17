@@ -1,15 +1,18 @@
 #[cfg(test)]
 mod test {
-    use std::str::FromStr as _;
+    use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
-    use crate::test_helpers::NON_RESPONSE_NUM;
+    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lsp_types::{
-        Location, OneOf, Range, ServerCapabilities, SymbolInformation, SymbolKind, SymbolTag, Uri,
-        WorkspaceSymbolResponse,
+        Location, OneOf, Position, Range, ServerCapabilities, SymbolInformation, SymbolKind,
+        SymbolTag, Uri, WorkspaceSymbolResponse,
     };
     use lspresso_shot::{
         lspresso_shot, test_workspace_symbol,
-        types::{CleanResponse as _, ResponseMismatchError, TestCase, TestError, TestFile},
+        types::{
+            CleanResponse as _, ResponseMismatchError, ServerStartType, TestCase, TestError,
+            TestFile,
+        },
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
 
@@ -134,5 +137,33 @@ mod test {
         lspresso_shot!(test_workspace_symbol(test_case, &uri, None, Some(&resp)));
     }
 
-    // TODO: rust-analyzer tests
+    #[test]
+    fn rust_analyzer() {
+        let source_file = TestFile::new("src/main.rs", "pub fn main() {}");
+        let test_case = TestCase::new("rust-analyzer", source_file)
+            .start_type(ServerStartType::Progress(
+                NonZeroU32::new(4).unwrap(),
+                "rustAnalyzer/cachePriming".to_string(),
+            ))
+            .timeout(Duration::from_secs(20))
+            .other_file(cargo_dot_toml());
+
+        lspresso_shot!(test_workspace_symbol(
+            test_case,
+            "",
+            None,
+            #[allow(deprecated)]
+            Some(&WorkspaceSymbolResponse::Flat(vec![SymbolInformation {
+                name: "main".to_string(),
+                kind: SymbolKind::FUNCTION,
+                tags: None,
+                container_name: None,
+                location: Location {
+                    uri: Uri::from_str("src/main.rs").unwrap(),
+                    range: Range::new(Position::new(0, 7), Position::new(0, 11)),
+                },
+                deprecated: None,
+            }]))
+        ));
+    }
 }
