@@ -325,6 +325,7 @@ pub type CodeActionResolveComparator = fn(&CodeAction, &CodeAction, &TestCase) -
 /// Panics if JSON serialization of `params` fails
 ///
 /// [`codeLens/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve
+#[allow(clippy::result_large_err)]
 pub fn test_code_action_resolve(
     mut test_case: TestCase,
     params: &CodeAction,
@@ -445,6 +446,7 @@ pub type CodeLensResolveComparator = fn(&CodeLens, &CodeLens, &TestCase) -> bool
 /// Panics if JSON serialization of `code_lens` fails
 ///
 /// [`codeLens/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve
+#[allow(clippy::result_large_err)]
 pub fn test_code_lens_resolve(
     mut test_case: TestCase,
     commands: Option<&Vec<String>>,
@@ -614,6 +616,7 @@ pub type CompletionResolveComparator = fn(&CompletionItem, &CompletionItem, &Tes
 /// Panics if JSON serialization of `completion_item` fails
 ///
 /// [`completionItem/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve
+#[allow(clippy::result_large_err)]
 pub fn test_completion_resolve(
     mut test_case: TestCase,
     completion_item: &CompletionItem,
@@ -1032,6 +1035,7 @@ pub type DocumentLinkResolveComparator = fn(&DocumentLink, &DocumentLink, &TestC
 /// Panics if JSON serialization of `link` fails
 ///
 /// [`documentLink/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve
+#[allow(clippy::result_large_err)]
 pub fn test_document_link_resolve(
     mut test_case: TestCase,
     params: &DocumentLink,
