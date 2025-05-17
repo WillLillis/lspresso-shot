@@ -107,11 +107,11 @@ impl Drop for RunnerGuard<'_> {
 /// This is the main workhorse for the testing framework. This function
 /// validates the test case and runs the actual test case. If there are results,
 /// it deserializes them and compares them to the expected results. The type parameter
-/// `R` is the type of the expected results.
+/// `T` is the type of the expected results.
 ///
-/// Note that even if a given request doesn't
-/// support an `Option` response, `expected` is always an `Option` here. For these
-/// cases, the expected result should be passed as `Some(expected)` unconditionally.
+/// Note that even if a given request doesn't support an `Option` response, `expected`
+/// is always an `Option` here. For these cases, the expected result should be passed
+/// as `Some(expected)` unconditionally in the caller
 fn collect_results<T>(
     test_case: &TestCase,
     replacements: &mut Vec<LuaReplacement>,
@@ -277,8 +277,7 @@ pub fn test_code_action(
 ) -> TestResult<(), CodeActionResponse> {
     test_case.test_type = Some(TestType::CodeAction);
     let context_json =
-        serde_json::to_string_pretty(context).expect("JSON deserialzation of `params` failed");
-
+        serde_json::to_string_pretty(context).expect("JSON serialization of `context` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -334,8 +333,7 @@ pub fn test_code_action_resolve(
 ) -> TestResult<(), CodeAction> {
     test_case.test_type = Some(TestType::CodeActionResolve);
     let code_action_json =
-        serde_json::to_string_pretty(params).expect("JSON deserialzation of params failed");
-
+        serde_json::to_string_pretty(params).expect("JSON serialization of `params` failed");
     collect_results(
         &test_case,
         &mut vec![LuaReplacement::ParamDestructure {
@@ -397,7 +395,6 @@ pub fn test_code_lens(
         cmds.iter()
             .fold(String::new(), |accum, cmd| accum + &format!("\"{cmd}\",\n"))
     });
-
     collect_results(
         &test_case,
         &mut vec![
@@ -460,8 +457,7 @@ pub fn test_code_lens_resolve(
             .fold(String::new(), |accum, cmd| accum + &format!("\"{cmd}\",\n"))
     });
     let code_lens_json =
-        serde_json::to_string_pretty(code_lens).expect("JSON deserialzation of code lens failed");
-
+        serde_json::to_string_pretty(code_lens).expect("JSON serialization of `code_lens` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -520,7 +516,7 @@ pub fn test_color_presentation(
 ) -> TestResult<(), Vec<ColorPresentation>> {
     test_case.test_type = Some(TestType::ColorPresentation);
     let color_json =
-        serde_json::to_string_pretty(&color).expect("JSON serialzation of `color` failed");
+        serde_json::to_string_pretty(&color).expect("JSON serialization of `color` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -624,9 +620,8 @@ pub fn test_completion_resolve(
     expected: Option<&CompletionItem>,
 ) -> TestResult<(), CompletionItem> {
     test_case.test_type = Some(TestType::CompletionResolve);
-
     let completion_item_json = serde_json::to_string_pretty(completion_item)
-        .expect("JSON deserialzation of completion item failed");
+        .expect("JSON serialization of `completion_item` failed");
     collect_results(
         &test_case,
         &mut vec![LuaReplacement::ParamDestructure {
@@ -846,13 +841,13 @@ pub fn test_diagnostic(
     test_case.test_type = Some(TestType::Diagnostic);
     let identifier_json = identifier.map_or_else(
         || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
-        |id| serde_json::to_string_pretty(id).expect("JSON deserialzation of identifier failed"),
+        |id| serde_json::to_string_pretty(id).expect("JSON serialization of `identifier` failed"),
     );
     let previous_result_id_json = previous_result_id.map_or_else(
         || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
         |id| {
             serde_json::to_string_pretty(id)
-                .expect("JSON deserialzation of previous result id failed")
+                .expect("JSON serialization of previous `previous_result_id` failed")
         },
     );
     collect_results(
@@ -1043,7 +1038,7 @@ pub fn test_document_link_resolve(
     expected: Option<&DocumentLink>,
 ) -> TestResult<(), DocumentLink> {
     let document_link_json =
-        serde_json::to_string_pretty(params).expect("JSON deserialzation of document link failed");
+        serde_json::to_string_pretty(params).expect("JSON serialization of `params` failed");
     test_case.test_type = Some(TestType::DocumentLinkResolve);
     collect_results(
         &test_case,
@@ -1228,7 +1223,7 @@ pub fn test_formatting(
             || serde_json::to_string_pretty(&default_format_opts()),
             serde_json::to_string_pretty,
         )
-        .expect("JSON serialzation of `options` failed");
+        .expect("JSON serialization of `options` failed");
     // map the child error types of `test_formatting_*` to `TestError<FormattingResult>`
     match expected {
         Some(FormattingResult::Response(edits)) => to_parent_err_type(test_formatting_resp(
@@ -1468,7 +1463,7 @@ pub fn test_incoming_calls(
 ) -> TestResult<(), Vec<CallHierarchyIncomingCall>> {
     test_case.test_type = Some(TestType::IncomingCalls);
     let call_item_json =
-        serde_json::to_string_pretty(call_item).expect("JSON deserialzation of call item failed");
+        serde_json::to_string_pretty(call_item).expect("JSON serialization of `call_item` failed");
     collect_results(
         &test_case,
         &mut vec![LuaReplacement::ParamDirect {
@@ -1688,13 +1683,13 @@ pub fn test_on_type_formatting(
 ) -> TestResult<(), Vec<TextEdit>> {
     test_case.test_type = Some(TestType::OnTypeFormatting);
     let character_json =
-        serde_json::to_string_pretty(character).expect("JSON deserialzation of `character` failed");
+        serde_json::to_string_pretty(character).expect("JSON serialization of `character` failed");
     let options_json = options
         .map_or_else(
             || serde_json::to_string_pretty(&default_format_opts()),
             serde_json::to_string_pretty,
         )
-        .expect("JSON deserialzation of `options` failed");
+        .expect("JSON serialization of `options` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -1757,7 +1752,7 @@ pub fn test_outgoing_calls(
 ) -> TestResult<(), Vec<CallHierarchyOutgoingCall>> {
     test_case.test_type = Some(TestType::OutgoingCalls);
     let call_item_json =
-        serde_json::to_string_pretty(call_item).expect("JSON deserialzation of call item failed");
+        serde_json::to_string_pretty(call_item).expect("JSON serialization of `call_item` failed");
     collect_results(
         &test_case,
         &mut vec![LuaReplacement::ParamDirect {
@@ -1916,10 +1911,7 @@ pub fn test_prepare_type_hierarchy(
     // TODO: We may need to prepend the relative paths in `items` with the test case root
     let items_json = items.map_or_else(
         || "null".to_string(),
-        |thi| {
-            serde_json::to_string_pretty(thi)
-                .expect("JSON deserialzation of type hierarchy items failed")
-        },
+        |thi| serde_json::to_string_pretty(thi).expect("JSON serialization of type `items` failed"),
     );
     collect_results(
         &test_case,
@@ -2050,7 +2042,7 @@ pub fn test_range_formatting(
             || serde_json::to_string_pretty(&default_format_opts()),
             serde_json::to_string_pretty,
         )
-        .expect("JSON deserialzation of `options` failed");
+        .expect("JSON serialization of `options` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -2108,7 +2100,7 @@ pub fn test_references(
 ) -> TestResult<(), Vec<Location>> {
     test_case.test_type = Some(TestType::References);
     let include_decl_json = serde_json::to_string_pretty(&include_declaration)
-        .expect("JSON deserialzation of include declaration failed");
+        .expect("JSON serialization of `include_declaration` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -2173,7 +2165,7 @@ pub fn test_rename(
 ) -> TestResult<(), WorkspaceEdit> {
     test_case.test_type = Some(TestType::Rename);
     let new_name_json =
-        serde_json::to_string_pretty(new_name).expect("JSON deserialzation of new name failed");
+        serde_json::to_string_pretty(new_name).expect("JSON serialization of `new_name` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -2232,7 +2224,7 @@ pub fn test_selection_range(
 ) -> TestResult<(), Vec<SelectionRange>> {
     test_case.test_type = Some(TestType::SelectionRange);
     let positions_json =
-        serde_json::to_string_pretty(positions).expect("JSON deserialzation of `positions` failed");
+        serde_json::to_string_pretty(positions).expect("JSON serialization of `positions` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -2569,10 +2561,7 @@ pub fn test_signature_help(
     test_case.test_type = Some(TestType::SignatureHelp);
     let context_json = context.map_or_else(
         || "null".to_string(),
-        |ctx| {
-            serde_json::to_string_pretty(ctx)
-                .expect("JSON deserialzation of signature help context failed")
-        },
+        |ctx| serde_json::to_string_pretty(ctx).expect("JSON serialization of `context` failed"),
     );
     collect_results(
         &test_case,
@@ -2707,10 +2696,10 @@ pub fn test_workspace_diagnostic(
     test_case.test_type = Some(TestType::WorkspaceDiagnostic);
     let identifier_json = identifier.map_or_else(
         || "null".to_string(), // NOTE: `vim.json.decode()` fails with an empty string
-        |id| serde_json::to_string_pretty(id).expect("JSON deserialzation of identifier failed"),
+        |id| serde_json::to_string_pretty(id).expect("JSON serialization of `identifier` failed"),
     );
     let previous_result_ids_json = serde_json::to_string_pretty(previous_result_ids)
-        .expect("JSON deserialzation of previous result id failed");
+        .expect("JSON serialization of `previous_result_id` failed");
     collect_results(
         &test_case,
         &mut vec![
@@ -2775,7 +2764,7 @@ pub fn test_workspace_symbol(
 ) -> TestResult<(), WorkspaceSymbolResponse> {
     test_case.test_type = Some(TestType::WorkspaceSymbol);
     let query_json =
-        serde_json::to_string_pretty(query).expect("JSON deserialzation of `query` failed");
+        serde_json::to_string_pretty(query).expect("JSON serialization of `query` failed");
     collect_results(
         &test_case,
         &mut vec![
