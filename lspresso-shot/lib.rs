@@ -289,11 +289,10 @@ pub fn test_code_action(
         ],
         expected,
         |expected, actual: &CodeActionResponse| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -351,11 +350,10 @@ pub fn test_code_action_resolve(
         }],
         Some(expected),
         |expected, actual: &CodeAction| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -405,11 +403,10 @@ pub fn test_code_lens(
         ],
         expected,
         |expected, actual: &Vec<CodeLens>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -472,11 +469,10 @@ pub fn test_code_lens_resolve(
         ],
         expected,
         |expected, actual: &CodeLens| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -528,11 +524,10 @@ pub fn test_color_presentation(
         ],
         Some(expected),
         |expected, actual: &Vec<ColorPresentation>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -577,11 +572,10 @@ pub fn test_completion(
         ],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -650,11 +644,10 @@ pub fn test_completion_resolve(
         }],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -709,11 +702,10 @@ pub fn test_declaration(
         ],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || GotoDeclarationResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -767,11 +759,10 @@ pub fn test_definition(
         ],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || GotoDefinitionResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -838,11 +829,10 @@ pub fn test_diagnostic(
         ],
         Some(expected),
         |expected: &DocumentDiagnosticReport, actual: &DocumentDiagnosticReport| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -879,11 +869,10 @@ pub fn test_document_color(
         &mut vec![LuaReplacement::ParamTextDocument],
         Some(expected),
         |expected, actual: &Vec<ColorInformation>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -929,11 +918,10 @@ pub fn test_document_highlight(
         ],
         expected,
         |expected, actual: &Vec<DocumentHighlight>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -969,11 +957,10 @@ pub fn test_document_link(
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual: &Vec<DocumentLink>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1022,11 +1009,10 @@ pub fn test_document_link_resolve(
         }],
         expected,
         |expected, actual: &DocumentLink| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1069,11 +1055,10 @@ pub fn test_document_symbol(
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || DocumentSymbolResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1110,11 +1095,10 @@ pub fn test_folding_range(
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual: &Vec<FoldingRange>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1221,11 +1205,10 @@ fn test_formatting_resp(
         ],
         expected,
         |expected, actual: &Vec<TextEdit>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1305,11 +1288,10 @@ pub fn test_hover(
         ],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1364,11 +1346,10 @@ pub fn test_implementation(
         ],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || GotoImplementationResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1416,11 +1397,10 @@ pub fn test_incoming_calls(
         }],
         expected,
         |expected, actual: &Vec<CallHierarchyIncomingCall>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1461,11 +1441,10 @@ pub fn test_inlay_hint(
         ],
         expected,
         |expected, actual: &Vec<InlayHint>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1515,11 +1494,10 @@ pub fn test_linked_editing_range(
         ],
         expected,
         |expected, actual: &LinkedEditingRanges| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1568,11 +1546,10 @@ pub fn test_moniker(
         ],
         expected,
         |expected, actual: &Vec<Moniker>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1653,11 +1630,10 @@ pub fn test_on_type_formatting(
         ],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1705,11 +1681,10 @@ pub fn test_outgoing_calls(
         }],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1755,11 +1730,10 @@ pub fn test_prepare_call_hierarchy(
         ],
         expected,
         |expected, actual: &Vec<CallHierarchyItem>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1805,11 +1779,10 @@ pub fn test_prepare_rename(
         ],
         expected,
         |expected, actual: &PrepareRenameResponse| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1872,11 +1845,10 @@ pub fn test_prepare_type_hierarchy(
         ],
         expected,
         |expected, actual: &Vec<TypeHierarchyItem>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1926,11 +1898,10 @@ pub fn test_publish_diagnostics(
         &mut Vec::new(),
         Some(expected),
         |expected: &Vec<Diagnostic>, actual: &Vec<Diagnostic>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -1999,11 +1970,10 @@ pub fn test_range_formatting(
         ],
         expected,
         |expected, actual: &Vec<TextEdit>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -2063,11 +2033,10 @@ pub fn test_references(
         ],
         expected,
         |expected, actual: &Vec<Location>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -2125,11 +2094,10 @@ pub fn test_rename(
         ],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -2180,11 +2148,10 @@ pub fn test_selection_range(
         ],
         expected,
         |expected, actual: &Vec<SelectionRange>| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -2229,11 +2196,10 @@ pub fn test_semantic_tokens_full(
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || SemanticTokensResult::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -2284,11 +2250,10 @@ pub fn test_semantic_tokens_full_delta(
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || SemanticTokensFullDeltaResult::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -2338,11 +2303,10 @@ pub fn test_semantic_tokens_range(
         ],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || SemanticTokensRangeResult::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -2401,11 +2365,10 @@ pub fn test_signature_help(
         ],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -2460,11 +2423,10 @@ pub fn test_type_definition(
         ],
         expected,
         |expected, actual| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || GotoTypeDefinitionResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -2525,11 +2487,10 @@ pub fn test_workspace_diagnostic(
         ],
         Some(expected),
         |expected: &WorkspaceDiagnosticReport, actual: &WorkspaceDiagnosticReport| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -2588,11 +2549,10 @@ pub fn test_workspace_symbol(
         ],
         expected,
         |expected: &WorkspaceSymbolResponse, actual: &WorkspaceSymbolResponse| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || WorkspaceSymbolResponse::approx_eq(expected, actual),
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
@@ -2642,11 +2602,10 @@ pub fn test_workspace_symbol_resolve(
         }],
         Some(expected),
         |expected: &WorkspaceSymbol, actual: &WorkspaceSymbol| {
-            let eql = cmp.as_ref().map_or_else(
+            if !cmp.as_ref().map_or_else(
                 || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
-            );
-            if !eql {
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
