@@ -1,5 +1,7 @@
 use lsp_types::SignatureHelp;
 
-use super::CleanResponse;
+use super::{ApproximateEq, CleanResponse};
 
 impl CleanResponse for SignatureHelp {}
+
+impl ApproximateEq for SignatureHelp {}

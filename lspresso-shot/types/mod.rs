@@ -783,3 +783,5 @@ where
         a == b
     }
 }
+
+impl ApproximateEq for String {}

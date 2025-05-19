@@ -1,7 +1,7 @@
 use lsp_types::TextEdit;
 use serde::Serialize;
 
-use super::{CleanResponse, ResponseMismatchError, TestError, TestResult};
+use super::{ApproximateEq, CleanResponse, ResponseMismatchError, TestError, TestResult};
 
 impl CleanResponse for FormattingResult {}
 impl CleanResponse for Vec<TextEdit> {}
@@ -73,3 +73,6 @@ impl From<TestError<String>> for TestError<FormattingResult> {
         }
     }
 }
+
+impl ApproximateEq for Vec<TextEdit> {}
+impl ApproximateEq for FormattingResult {}

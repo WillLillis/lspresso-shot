@@ -1,6 +1,6 @@
 use lsp_types::{CodeAction, CodeActionOrCommand, CodeActionResponse};
 
-use super::{CleanResponse, TestExecutionResult};
+use super::{ApproximateEq, CleanResponse, TestExecutionResult};
 
 impl CleanResponse for CodeActionResponse {
     fn clean_response(mut self, test_case: &super::TestCase) -> TestExecutionResult<Self> {
@@ -26,3 +26,6 @@ impl CleanResponse for CodeAction {
         Ok(self)
     }
 }
+
+impl ApproximateEq for Vec<CodeActionOrCommand> {}
+impl ApproximateEq for CodeAction {}

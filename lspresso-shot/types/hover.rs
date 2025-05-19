@@ -1,5 +1,7 @@
 use lsp_types::Hover;
 
-use super::CleanResponse;
+use super::{ApproximateEq, CleanResponse};
 
 impl CleanResponse for Hover {}
+
+impl ApproximateEq for Hover {}

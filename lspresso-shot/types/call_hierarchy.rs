@@ -1,6 +1,6 @@
 use lsp_types::{CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall};
 
-use super::{CleanResponse, TestCase, TestExecutionResult, clean_uri};
+use super::{ApproximateEq, CleanResponse, TestCase, TestExecutionResult, clean_uri};
 
 impl CleanResponse for Vec<CallHierarchyItem> {
     fn clean_response(mut self, test_case: &TestCase) -> TestExecutionResult<Self> {
@@ -26,3 +26,7 @@ impl CleanResponse for Vec<CallHierarchyOutgoingCall> {
         Ok(self)
     }
 }
+
+impl ApproximateEq for Vec<CallHierarchyIncomingCall> {}
+impl ApproximateEq for Vec<CallHierarchyOutgoingCall> {}
+impl ApproximateEq for Vec<CallHierarchyItem> {}

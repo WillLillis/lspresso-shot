@@ -1,6 +1,6 @@
 use lsp_types::Location;
 
-use super::{CleanResponse, TestCase, TestExecutionResult, clean_uri};
+use super::{ApproximateEq, CleanResponse, TestCase, TestExecutionResult, clean_uri};
 
 impl CleanResponse for Vec<Location> {
     fn clean_response(mut self, test_case: &TestCase) -> TestExecutionResult<Self> {
@@ -10,3 +10,5 @@ impl CleanResponse for Vec<Location> {
         Ok(self)
     }
 }
+
+impl ApproximateEq for Vec<Location> {}

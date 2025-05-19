@@ -4,7 +4,7 @@ use lsp_types::{
     DocumentChangeOperation, DocumentChanges, PrepareRenameResponse, ResourceOp, WorkspaceEdit,
 };
 
-use super::{CleanResponse, TestCase, TestExecutionResult, clean_uri};
+use super::{ApproximateEq, CleanResponse, TestCase, TestExecutionResult, clean_uri};
 
 impl CleanResponse for WorkspaceEdit {
     fn clean_response(mut self, test_case: &TestCase) -> TestExecutionResult<Self> {
@@ -50,3 +50,6 @@ impl CleanResponse for WorkspaceEdit {
 }
 
 impl CleanResponse for PrepareRenameResponse {}
+
+impl ApproximateEq for PrepareRenameResponse {}
+impl ApproximateEq for WorkspaceEdit {}
