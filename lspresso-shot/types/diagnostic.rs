@@ -5,7 +5,7 @@ use lsp_types::{
     WorkspaceDocumentDiagnosticReport,
 };
 
-use super::{CleanResponse, TestCase, TestExecutionResult, clean_uri};
+use super::{ApproximateEq, CleanResponse, TestCase, TestExecutionResult, clean_uri};
 
 impl CleanResponse for Vec<Diagnostic> {
     fn clean_response(mut self, test_case: &TestCase) -> TestExecutionResult<Self> {
@@ -85,3 +85,7 @@ impl CleanResponse for WorkspaceDiagnosticReport {
         Ok(self)
     }
 }
+
+impl ApproximateEq for DocumentDiagnosticReport {}
+impl ApproximateEq for Vec<Diagnostic> {}
+impl ApproximateEq for WorkspaceDiagnosticReport {}

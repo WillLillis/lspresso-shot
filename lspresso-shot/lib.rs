@@ -111,14 +111,15 @@ impl Drop for RunnerGuard<'_> {
 /// Note that even if a given request doesn't support an `Option` response, `expected`
 /// is always an `Option` here. For these cases, the expected result should be passed
 /// as `Some(expected)` unconditionally in the caller
+#[allow(clippy::needless_pass_by_value)]
 fn collect_results<T>(
     test_case: &TestCase,
     replacements: &mut Vec<LuaReplacement>,
     expected: Option<&T>,
-    cmp: impl Fn(&T, &T) -> TestResult<(), T>,
+    cmp: Option<impl Fn(&T, &T, &TestCase) -> bool>,
 ) -> TestResult<(), T>
 where
-    T: Clone + serde::de::DeserializeOwned + std::fmt::Debug + CleanResponse,
+    T: Clone + serde::de::DeserializeOwned + std::fmt::Debug + CleanResponse + ApproximateEq,
 {
     let get_results = |path: &Path| -> TestExecutionResult<T> {
         let raw_results = String::from_utf8(
@@ -177,7 +178,17 @@ where
         // Expected and got some results
         (Some(exp), false, true) => {
             let actual: T = get_results(&results_file_path)?;
-            Ok(cmp(exp, &actual)?)
+            if !cmp.as_ref().map_or_else(
+                || T::approx_eq(exp, &actual),
+                |cmp_fn| cmp_fn(exp, &actual, test_case),
+            ) {
+                Err(ResponseMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: Some((*exp).clone()),
+                    actual: Some(actual),
+                })?;
+            }
+            Ok(())
         }
     }
 }
@@ -288,19 +299,7 @@ pub fn test_code_action(
             },
         ],
         expected,
-        |expected, actual: &CodeActionResponse| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -349,19 +348,7 @@ pub fn test_code_action_resolve(
             json: code_action_json,
         }],
         Some(expected),
-        |expected, actual: &CodeAction| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -402,19 +389,7 @@ pub fn test_code_lens(
             },
         ],
         expected,
-        |expected, actual: &Vec<CodeLens>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -468,19 +443,7 @@ pub fn test_code_lens_resolve(
             },
         ],
         expected,
-        |expected, actual: &CodeLens| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -523,19 +486,7 @@ pub fn test_color_presentation(
             LuaReplacement::ParamRange(range),
         ],
         Some(expected),
-        |expected, actual: &Vec<ColorPresentation>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -571,19 +522,7 @@ pub fn test_completion(
             },
         ],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -643,19 +582,7 @@ pub fn test_completion_resolve(
             json: completion_item_json,
         }],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -701,19 +628,7 @@ pub fn test_declaration(
             },
         ],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || GotoDeclarationResponse::approx_eq(expected, actual),
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -758,19 +673,7 @@ pub fn test_definition(
             },
         ],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || GotoDefinitionResponse::approx_eq(expected, actual),
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -828,19 +731,7 @@ pub fn test_diagnostic(
             },
         ],
         Some(expected),
-        |expected: &DocumentDiagnosticReport, actual: &DocumentDiagnosticReport| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -868,19 +759,7 @@ pub fn test_document_color(
         &test_case,
         &mut vec![LuaReplacement::ParamTextDocument],
         Some(expected),
-        |expected, actual: &Vec<ColorInformation>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -917,19 +796,7 @@ pub fn test_document_highlight(
             },
         ],
         expected,
-        |expected, actual: &Vec<DocumentHighlight>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -956,19 +823,7 @@ pub fn test_document_link(
         &test_case,
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
-        |expected, actual: &Vec<DocumentLink>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1008,19 +863,7 @@ pub fn test_document_link_resolve(
             json: document_link_json,
         }],
         expected,
-        |expected, actual: &DocumentLink| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1054,20 +897,7 @@ pub fn test_document_symbol(
         &test_case,
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || DocumentSymbolResponse::approx_eq(expected, actual),
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1094,19 +924,7 @@ pub fn test_folding_range(
         &test_case,
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
-        |expected, actual: &Vec<FoldingRange>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1121,7 +939,6 @@ fn default_format_opts() -> FormattingOptions {
     }
 }
 
-// pub type FormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) -> bool;
 pub type FormattingComparator = fn(&FormattingResult, &FormattingResult, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/formatting`] request.
@@ -1155,7 +972,7 @@ pub type FormattingComparator = fn(&FormattingResult, &FormattingResult, &TestCa
 pub fn test_formatting(
     mut test_case: TestCase,
     options: Option<&FormattingOptions>,
-    cmp: Option<&FormattingComparator>,
+    cmp: Option<FormattingComparator>,
     expected: Option<&FormattingResult>,
 ) -> TestResult<(), FormattingResult> {
     use types::formatting::to_parent_err_type;
@@ -1178,7 +995,7 @@ pub fn test_formatting(
             &test_case,
             options_json,
             cmp,
-            state.clone(),
+            state.to_string(),
         )),
         None => to_parent_err_type(test_formatting_resp(&test_case, options_json, cmp, None)),
     }
@@ -1189,9 +1006,18 @@ pub fn test_formatting(
 fn test_formatting_resp(
     test_case: &TestCase,
     options_json: String,
-    cmp: Option<&FormattingComparator>,
+    cmp: Option<FormattingComparator>,
     expected: Option<&Vec<TextEdit>>,
 ) -> TestResult<(), Vec<TextEdit>> {
+    let outer_cmp =
+        |expected: &Vec<TextEdit>, actual: &Vec<TextEdit>, test_case: &TestCase| -> bool {
+            let result_expected = FormattingResult::Response(expected.clone());
+            let result_actual = FormattingResult::Response(actual.clone());
+            cmp.as_ref().map_or_else(
+                || result_expected == result_actual,
+                |cmp_fn| cmp_fn(&result_expected, &result_actual, test_case),
+            )
+        };
     collect_results(
         test_case,
         &mut vec![
@@ -1205,25 +1031,7 @@ fn test_formatting_resp(
             },
         ],
         expected,
-        |expected, actual: &Vec<TextEdit>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| {
-                    cmp_fn(
-                        &FormattingResult::Response(expected.clone()),
-                        &FormattingResult::Response(actual.clone()),
-                        test_case,
-                    )
-                },
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        Some(&outer_cmp),
     )
 }
 
@@ -1232,9 +1040,17 @@ fn test_formatting_resp(
 fn test_formatting_state(
     test_case: &TestCase,
     options_json: String,
-    cmp: Option<&FormattingComparator>,
+    cmp: Option<FormattingComparator>,
     expected: String,
 ) -> TestResult<(), String> {
+    let outer_cmp = |expected: &String, actual: &String, test_case: &TestCase| -> bool {
+        let result_expected = FormattingResult::EndState(expected.to_string());
+        let result_actual = FormattingResult::EndState(actual.to_string());
+        cmp.as_ref().map_or_else(
+            || result_expected == result_actual,
+            |cmp_fn| cmp_fn(&result_expected, &result_actual, test_case),
+        )
+    };
     collect_results(
         test_case,
         &mut vec![
@@ -1249,25 +1065,7 @@ fn test_formatting_state(
             },
         ],
         Some(&expected),
-        |expected, actual: &String| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| {
-                    cmp_fn(
-                        &FormattingResult::EndState(expected.clone()),
-                        &FormattingResult::EndState(actual.clone()),
-                        test_case,
-                    )
-                },
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        Some(&outer_cmp),
     )
 }
 
@@ -1304,19 +1102,7 @@ pub fn test_hover(
             },
         ],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1362,19 +1148,7 @@ pub fn test_implementation(
             },
         ],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || GotoImplementationResponse::approx_eq(expected, actual),
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1413,19 +1187,7 @@ pub fn test_incoming_calls(
             json: call_item_json,
         }],
         expected,
-        |expected, actual: &Vec<CallHierarchyIncomingCall>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1457,19 +1219,7 @@ pub fn test_inlay_hint(
             LuaReplacement::ParamRange(range),
         ],
         expected,
-        |expected, actual: &Vec<InlayHint>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1510,19 +1260,7 @@ pub fn test_linked_editing_range(
             },
         ],
         expected,
-        |expected, actual: &LinkedEditingRanges| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1562,19 +1300,7 @@ pub fn test_moniker(
             },
         ],
         expected,
-        |expected, actual: &Vec<Moniker>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1646,19 +1372,7 @@ pub fn test_on_type_formatting(
             },
         ],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1697,19 +1411,7 @@ pub fn test_outgoing_calls(
             json: call_item_json,
         }],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1746,19 +1448,7 @@ pub fn test_prepare_call_hierarchy(
             },
         ],
         expected,
-        |expected, actual: &Vec<CallHierarchyItem>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1795,19 +1485,7 @@ pub fn test_prepare_rename(
             },
         ],
         expected,
-        |expected, actual: &PrepareRenameResponse| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1861,19 +1539,7 @@ pub fn test_prepare_type_hierarchy(
             },
         ],
         expected,
-        |expected, actual: &Vec<TypeHierarchyItem>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -1910,24 +1576,7 @@ pub fn test_publish_diagnostics(
     expected: &Vec<Diagnostic>,
 ) -> TestResult<(), Vec<Diagnostic>> {
     test_case.test_type = Some(TestType::PublishDiagnostics);
-    collect_results(
-        &test_case,
-        &mut Vec::new(),
-        Some(expected),
-        |expected: &Vec<Diagnostic>, actual: &Vec<Diagnostic>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
-    )
+    collect_results(&test_case, &mut Vec::new(), Some(expected), cmp)
 }
 
 pub type RangeFormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) -> bool;
@@ -1986,19 +1635,7 @@ pub fn test_range_formatting(
             },
         ],
         expected,
-        |expected, actual: &Vec<TextEdit>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -2049,19 +1686,7 @@ pub fn test_references(
             },
         ],
         expected,
-        |expected, actual: &Vec<Location>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -2110,19 +1735,7 @@ pub fn test_rename(
             },
         ],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -2164,19 +1777,7 @@ pub fn test_selection_range(
             },
         ],
         expected,
-        |expected, actual: &Vec<SelectionRange>| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -2212,19 +1813,7 @@ pub fn test_semantic_tokens_full(
         &test_case,
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || SemanticTokensResult::approx_eq(expected, actual),
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -2266,19 +1855,7 @@ pub fn test_semantic_tokens_full_delta(
         &test_case,
         &mut vec![LuaReplacement::ParamTextDocument],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || SemanticTokensFullDeltaResult::approx_eq(expected, actual),
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -2319,19 +1896,7 @@ pub fn test_semantic_tokens_range(
             LuaReplacement::ParamRange(range),
         ],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || SemanticTokensRangeResult::approx_eq(expected, actual),
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -2381,19 +1946,7 @@ pub fn test_signature_help(
             },
         ],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -2439,19 +1992,7 @@ pub fn test_type_definition(
             },
         ],
         expected,
-        |expected, actual| {
-            if !cmp.as_ref().map_or_else(
-                || GotoTypeDefinitionResponse::approx_eq(expected, actual),
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -2503,19 +2044,7 @@ pub fn test_workspace_diagnostic(
             },
         ],
         Some(expected),
-        |expected: &WorkspaceDiagnosticReport, actual: &WorkspaceDiagnosticReport| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -2565,19 +2094,7 @@ pub fn test_workspace_symbol(
             },
         ],
         expected,
-        |expected: &WorkspaceSymbolResponse, actual: &WorkspaceSymbolResponse| {
-            if !cmp.as_ref().map_or_else(
-                || WorkspaceSymbolResponse::approx_eq(expected, actual),
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }
 
@@ -2618,18 +2135,6 @@ pub fn test_workspace_symbol_resolve(
             json: params_json,
         }],
         Some(expected),
-        |expected: &WorkspaceSymbol, actual: &WorkspaceSymbol| {
-            if !cmp.as_ref().map_or_else(
-                || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, &test_case),
-            ) {
-                Err(ResponseMismatchError {
-                    test_id: test_case.test_id.clone(),
-                    expected: Some((*expected).clone()),
-                    actual: Some(actual.clone()),
-                })?;
-            }
-            Ok(())
-        },
+        cmp,
     )
 }

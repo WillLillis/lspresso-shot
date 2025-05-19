@@ -1,5 +1,7 @@
 use lsp_types::Moniker;
 
-use super::CleanResponse;
+use super::{ApproximateEq, CleanResponse};
 
 impl CleanResponse for Vec<Moniker> {}
+
+impl ApproximateEq for Vec<Moniker> {}

@@ -93,3 +93,5 @@ fn cmp_inner(sym_info: &SymbolInformation, workspace_sym: &WorkspaceSymbol) -> b
 
     true
 }
+
+impl ApproximateEq for WorkspaceSymbol {}
