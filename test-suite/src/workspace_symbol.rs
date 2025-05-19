@@ -5,10 +5,10 @@ mod test {
     use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
     use lsp_types::{
         Location, OneOf, Position, Range, ServerCapabilities, SymbolInformation, SymbolKind,
-        SymbolTag, Uri, WorkspaceSymbolResponse,
+        SymbolTag, Uri, WorkDoneProgressOptions, WorkspaceSymbolOptions, WorkspaceSymbolResponse,
     };
     use lspresso_shot::{
-        lspresso_shot, test_workspace_symbol,
+        lspresso_shot, test_workspace_symbol, test_workspace_symbol_resolve,
         types::{
             CleanResponse as _, ResponseMismatchError, ServerStartType, TestCase, TestError,
             TestFile,
@@ -21,6 +21,18 @@ mod test {
     fn workspace_symbol_capabilities_simple() -> ServerCapabilities {
         ServerCapabilities {
             workspace_symbol_provider: Some(OneOf::Left(true)),
+            ..ServerCapabilities::default()
+        }
+    }
+
+    fn workspace_symbol_resolve_capabilities_simple() -> ServerCapabilities {
+        ServerCapabilities {
+            workspace_symbol_provider: Some(OneOf::Right(WorkspaceSymbolOptions {
+                work_done_progress_options: WorkDoneProgressOptions {
+                    work_done_progress: None,
+                },
+                resolve_provider: Some(true),
+            })),
             ..ServerCapabilities::default()
         }
     }
@@ -137,6 +149,36 @@ mod test {
         lspresso_shot!(test_workspace_symbol(test_case, &uri, None, Some(&resp)));
     }
 
+    #[rstest]
+    fn test_server_resolve_simple_expect_some_got_some(#[values(0, 1)] response_num: u32) {
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
+        let uri = get_dummy_uri(&test_case);
+        let resp = test_server::responses::get_workspace_symbol_resolve_response(
+            response_num,
+            &Uri::from_str(&uri).unwrap(),
+        )
+        .unwrap();
+
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(response_num, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(
+            &workspace_symbol_resolve_capabilities_simple(),
+            &test_case_root,
+        )
+        .expect("Failed to send capabilities");
+        let cleaned_resp = resp.clone().clean_response(&test_case).unwrap();
+
+        lspresso_shot!(test_workspace_symbol_resolve(
+            test_case,
+            &resp,
+            None,
+            &cleaned_resp
+        ));
+    }
+
     #[test]
     fn rust_analyzer() {
         let source_file = TestFile::new("src/main.rs", "pub fn main() {}");
@@ -166,4 +208,7 @@ mod test {
             }]))
         ));
     }
+
+    // NOTE: It would be a pain to add a rust-analyzer test for `workspaceSymbol/resolve`,
+    // since we need to pass in in a valid `WorkspaceSymbol`
 }

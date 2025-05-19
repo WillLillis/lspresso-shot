@@ -10,10 +10,11 @@ use lsp_types::{
     DocumentFormattingParams, DocumentHighlightParams, DocumentLink, DocumentLinkParams,
     DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, DocumentSymbolParams,
     FoldingRangeParams, GotoDefinitionParams, HoverParams, InlayHintParams,
-    LinkedEditingRangeParams, MonikerParams, ReferenceParams, RenameParams, SelectionRangeParams,
-    SemanticTokensDeltaParams, SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities,
-    SignatureHelpParams, TextDocumentPositionParams, TypeHierarchyPrepareParams, Uri,
-    WorkspaceDiagnosticParams, WorkspaceSymbolParams,
+    LinkedEditingRangeParams, MonikerParams, OneOf, ReferenceParams, RenameParams,
+    SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
+    SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams, TextDocumentPositionParams,
+    TypeHierarchyPrepareParams, Uri, WorkspaceDiagnosticParams, WorkspaceSymbol,
+    WorkspaceSymbolParams,
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
         CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare,
@@ -27,6 +28,7 @@ use lsp_types::{
         ResolveCompletionItem, SelectionRangeRequest, SemanticTokensFullDeltaRequest,
         SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
         TypeHierarchyPrepare, WorkspaceDiagnosticRequest, WorkspaceSymbolRequest,
+        WorkspaceSymbolResolve,
     },
 };
 
@@ -48,7 +50,7 @@ use crate::{
         get_semantic_tokens_full_delta_response, get_semantic_tokens_full_response,
         get_semantic_tokens_range_response, get_signature_help_response,
         get_type_definition_response, get_workspace_diagnostics_response,
-        get_workspace_symbol_response,
+        get_workspace_symbol_resolve_response, get_workspace_symbol_response,
     },
 };
 
@@ -587,6 +589,20 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: WorkspaceSymbolParams| -> Uri { Uri::from_str(&params.query).unwrap() }
+            )?;
+        }
+        WorkspaceSymbolResolve::METHOD => {
+            handle_request!(
+                WorkspaceSymbolResolve,
+                get_workspace_symbol_resolve_response,
+                req,
+                conn,
+                |params: WorkspaceSymbol| -> Uri {
+                    match params.location {
+                        OneOf::Left(location) => location.uri,
+                        OneOf::Right(workspace_location) => workspace_location.uri,
+                    }
+                }
             )?;
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),

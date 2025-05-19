@@ -2,6 +2,22 @@ use lsp_types::{OneOf, SymbolInformation, WorkspaceSymbol, WorkspaceSymbolRespon
 
 use super::{ApproximateEq, CleanResponse, TestExecutionResult, clean_uri};
 
+impl CleanResponse for WorkspaceSymbol {
+    fn clean_response(mut self, test_case: &super::TestCase) -> TestExecutionResult<Self> {
+        match &mut self.location {
+            OneOf::Left(location) => {
+                let uri = location.uri.clone();
+                location.uri = clean_uri(&uri, test_case)?;
+            }
+            OneOf::Right(workspace_location) => {
+                let uri = workspace_location.uri.clone();
+                workspace_location.uri = clean_uri(&uri, test_case)?;
+            }
+        }
+        Ok(self)
+    }
+}
+
 impl CleanResponse for WorkspaceSymbolResponse {
     fn clean_response(mut self, test_case: &super::TestCase) -> TestExecutionResult<Self> {
         match &mut self {
@@ -13,16 +29,7 @@ impl CleanResponse for WorkspaceSymbolResponse {
             }
             Self::Nested(symbols) => {
                 for symbol in symbols.iter_mut() {
-                    match &mut symbol.location {
-                        OneOf::Left(location) => {
-                            let uri = location.uri.clone();
-                            location.uri = clean_uri(&uri, test_case)?;
-                        }
-                        OneOf::Right(workspace_location) => {
-                            let uri = workspace_location.uri.clone();
-                            workspace_location.uri = clean_uri(&uri, test_case)?;
-                        }
-                    }
+                    *symbol = symbol.clone().clean_response(test_case)?;
                 }
             }
         }

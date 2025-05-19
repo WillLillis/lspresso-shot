@@ -175,7 +175,7 @@ pub enum LuaReplacement {
     /// object can be inserted directly into `params`.
     ParamDirect { name: &'static str, json: String },
     /// An object that is converted to JSON in order to pass to the lua side. After
-    /// conversion from JSON into a lua table, each field is insserted into `params`
+    /// conversion from JSON into a lua table, each field is inserted into `params`
     /// individually.
     ParamDestructure {
         name: &'static str,
