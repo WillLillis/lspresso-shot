@@ -1121,7 +1121,8 @@ fn default_format_opts() -> FormattingOptions {
     }
 }
 
-pub type FormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) -> bool;
+// pub type FormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) -> bool;
+pub type FormattingComparator = fn(&FormattingResult, &FormattingResult, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/formatting`] request.
 ///
@@ -1140,8 +1141,7 @@ pub type FormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) ->
 /// ```
 ///
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
-///   between the expected and actual results. Note that a custom comparator is only
-///   availble for the `FormattingResult::Response` variant.
+///   between the expected and actual results.
 ///
 /// # Errors
 ///
@@ -1177,6 +1177,7 @@ pub fn test_formatting(
         Some(FormattingResult::EndState(state)) => to_parent_err_type(test_formatting_state(
             &test_case,
             options_json,
+            cmp,
             state.clone(),
         )),
         None => to_parent_err_type(test_formatting_resp(&test_case, options_json, cmp, None)),
@@ -1207,7 +1208,13 @@ fn test_formatting_resp(
         |expected, actual: &Vec<TextEdit>| {
             if !cmp.as_ref().map_or_else(
                 || expected == actual,
-                |cmp_fn| cmp_fn(expected, actual, test_case),
+                |cmp_fn| {
+                    cmp_fn(
+                        &FormattingResult::Response(expected.clone()),
+                        &FormattingResult::Response(actual.clone()),
+                        test_case,
+                    )
+                },
             ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
@@ -1225,6 +1232,7 @@ fn test_formatting_resp(
 fn test_formatting_state(
     test_case: &TestCase,
     options_json: String,
+    cmp: Option<&FormattingComparator>,
     expected: String,
 ) -> TestResult<(), String> {
     collect_results(
@@ -1242,7 +1250,16 @@ fn test_formatting_state(
         ],
         Some(&expected),
         |expected, actual: &String| {
-            if expected != actual {
+            if !cmp.as_ref().map_or_else(
+                || expected == actual,
+                |cmp_fn| {
+                    cmp_fn(
+                        &FormattingResult::EndState(expected.clone()),
+                        &FormattingResult::EndState(actual.clone()),
+                        test_case,
+                    )
+                },
+            ) {
                 Err(ResponseMismatchError {
                     test_id: test_case.test_id.clone(),
                     expected: Some((*expected).clone()),
