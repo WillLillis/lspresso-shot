@@ -124,6 +124,8 @@ pub enum TestType {
     WorkspaceDiagnostic,
     /// Test `workspace/symbol` requests
     WorkspaceSymbol,
+    /// Test `workspaceSymbol/resolve` requests
+    WorkspaceSymbolResolve,
 }
 
 impl std::fmt::Display for TestType {
@@ -172,6 +174,7 @@ impl std::fmt::Display for TestType {
                 Self::TypeDefinition => "textDocument/typeDefinition",
                 Self::WorkspaceDiagnostic => "workspace/diagnostic",
                 Self::WorkspaceSymbol => "workspace/symbol",
+                Self::WorkspaceSymbolResolve => "workspaceSymbol/resolve",
             }
         )?;
         Ok(())

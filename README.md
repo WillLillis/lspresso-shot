@@ -109,6 +109,7 @@ So far, we have:
 - [x] `textDocument/typeDefinition`
 - [x] `workspace/diagnostic`
 - [x] `workspace/symbol`
+- [x] `workspaceSymbol/resolve`
 
 ## Gotchas/Known Issues
 

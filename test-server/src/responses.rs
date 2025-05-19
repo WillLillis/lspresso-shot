@@ -1943,3 +1943,33 @@ pub fn get_workspace_symbol_response(
         _ => None,
     }
 }
+
+pub fn get_workspace_symbol_resolve_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<WorkspaceSymbol> {
+    let workspace_sym_1 = WorkspaceSymbol {
+        name: "name1".to_string(),
+        kind: SymbolKind::FILE,
+        tags: Some(vec![SymbolTag::DEPRECATED]),
+        container_name: None,
+        data: None,
+        location: OneOf::Left(Location {
+            uri: uri.clone(),
+            range: Range::default(),
+        }),
+    };
+    let workspace_sym_2 = WorkspaceSymbol {
+        name: "name2".to_string(),
+        kind: SymbolKind::FILE,
+        tags: Some(vec![SymbolTag::DEPRECATED]),
+        container_name: Some("container_name 2".to_string()),
+        data: None,
+        location: OneOf::Right(WorkspaceLocation { uri: uri.clone() }),
+    };
+    match response_num {
+        0 => Some(workspace_sym_1),
+        1 => Some(workspace_sym_2),
+        _ => None,
+    }
+}

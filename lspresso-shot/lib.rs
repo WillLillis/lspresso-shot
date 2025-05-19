@@ -10,7 +10,8 @@ use lsp_types::{
     Hover, InlayHint, LinkedEditingRanges, Location, Moniker, Position, PrepareRenameResponse,
     PreviousResultId, Range, SelectionRange, SemanticTokensFullDeltaResult,
     SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, SignatureHelpContext, TextEdit,
-    TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit, WorkspaceSymbolResponse,
+    TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit, WorkspaceSymbol,
+    WorkspaceSymbolResponse,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
@@ -2589,6 +2590,60 @@ pub fn test_workspace_symbol(
         |expected: &WorkspaceSymbolResponse, actual: &WorkspaceSymbolResponse| {
             let eql = cmp.as_ref().map_or_else(
                 || WorkspaceSymbolResponse::approx_eq(expected, actual),
+                |cmp_fn| cmp_fn(expected, actual, &test_case),
+            );
+            if !eql {
+                Err(ResponseMismatchError {
+                    test_id: test_case.test_id.clone(),
+                    expected: Some((*expected).clone()),
+                    actual: Some(actual.clone()),
+                })?;
+            }
+            Ok(())
+        },
+    )
+}
+
+pub type WorkspaceSymbolResolveComparator =
+    fn(&WorkspaceSymbol, &WorkspaceSymbol, &TestCase) -> bool;
+
+/// Tests the server's response to a [`workspaceSymbol/resolve`] request
+///
+/// - `params`: Passed to the client via the request's [`WorkspaceSymbol`] param
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `params` fails
+///
+/// [`workspaceSymbole/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve
+#[allow(clippy::result_large_err)]
+pub fn test_workspace_symbol_resolve(
+    mut test_case: TestCase,
+    params: &WorkspaceSymbol,
+    cmp: Option<WorkspaceSymbolResolveComparator>,
+    expected: &WorkspaceSymbol,
+) -> TestResult<(), WorkspaceSymbol> {
+    test_case.test_type = Some(TestType::WorkspaceSymbolResolve);
+    let params_json =
+        serde_json::to_string_pretty(params).expect("JSON serialization of `params` failed");
+    collect_results(
+        &test_case,
+        &mut vec![LuaReplacement::ParamDestructure {
+            name: "symbol",
+            fields: vec!["name", "kind", "tags", "containerName", "location", "data"],
+            json: params_json,
+        }],
+        Some(expected),
+        |expected: &WorkspaceSymbol, actual: &WorkspaceSymbol| {
+            let eql = cmp.as_ref().map_or_else(
+                || expected == actual,
                 |cmp_fn| cmp_fn(expected, actual, &test_case),
             );
             if !eql {
