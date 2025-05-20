@@ -1241,6 +1241,7 @@ pub fn get_definition_response(response_num: u32, uri: &Uri) -> Option<GotoDefin
 #[must_use]
 #[allow(clippy::missing_panics_doc)]
 pub fn get_rename_response(response_num: u32, uri: &Uri) -> Option<WorkspaceEdit> {
+    // TODO: incorporate `uri` into the response
     _ = uri;
     match response_num {
         0 => Some(WorkspaceEdit {
@@ -1875,6 +1876,7 @@ pub fn get_on_type_formatting_response(response_num: u32, uri: &Uri) -> Option<V
     get_formatting_response(response_num, uri)
 }
 
+/// For use with `test_workspace_symbol`.
 pub fn get_workspace_symbol_response(
     response_num: u32,
     uri: &Uri,
@@ -1944,6 +1946,7 @@ pub fn get_workspace_symbol_response(
     }
 }
 
+/// For use with `test_workspace_symbol_resolve`.
 pub fn get_workspace_symbol_resolve_response(
     response_num: u32,
     uri: &Uri,
@@ -1972,4 +1975,14 @@ pub fn get_workspace_symbol_resolve_response(
         1 => Some(workspace_sym_2),
         _ => None,
     }
+}
+
+/// For use with `test_workspace_symbol_resolve`.
+/// Since this returns the same response type as `textDocument/rename`, we just wrap
+/// that function
+pub fn get_workspace_will_create_files_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<WorkspaceEdit> {
+    get_rename_response(response_num, uri)
 }

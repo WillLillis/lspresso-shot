@@ -5,10 +5,10 @@ use init_dot_lua::LuaReplacement;
 use lsp_types::{
     CallHierarchyIncomingCall, CallHierarchyItem, CallHierarchyOutgoingCall, CodeAction,
     CodeActionContext, CodeActionResponse, CodeLens, Color, ColorInformation, ColorPresentation,
-    CompletionItem, CompletionResponse, Diagnostic, DocumentDiagnosticReport, DocumentHighlight,
-    DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions, GotoDefinitionResponse,
-    Hover, InlayHint, LinkedEditingRanges, Location, Moniker, Position, PrepareRenameResponse,
-    PreviousResultId, Range, SelectionRange, SemanticTokensFullDeltaResult,
+    CompletionItem, CompletionResponse, CreateFilesParams, Diagnostic, DocumentDiagnosticReport,
+    DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
+    GotoDefinitionResponse, Hover, InlayHint, LinkedEditingRanges, Location, Moniker, Position,
+    PrepareRenameResponse, PreviousResultId, Range, SelectionRange, SemanticTokensFullDeltaResult,
     SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, SignatureHelpContext, TextEdit,
     TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit, WorkspaceSymbol,
     WorkspaceSymbolResponse,
@@ -2135,6 +2135,46 @@ pub fn test_workspace_symbol_resolve(
             json: params_json,
         }],
         Some(expected),
+        cmp,
+    )
+}
+
+pub type WorkspaceWillCreateFilesComparator = fn(&WorkspaceEdit, &WorkspaceEdit, &TestCase) -> bool;
+
+/// Tests the server's response to a [`workspace/willCreateFiles`] request
+///
+/// - `params`: Passed to the client via the request's [`CreateFilesParams`] param
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `params` fails
+///
+/// [`workspaceSymbole/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles
+#[allow(clippy::result_large_err)]
+pub fn test_workspace_will_create_files(
+    mut test_case: TestCase,
+    params: &CreateFilesParams,
+    cmp: Option<WorkspaceWillCreateFilesComparator>,
+    expected: Option<&WorkspaceEdit>,
+) -> TestResult<(), WorkspaceEdit> {
+    test_case.test_type = Some(TestType::WorkspaceWillCreateFiles);
+    let params_json =
+        serde_json::to_string_pretty(params).expect("JSON serialization of `params` failed");
+    collect_results(
+        &test_case,
+        &mut vec![LuaReplacement::ParamDestructure {
+            name: "create_params",
+            fields: vec!["files"],
+            json: params_json,
+        }],
+        expected,
         cmp,
     )
 }

@@ -6,10 +6,10 @@ use lsp_server::{Connection, Message, Notification, Request, RequestId, Response
 use lsp_types::{
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeAction, CodeActionParams, CodeLens, CodeLensParams, ColorPresentationParams,
-    CompletionItem, CompletionParams, DocumentColorParams, DocumentDiagnosticParams,
-    DocumentFormattingParams, DocumentHighlightParams, DocumentLink, DocumentLinkParams,
-    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, DocumentSymbolParams,
-    FoldingRangeParams, GotoDefinitionParams, HoverParams, InlayHintParams,
+    CompletionItem, CompletionParams, CreateFilesParams, DocumentColorParams,
+    DocumentDiagnosticParams, DocumentFormattingParams, DocumentHighlightParams, DocumentLink,
+    DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
+    DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams, HoverParams, InlayHintParams,
     LinkedEditingRangeParams, MonikerParams, OneOf, ReferenceParams, RenameParams,
     SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
     SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams, TextDocumentPositionParams,
@@ -27,7 +27,7 @@ use lsp_types::{
         PrepareRenameRequest, RangeFormatting, References, Rename, Request as _,
         ResolveCompletionItem, SelectionRangeRequest, SemanticTokensFullDeltaRequest,
         SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
-        TypeHierarchyPrepare, WorkspaceDiagnosticRequest, WorkspaceSymbolRequest,
+        TypeHierarchyPrepare, WillCreateFiles, WorkspaceDiagnosticRequest, WorkspaceSymbolRequest,
         WorkspaceSymbolResolve,
     },
 };
@@ -51,6 +51,7 @@ use crate::{
         get_semantic_tokens_range_response, get_signature_help_response,
         get_type_definition_response, get_workspace_diagnostics_response,
         get_workspace_symbol_resolve_response, get_workspace_symbol_response,
+        get_workspace_will_create_files_response,
     },
 };
 
@@ -603,6 +604,15 @@ pub fn handle_request(
                         OneOf::Right(workspace_location) => workspace_location.uri,
                     }
                 }
+            )?;
+        }
+        WillCreateFiles::METHOD => {
+            handle_request!(
+                WillCreateFiles,
+                get_workspace_will_create_files_response,
+                req,
+                conn,
+                |params: CreateFilesParams| -> Uri { Uri::from_str(&params.files[0].uri).unwrap() }
             )?;
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),
