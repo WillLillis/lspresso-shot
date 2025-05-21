@@ -65,52 +65,6 @@ are necessary.
 for examples of how to use the library.
 - TODO: Add asm-lsp/other LSPs here once it's being used.
 
-## TODO:
-
-As an eventual end goal, we'd obviously like to provide test coverage for *all* LSP methods.
-So far, we have:
-
-- [x] `callHierarchy/incomingCalls`
-- [x] `callHierarchy/outgoingCalls`
-- [x] `codeLens/resolve`
-- [x] `completionItem/resolve`
-- [x] `documentLink/resolve`
-- [x] `textDocument/codeAction`
-- [x] `textDocument/codeLens`
-- [x] `textDocument/colorPresentation`
-- [x] `textDocument/completion`
-- [x] `textDocument/declaration`
-- [x] `textDocument/definition`
-- [x] `textDocument/diagnostic`
-- [x] `textDocument/documentColor`
-- [x] `textDocument/documentHighlight`
-- [x] `textDocument/documentLink`
-- [x] `textDocument/documentSymbol`
-- [x] `textDocument/foldingRange`
-- [x] `textDocument/formatting`
-- [x] `textDocument/implementation`
-- [x] `textDocument/inlayHint`
-- [x] `textDocument/hover`
-- [x] `textDocument/linkedEditingRange`
-- [x] `textDocument/moniker`
-- [x] `textDocument/onTypeFormatting`
-- [x] `textDocument/prepareCallHierarchy`
-- [x] `textDocument/prepareRename`
-- [x] `textDocument/prepareTypeHierarchy`
-- [x] `textDocument/publishDiagnostics`
-- [x] `textDocument/rangeFormatting`
-- [x] `textDocument/references`
-- [x] `textDocument/rename`
-- [x] `textDocument/selectionRange`
-- [x] `textDocument/semanticTokens/full`
-- [x] `textDocument/semanticTokens/full/delta` -- Could use some work
-- [x] `textDocument/semanticTokens/range`
-- [x] `textDocument/signatureHelp`
-- [x] `textDocument/typeDefinition`
-- [x] `workspace/diagnostic`
-- [x] `workspace/symbol`
-- [x] `workspaceSymbol/resolve`
-
 ## Gotchas/Known Issues
 
 - If your server undergoes some sort of indexing process at startup before it's ready
@@ -119,8 +73,8 @@ to the test case. The `NonZeroU32` specifies *which* `end` message to issue the 
 after (in case there are multiple). The `String` provides the relevant [progress token][progress-token].
 
 - **String comparison of results**: Many LSP client implementations do some post processing
-of responses returned by a given language server, primarily removing newlines. Your expected
-response may need to be minimally altered from what you originally expect in order for tests
+of responses returned by a given language server before displaying it to the user. Your expected
+response may need to be minimally altered from what you see in your editor in order for tests
 to pass.
 
 - **Uri fields**: If a response contains a Uri field with an absolute path, this field
@@ -132,11 +86,12 @@ leaving plenty of room for client implementations to behave differently from one
 project utilizes [neovim][nvim-repo]'s, meaning that unexpected behavior may occur when your server
 is used with other editors' clients.
 
-- **Error Messages with Empty Container Types**: If the response to an LSP request contains an enum
-with inner types such as `Vec` or `HashMap`, and you expect this to be empty, the error messages
-associated with a failure with said test case may display the wrong enum variant. This is because
-the Rust LSP types are untagged, so there is no way to differentiate between empty container variants
-during deserialization.
+- **Ambiguous Deserialization of Response Types**: Several response types specified in the 
+[LSP Spec][lsp-spec] are ambiguously deserialized to multiple types from their JSON representations.
+Because the LSP specification is defined over JSON RPC, this means that the value received by the
+LSP client may not match the value sent by your server. Any request affected by ambiguity will treat
+such values as equal in using the default comparison logic. Error messages may still display incorrect
+or misleading types, however.
 
 ## Contributing
 
