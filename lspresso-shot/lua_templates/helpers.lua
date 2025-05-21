@@ -76,7 +76,7 @@ capabilities.experimental = {
 
 vim.lsp.log.set_format_func(function(msg)
     report_log('LSP LOG: ' .. msg)
-    return msg
+    return nil
 end)
 
 local timer, err = vim.uv.new_timer()
