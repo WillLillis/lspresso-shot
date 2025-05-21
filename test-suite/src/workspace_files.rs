@@ -4,12 +4,13 @@ mod test {
 
     use crate::test_helpers::NON_RESPONSE_NUM;
     use lsp_types::{
-        CreateFilesParams, FileCreate, FileOperationRegistrationOptions, FileRename,
-        RenameFilesParams, ServerCapabilities, Uri, WorkspaceEdit,
-        WorkspaceFileOperationsServerCapabilities, WorkspaceServerCapabilities,
+        CreateFilesParams, DeleteFilesParams, FileCreate, FileDelete,
+        FileOperationRegistrationOptions, FileRename, RenameFilesParams, ServerCapabilities, Uri,
+        WorkspaceEdit, WorkspaceFileOperationsServerCapabilities, WorkspaceServerCapabilities,
     };
     use lspresso_shot::{
-        lspresso_shot, test_workspace_will_create_files, test_workspace_will_rename_files,
+        lspresso_shot, test_workspace_will_create_files, test_workspace_will_delete_files,
+        test_workspace_will_rename_files,
         types::{CleanResponse as _, ResponseMismatchError, TestCase, TestError, TestFile},
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
@@ -22,6 +23,19 @@ mod test {
                 workspace_folders: None,
                 file_operations: Some(WorkspaceFileOperationsServerCapabilities {
                     will_create: Some(FileOperationRegistrationOptions { filters: vec![] }),
+                    ..Default::default()
+                }),
+            }),
+            ..ServerCapabilities::default()
+        }
+    }
+
+    fn workspace_will_delete_files_capabilities_simple() -> ServerCapabilities {
+        ServerCapabilities {
+            workspace: Some(WorkspaceServerCapabilities {
+                workspace_folders: None,
+                file_operations: Some(WorkspaceFileOperationsServerCapabilities {
+                    will_delete: Some(FileOperationRegistrationOptions { filters: vec![] }),
                     ..Default::default()
                 }),
             }),
@@ -71,6 +85,30 @@ mod test {
         };
 
         lspresso_shot!(test_workspace_will_create_files(
+            test_case, &params, None, None
+        ));
+    }
+
+    #[test]
+    fn test_server_delete_simple_expect_none_got_none() {
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
+
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        let uri = get_dummy_uri(&test_case);
+        send_response_num(NON_RESPONSE_NUM, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(
+            &workspace_will_delete_files_capabilities_simple(),
+            &test_case_root,
+        )
+        .expect("Failed to send capabilities");
+        let params = DeleteFilesParams {
+            files: vec![FileDelete { uri }],
+        };
+
+        lspresso_shot!(test_workspace_will_delete_files(
             test_case, &params, None, None
         ));
     }
@@ -132,6 +170,44 @@ mod test {
         };
 
         let test_result = test_workspace_will_create_files(test_case.clone(), &params, None, None);
+        let resp = WorkspaceEdit::clean_response(resp, &test_case).unwrap();
+        let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
+            test_id: test_case.test_id,
+            expected: None,
+            actual: Some(resp),
+        });
+        assert_eq!(Err(expected_err), test_result);
+    }
+
+    #[rstest]
+    fn test_server_delete_simple_expect_none_got_some(
+        #[values(0, 1, 2, 3, 4, 5)] response_num: u32,
+    ) {
+        // NOTE: The URI passed here matches the cleaned URI in the response
+        let resp = test_server::responses::get_workspace_will_delete_files_response(
+            response_num,
+            &Uri::from_str("main.dummy").unwrap(),
+        )
+        .unwrap();
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
+
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(response_num, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(
+            &workspace_will_delete_files_capabilities_simple(),
+            &test_case_root,
+        )
+        .expect("Failed to send capabilities");
+        let uri = get_dummy_uri(&test_case);
+
+        let params = DeleteFilesParams {
+            files: vec![FileDelete { uri }],
+        };
+
+        let test_result = test_workspace_will_delete_files(test_case.clone(), &params, None, None);
         let resp = WorkspaceEdit::clean_response(resp, &test_case).unwrap();
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
@@ -222,6 +298,45 @@ mod test {
     }
 
     #[rstest]
+    fn test_server_delete_simple_expect_some_got_some(
+        #[values(0, 1, 2, 3, 4, 5)] response_num: u32,
+    ) {
+        let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
+        let resp =
+            test_server::responses::get_workspace_will_delete_files_response(response_num, &uri)
+                .unwrap();
+        let source_file = TestFile::new(test_server::get_dummy_source_path(), "");
+        let test_case = TestCase::new(get_dummy_server_path(), source_file);
+
+        let test_case_root = test_case
+            .get_lspresso_dir()
+            .expect("Failed to get test case's root directory");
+        send_response_num(response_num, &test_case_root).expect("Failed to send response num");
+        send_capabiltiies(
+            &workspace_will_delete_files_capabilities_simple(),
+            &test_case_root,
+        )
+        .expect("Failed to send capabilities");
+        let uri = test_case
+            .get_source_file_path("src/foo.rs")
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .to_string();
+
+        let params = DeleteFilesParams {
+            files: vec![FileDelete { uri }],
+        };
+
+        lspresso_shot!(test_workspace_will_delete_files(
+            test_case,
+            &params,
+            None,
+            Some(&resp)
+        ));
+    }
+
+    #[rstest]
     fn test_server_rename_simple_expect_some_got_some(
         #[values(0, 1, 2, 3, 4, 5)] response_num: u32,
     ) {
@@ -265,5 +380,6 @@ mod test {
     }
 
     // NOTE: rust-analyzer doesn't support `workspace/willCreateFiles` requests
+    // NOTE: rust-analyzer doesn't support `workspace/willDeleteFiles` requests
     // NOTE: rust-analyzer doesn't support `workspace/willRenameFiles` requests
 }

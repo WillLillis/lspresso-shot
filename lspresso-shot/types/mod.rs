@@ -128,6 +128,8 @@ pub enum TestType {
     WorkspaceSymbolResolve,
     /// Test `workspace/willCreateFiles` requests
     WorkspaceWillCreateFiles,
+    /// Test `workspace/willDeleteFiles` requests
+    WorkspaceWillDeleteFiles,
     /// Test `workspace/willRenameFiles` requests
     WorkspaceWillRenameFiles,
 }
@@ -180,6 +182,7 @@ impl std::fmt::Display for TestType {
                 Self::WorkspaceSymbol => "workspace/symbol",
                 Self::WorkspaceSymbolResolve => "workspaceSymbol/resolve",
                 Self::WorkspaceWillCreateFiles => "workspace/willCreateFiles",
+                Self::WorkspaceWillDeleteFiles => "workspace/willDeleteFiles",
                 Self::WorkspaceWillRenameFiles => "workspace/willRenameFiles",
             }
         )?;
