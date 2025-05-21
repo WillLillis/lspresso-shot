@@ -8,10 +8,10 @@ use lsp_types::{
     CompletionItem, CompletionResponse, CreateFilesParams, Diagnostic, DocumentDiagnosticReport,
     DocumentHighlight, DocumentLink, DocumentSymbolResponse, FoldingRange, FormattingOptions,
     GotoDefinitionResponse, Hover, InlayHint, LinkedEditingRanges, Location, Moniker, Position,
-    PrepareRenameResponse, PreviousResultId, Range, SelectionRange, SemanticTokensFullDeltaResult,
-    SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp, SignatureHelpContext, TextEdit,
-    TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit, WorkspaceSymbol,
-    WorkspaceSymbolResponse,
+    PrepareRenameResponse, PreviousResultId, Range, RenameFilesParams, SelectionRange,
+    SemanticTokensFullDeltaResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
+    SignatureHelpContext, TextEdit, TypeHierarchyItem, WorkspaceDiagnosticReport, WorkspaceEdit,
+    WorkspaceSymbol, WorkspaceSymbolResponse,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
 
@@ -2156,7 +2156,7 @@ pub type WorkspaceWillCreateFilesComparator = fn(&WorkspaceEdit, &WorkspaceEdit,
 ///
 /// Panics if JSON serialization of `params` fails
 ///
-/// [`workspaceSymbole/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles
+/// [`workspace/willCreateFiles`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles
 #[allow(clippy::result_large_err)]
 pub fn test_workspace_will_create_files(
     mut test_case: TestCase,
@@ -2171,6 +2171,46 @@ pub fn test_workspace_will_create_files(
         &test_case,
         &mut vec![LuaReplacement::ParamDestructure {
             name: "create_params",
+            fields: vec!["files"],
+            json: params_json,
+        }],
+        expected,
+        cmp,
+    )
+}
+
+pub type WorkspaceWillRenameFilesComparator = fn(&WorkspaceEdit, &WorkspaceEdit, &TestCase) -> bool;
+
+/// Tests the server's response to a [`workspace/willRenameFiles`] request
+///
+/// - `params`: Passed to the client via the request's [`RenameFilesParams`] param
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `params` fails
+///
+/// [`workspace/willRenameFiles`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles
+#[allow(clippy::result_large_err)]
+pub fn test_workspace_will_rename_files(
+    mut test_case: TestCase,
+    params: &RenameFilesParams,
+    cmp: Option<WorkspaceWillRenameFilesComparator>,
+    expected: Option<&WorkspaceEdit>,
+) -> TestResult<(), WorkspaceEdit> {
+    test_case.test_type = Some(TestType::WorkspaceWillRenameFiles);
+    let params_json =
+        serde_json::to_string_pretty(params).expect("JSON serialization of `params` failed");
+    collect_results(
+        &test_case,
+        &mut vec![LuaReplacement::ParamDestructure {
+            name: "rename_params",
             fields: vec!["files"],
             json: params_json,
         }],

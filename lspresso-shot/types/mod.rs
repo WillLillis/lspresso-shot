@@ -120,14 +120,16 @@ pub enum TestType {
     SignatureHelp,
     /// Test `textDocument/typeDefinition` requests
     TypeDefinition,
-    /// Test `workspace/willCreateFiles` requests
-    WorkspaceWillCreateFiles,
     /// Test `workspace/diagnostic` requests
     WorkspaceDiagnostic,
     /// Test `workspace/symbol` requests
     WorkspaceSymbol,
     /// Test `workspaceSymbol/resolve` requests
     WorkspaceSymbolResolve,
+    /// Test `workspace/willCreateFiles` requests
+    WorkspaceWillCreateFiles,
+    /// Test `workspace/willRenameFiles` requests
+    WorkspaceWillRenameFiles,
 }
 
 impl std::fmt::Display for TestType {
@@ -174,10 +176,11 @@ impl std::fmt::Display for TestType {
                 Self::SemanticTokensRange => "textDocument/semanticTokens/range",
                 Self::SignatureHelp => "textDocument/signatureHelp",
                 Self::TypeDefinition => "textDocument/typeDefinition",
-                Self::WorkspaceWillCreateFiles => "workspace/willCreateFiles",
                 Self::WorkspaceDiagnostic => "workspace/diagnostic",
                 Self::WorkspaceSymbol => "workspace/symbol",
                 Self::WorkspaceSymbolResolve => "workspaceSymbol/resolve",
+                Self::WorkspaceWillCreateFiles => "workspace/willCreateFiles",
+                Self::WorkspaceWillRenameFiles => "workspace/willRenameFiles",
             }
         )?;
         Ok(())

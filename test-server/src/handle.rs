@@ -10,8 +10,8 @@ use lsp_types::{
     DocumentDiagnosticParams, DocumentFormattingParams, DocumentHighlightParams, DocumentLink,
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
     DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams, HoverParams, InlayHintParams,
-    LinkedEditingRangeParams, MonikerParams, OneOf, ReferenceParams, RenameParams,
-    SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
+    LinkedEditingRangeParams, MonikerParams, OneOf, ReferenceParams, RenameFilesParams,
+    RenameParams, SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
     SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams, TextDocumentPositionParams,
     TypeHierarchyPrepareParams, Uri, WorkspaceDiagnosticParams, WorkspaceSymbol,
     WorkspaceSymbolParams,
@@ -27,8 +27,8 @@ use lsp_types::{
         PrepareRenameRequest, RangeFormatting, References, Rename, Request as _,
         ResolveCompletionItem, SelectionRangeRequest, SemanticTokensFullDeltaRequest,
         SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
-        TypeHierarchyPrepare, WillCreateFiles, WorkspaceDiagnosticRequest, WorkspaceSymbolRequest,
-        WorkspaceSymbolResolve,
+        TypeHierarchyPrepare, WillCreateFiles, WillRenameFiles, WorkspaceDiagnosticRequest,
+        WorkspaceSymbolRequest, WorkspaceSymbolResolve,
     },
 };
 
@@ -613,6 +613,17 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: CreateFilesParams| -> Uri { Uri::from_str(&params.files[0].uri).unwrap() }
+            )?;
+        }
+        WillRenameFiles::METHOD => {
+            handle_request!(
+                WillRenameFiles,
+                get_workspace_will_create_files_response,
+                req,
+                conn,
+                |params: RenameFilesParams| -> Uri {
+                    Uri::from_str(&params.files[0].old_uri).unwrap()
+                }
             )?;
         }
         method => error!("Unimplemented request method: {method:?}\n{req:?}"),

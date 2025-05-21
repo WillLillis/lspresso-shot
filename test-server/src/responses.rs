@@ -1977,10 +1977,20 @@ pub fn get_workspace_symbol_resolve_response(
     }
 }
 
-/// For use with `test_workspace_symbol_resolve`.
+/// For use with `test_workspace_will_create_files`.
 /// Since this returns the same response type as `textDocument/rename`, we just wrap
 /// that function
 pub fn get_workspace_will_create_files_response(
+    response_num: u32,
+    uri: &Uri,
+) -> Option<WorkspaceEdit> {
+    get_rename_response(response_num, uri)
+}
+
+/// For use with `test_workspace_will_rename_files`.
+/// Since this returns the same response type as `textDocument/rename`, we just wrap
+/// that function
+pub fn get_workspace_will_rename_files_response(
     response_num: u32,
     uri: &Uri,
 ) -> Option<WorkspaceEdit> {
