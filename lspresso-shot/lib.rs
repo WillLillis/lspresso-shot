@@ -20,13 +20,14 @@ use lsp_types::{
 use lsp_types::{
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
     CodeActionParams, CompletionParams, DocumentDiagnosticParams, DocumentHighlightParams,
-    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, GotoDefinitionParams,
-    HoverParams, InlayHintParams, MonikerParams, ReferenceParams, RenameParams,
-    SelectionRangeParams, SemanticTokensRangeParams, SignatureHelpParams,
+    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, ExecuteCommandParams,
+    GotoDefinitionParams, HoverParams, InlayHintParams, MonikerParams, ReferenceParams,
+    RenameParams, SelectionRangeParams, SemanticTokensRangeParams, SignatureHelpParams,
     TextDocumentPositionParams, TypeHierarchyPrepareParams, WorkspaceDiagnosticParams,
     WorkspaceSymbolParams,
     request::{GotoDeclarationParams, GotoImplementationParams, GotoTypeDefinitionParams},
 };
+use serde_json::Value;
 #[allow(unused_imports)]
 use types::ServerStartType;
 
@@ -39,8 +40,9 @@ use std::{
 };
 
 use types::{
-    ApproximateEq, CleanResponse, ResponseMismatchError, TestCase, TestError, TestExecutionError,
-    TestExecutionResult, TestResult, TestType, TimeoutError, formatting::FormattingResult,
+    ApproximateEq, CleanResponse, ResponseMismatchError, StateOrResponse, TestCase, TestError,
+    TestExecutionError, TestExecutionResult, TestResult, TestType, TimeoutError,
+    to_parent_err_type,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -939,7 +941,8 @@ fn default_format_opts() -> FormattingOptions {
     }
 }
 
-pub type FormattingComparator = fn(&FormattingResult, &FormattingResult, &TestCase) -> bool;
+pub type FormattingComparator =
+    fn(&StateOrResponse<Vec<TextEdit>>, &StateOrResponse<Vec<TextEdit>>, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/formatting`] request.
 ///
@@ -973,9 +976,8 @@ pub fn test_formatting(
     mut test_case: TestCase,
     options: Option<&FormattingOptions>,
     cmp: Option<FormattingComparator>,
-    expected: Option<&FormattingResult>,
-) -> TestResult<(), FormattingResult> {
-    use types::formatting::to_parent_err_type;
+    expected: Option<&StateOrResponse<Vec<TextEdit>>>,
+) -> TestResult<(), StateOrResponse<Vec<TextEdit>>> {
     test_case.test_type = Some(TestType::Formatting);
     let options_json = options
         .map_or_else(
@@ -983,15 +985,15 @@ pub fn test_formatting(
             serde_json::to_string_pretty,
         )
         .expect("JSON serialization of `options` failed");
-    // map the child error types of `test_formatting_*` to `TestError<FormattingResult>`
+    // map the child error types of `test_formatting_*` to `TestError<StateOrResponse<Vec<TextEdit>>>`
     match expected {
-        Some(FormattingResult::Response(edits)) => to_parent_err_type(test_formatting_resp(
+        Some(StateOrResponse::Response(edits)) => to_parent_err_type(test_formatting_resp(
             &test_case,
             options_json,
             cmp,
             Some(edits),
         )),
-        Some(FormattingResult::EndState(state)) => to_parent_err_type(test_formatting_state(
+        Some(StateOrResponse::State(state)) => to_parent_err_type(test_formatting_state(
             &test_case,
             options_json,
             cmp,
@@ -1011,8 +1013,8 @@ fn test_formatting_resp(
 ) -> TestResult<(), Vec<TextEdit>> {
     let outer_cmp =
         |expected: &Vec<TextEdit>, actual: &Vec<TextEdit>, test_case: &TestCase| -> bool {
-            let result_expected = FormattingResult::Response(expected.clone());
-            let result_actual = FormattingResult::Response(actual.clone());
+            let result_expected = StateOrResponse::Response(expected.clone());
+            let result_actual = StateOrResponse::Response(actual.clone());
             cmp.as_ref().map_or_else(
                 || result_expected == result_actual,
                 |cmp_fn| cmp_fn(&result_expected, &result_actual, test_case),
@@ -1022,7 +1024,7 @@ fn test_formatting_resp(
         test_case,
         &mut vec![
             LuaReplacement::Other {
-                from: "INVOKE_FORMAT",
+                from: "INVOKE_ACTION",
                 to: "false".to_string(),
             },
             LuaReplacement::ParamTextDocument,
@@ -1045,8 +1047,8 @@ fn test_formatting_state(
     expected: String,
 ) -> TestResult<(), String> {
     let outer_cmp = |expected: &String, actual: &String, test_case: &TestCase| -> bool {
-        let result_expected = FormattingResult::EndState(expected.to_string());
-        let result_actual = FormattingResult::EndState(actual.to_string());
+        let result_expected = StateOrResponse::State(expected.to_string());
+        let result_actual = StateOrResponse::State(actual.to_string());
         cmp.as_ref().map_or_else(
             || result_expected == result_actual,
             |cmp_fn| cmp_fn(&result_expected, &result_actual, test_case),
@@ -1056,7 +1058,7 @@ fn test_formatting_state(
         test_case,
         &mut vec![
             LuaReplacement::Other {
-                from: "INVOKE_FORMAT",
+                from: "INVOKE_ACTION",
                 to: "true".to_string(),
             },
             LuaReplacement::Other {
@@ -2052,6 +2054,80 @@ pub fn test_workspace_diagnostic(
             },
         ],
         Some(expected),
+        cmp,
+    )
+}
+
+pub type WorkspaceExecuteCommandComparator = fn(&Value, &Value, &TestCase) -> bool;
+
+/// Tests the server's response to a [`workspace/executeCommand`] request
+///
+/// - `commands`: A list of LSP command names the client should advertise support for in its
+///   capabilities (e.g. "rust-analyzer.runSingle"). This enables command-based `CodeLens`
+/// - `command`: The command to be executed. Passed to the client via the request's
+///   [`ExecuteCommandParams`]
+/// - `arguments`: The arguments to be passed to the command. Passed to the client via
+///   the request's [`ExecuteCommandParams`]
+/// - `cmp`: An optional custom comparator function that can be used to determine equality
+///   between the expected and actual results.
+///
+/// # Warnings
+///
+/// Responses of `serde_json::Value::Null` are equivalent to a lack of response. If you expect
+/// to receive a `null` response, you should use `None` as the expected value.
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `command` or `arguments` fails
+///
+/// [`workspace/executeCommand`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand
+pub fn test_workspace_execute_command(
+    mut test_case: TestCase,
+    commands: Option<&Vec<String>>,
+    command: &str,
+    arguments: Option<&Vec<Value>>,
+    cmp: Option<WorkspaceExecuteCommandComparator>,
+    expected: Option<&Value>,
+) -> TestResult<(), Value> {
+    test_case.test_type = Some(TestType::WorkspaceExecuteCommand);
+    let command_str = commands.map_or_else(String::new, |cmds| {
+        cmds.iter()
+            .fold(String::new(), |accum, cmd| accum + &format!("\"{cmd}\",\n"))
+    });
+    let command_json =
+        serde_json::to_string_pretty(command).expect("JSON serialization of `command` failed");
+    let arguments_json = arguments.map_or_else(
+        || "null".to_string(),
+        |args| {
+            serde_json::to_string_pretty(args).expect("JSON serialization of `arguments` failed")
+        },
+    );
+    collect_results(
+        &test_case,
+        &mut vec![
+            LuaReplacement::Other {
+                from: "COMMANDS",
+                to: command_str,
+            },
+            LuaReplacement::ParamDirect {
+                name: "command",
+                json: command_json,
+            },
+            LuaReplacement::ParamDirect {
+                name: "arguments",
+                json: arguments_json,
+            },
+            LuaReplacement::Other {
+                from: "INVOKE_ACTION",
+                to: false.to_string(),
+            },
+        ],
+        expected,
         cmp,
     )
 }

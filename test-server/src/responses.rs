@@ -22,6 +22,7 @@ use lsp_types::{
     WorkspaceSymbolResponse, WorkspaceUnchangedDocumentDiagnosticReport,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
+use serde_json::Value;
 
 use crate::get_dummy_source_path;
 
@@ -314,6 +315,23 @@ pub fn get_document_symbol_response(
             },
             children: Some(vec![]),
         }])),
+        _ => None,
+    }
+}
+
+/// For use with `test_workspace_execute_command`.
+#[must_use]
+#[allow(clippy::missing_panics_doc)]
+pub fn get_execute_command_response(response_num: u32, uri: &Uri) -> Option<Value> {
+    _ = uri;
+    match response_num {
+        0 => Some(Value::Bool(true)),
+        1 => Some(Value::Number(serde_json::Number::from(42))),
+        2 => Some(Value::String("string".to_string())),
+        3 => Some(Value::Array(vec![
+            Value::String("string".to_string()),
+            Value::Number(serde_json::Number::from(42)),
+        ])),
         _ => None,
     }
 }
