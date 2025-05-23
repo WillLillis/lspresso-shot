@@ -14,7 +14,7 @@ pub fn get_init_dot_lua(
     let mut raw_init = include_str!("lua_templates/helpers.lua").to_string();
     raw_init.push_str(match test_type {
         TestType::PublishDiagnostics => include_str!("lua_templates/diagnostic_autocmd.lua"),
-        TestType::Formatting => include_str!("lua_templates/formatting_action.lua"),
+        TestType::Formatting => include_str!("lua_templates/state_or_response_action.lua"),
         TestType::SemanticTokensFullDelta => {
             include_str!("lua_templates/semantic_tokens_full_delta_action.lua")
         }
