@@ -36,7 +36,7 @@ use std::{
 };
 
 use compare::write_fields_comparison;
-use lsp_types::{Position, Uri};
+use lsp_types::{LSPAny, Position, Uri};
 use rand::distr::Distribution as _;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -122,6 +122,8 @@ pub enum TestType {
     TypeDefinition,
     /// Test `workspace/diagnostic` requests
     WorkspaceDiagnostic,
+    /// Test `workspace/executeCommand` requests
+    WorkspaceExecuteCommand,
     /// Test `workspace/symbol` requests
     WorkspaceSymbol,
     /// Test `workspaceSymbol/resolve` requests
@@ -179,6 +181,7 @@ impl std::fmt::Display for TestType {
                 Self::SignatureHelp => "textDocument/signatureHelp",
                 Self::TypeDefinition => "textDocument/typeDefinition",
                 Self::WorkspaceDiagnostic => "workspace/diagnostic",
+                Self::WorkspaceExecuteCommand => "workspace/executeCommand",
                 Self::WorkspaceSymbol => "workspace/symbol",
                 Self::WorkspaceSymbolResolve => "workspaceSymbol/resolve",
                 Self::WorkspaceWillCreateFiles => "workspace/willCreateFiles",
@@ -632,6 +635,56 @@ pub enum ServerStartType {
     Progress(NonZeroU32, String),
 }
 
+/// Response type for cases where it's reasonable to either compare the server's
+/// actual response, or the state of the buffer after the response is received
+#[derive(Debug, PartialEq, Eq, Clone, Serialize)]
+pub enum StateOrResponse<T> {
+    /// Check if the buffer's state matches after the response is received
+    State(String),
+    /// Check if the server's response matches
+    Response(T),
+}
+
+impl<T> From<TestError<T>> for TestError<StateOrResponse<T>> {
+    fn from(value: TestError<T>) -> Self {
+        match value {
+            TestError::ResponseMismatch(ResponseMismatchError {
+                test_id,
+                expected,
+                actual,
+            }) => {
+                let expected = expected.map(StateOrResponse::Response);
+                let actual = actual.map(StateOrResponse::Response);
+                Self::ResponseMismatch(ResponseMismatchError {
+                    test_id,
+                    expected,
+                    actual,
+                })
+            }
+            TestError::TestSetup(e) => Self::TestSetup(e),
+            TestError::TestExecution(e) => Self::TestExecution(e),
+        }
+    }
+}
+
+/// Converts a `TestResult<(), String>` or `TestResult<(), Vec<TextEdit>>` to `TestResult<(), FormattingResult>`.
+/// This is necessary to satisfy the generic constraints introduced by `test_formatting` calling
+/// `test_formatting_resp` and `test_formatting_state`.
+///
+/// Note that we can't implement this logic directly via the `From` trait because `TestResult` is just an alias
+/// for `Result`, and thus a foreign type.
+pub(crate) fn to_parent_err_type<C, P>(
+    result: TestResult<(), C>,
+) -> TestResult<(), StateOrResponse<P>>
+where
+    TestError<StateOrResponse<P>>: From<TestError<C>>,
+{
+    match result {
+        Ok(()) => Ok(()),
+        Err(e) => Err(e.into()),
+    }
+}
+
 pub type TestSetupResult<T> = Result<T, TestSetupError>;
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -659,7 +712,11 @@ impl From<std::io::Error> for TestSetupError {
 macro_rules! type_name {
     ($t:ty) => {{
         let full_name = std::any::type_name::<$t>();
-        full_name.rsplit("::").next().unwrap_or(full_name)
+        full_name
+            .rsplit("::")
+            .next()
+            .unwrap_or(full_name)
+            .trim_end_matches(|c| c == '<' || c == '>')
     }};
 }
 
@@ -781,6 +838,7 @@ where
 }
 
 impl CleanResponse for String {}
+impl CleanResponse for LSPAny {}
 
 /// This trait implements a comparison method that accounts for issues w.r.t. JSON
 /// serialization/deserialization of types used in the LSP protocol.
@@ -794,3 +852,4 @@ where
 }
 
 impl ApproximateEq for String {}
+impl ApproximateEq for LSPAny {}

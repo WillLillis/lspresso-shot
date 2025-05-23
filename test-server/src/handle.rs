@@ -9,26 +9,27 @@ use lsp_types::{
     CompletionItem, CompletionParams, CreateFilesParams, DeleteFilesParams, DocumentColorParams,
     DocumentDiagnosticParams, DocumentFormattingParams, DocumentHighlightParams, DocumentLink,
     DocumentLinkParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
-    DocumentSymbolParams, FoldingRangeParams, GotoDefinitionParams, HoverParams, InlayHintParams,
-    LinkedEditingRangeParams, MonikerParams, OneOf, ReferenceParams, RenameFilesParams,
-    RenameParams, SelectionRangeParams, SemanticTokensDeltaParams, SemanticTokensParams,
-    SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams, TextDocumentPositionParams,
-    TypeHierarchyPrepareParams, Uri, WorkspaceDiagnosticParams, WorkspaceSymbol,
-    WorkspaceSymbolParams,
+    DocumentSymbolParams, ExecuteCommandParams, FoldingRangeParams, GotoDefinitionParams,
+    HoverParams, InlayHintParams, LinkedEditingRangeParams, MonikerParams, OneOf, ReferenceParams,
+    RenameFilesParams, RenameParams, SelectionRangeParams, SemanticTokensDeltaParams,
+    SemanticTokensParams, SemanticTokensRangeParams, ServerCapabilities, SignatureHelpParams,
+    TextDocumentPositionParams, TypeHierarchyPrepareParams, Uri, WorkspaceDiagnosticParams,
+    WorkspaceSymbol, WorkspaceSymbolParams,
     notification::{DidOpenTextDocument, Notification as _, PublishDiagnostics},
     request::{
         CallHierarchyIncomingCalls, CallHierarchyOutgoingCalls, CallHierarchyPrepare,
         CodeActionRequest, CodeActionResolveRequest, CodeLensRequest, CodeLensResolve,
         ColorPresentationRequest, Completion, DocumentColor, DocumentDiagnosticRequest,
         DocumentHighlightRequest, DocumentLinkRequest, DocumentLinkResolve, DocumentSymbolRequest,
-        FoldingRangeRequest, Formatting, GotoDeclaration, GotoDeclarationParams, GotoDefinition,
-        GotoImplementation, GotoImplementationParams, GotoTypeDefinition, GotoTypeDefinitionParams,
-        HoverRequest, InlayHintRequest, LinkedEditingRange, MonikerRequest, OnTypeFormatting,
-        PrepareRenameRequest, RangeFormatting, References, Rename, Request as _,
-        ResolveCompletionItem, SelectionRangeRequest, SemanticTokensFullDeltaRequest,
-        SemanticTokensFullRequest, SemanticTokensRangeRequest, SignatureHelpRequest,
-        TypeHierarchyPrepare, WillCreateFiles, WillDeleteFiles, WillRenameFiles,
-        WorkspaceDiagnosticRequest, WorkspaceSymbolRequest, WorkspaceSymbolResolve,
+        ExecuteCommand, FoldingRangeRequest, Formatting, GotoDeclaration, GotoDeclarationParams,
+        GotoDefinition, GotoImplementation, GotoImplementationParams, GotoTypeDefinition,
+        GotoTypeDefinitionParams, HoverRequest, InlayHintRequest, LinkedEditingRange,
+        MonikerRequest, OnTypeFormatting, PrepareRenameRequest, RangeFormatting, References,
+        Rename, Request as _, ResolveCompletionItem, SelectionRangeRequest,
+        SemanticTokensFullDeltaRequest, SemanticTokensFullRequest, SemanticTokensRangeRequest,
+        SignatureHelpRequest, TypeHierarchyPrepare, WillCreateFiles, WillDeleteFiles,
+        WillRenameFiles, WorkspaceDiagnosticRequest, WorkspaceSymbolRequest,
+        WorkspaceSymbolResolve,
     },
 };
 
@@ -40,18 +41,19 @@ use crate::{
         get_completion_response, get_declaration_response, get_definition_response,
         get_diagnostic_response, get_document_color_response, get_document_highlight_response,
         get_document_link_resolve_response, get_document_link_response,
-        get_document_symbol_response, get_folding_range_response, get_formatting_range_response,
-        get_formatting_response, get_hover_response, get_implementation_response,
-        get_incoming_calls_response, get_inlay_hint_response, get_linked_editing_range_response,
-        get_moniker_response, get_on_type_formatting_response, get_outgoing_calls_response,
-        get_prepare_call_hierachy_response, get_prepare_rename_response,
-        get_prepare_type_hierachy_response, get_publish_diagnostics_response,
-        get_references_response, get_rename_response, get_selection_range_response,
-        get_semantic_tokens_full_delta_response, get_semantic_tokens_full_response,
-        get_semantic_tokens_range_response, get_signature_help_response,
-        get_type_definition_response, get_workspace_diagnostics_response,
-        get_workspace_symbol_resolve_response, get_workspace_symbol_response,
-        get_workspace_will_create_files_response, get_workspace_will_delete_files_response,
+        get_document_symbol_response, get_execute_command_response, get_folding_range_response,
+        get_formatting_range_response, get_formatting_response, get_hover_response,
+        get_implementation_response, get_incoming_calls_response, get_inlay_hint_response,
+        get_linked_editing_range_response, get_moniker_response, get_on_type_formatting_response,
+        get_outgoing_calls_response, get_prepare_call_hierachy_response,
+        get_prepare_rename_response, get_prepare_type_hierachy_response,
+        get_publish_diagnostics_response, get_references_response, get_rename_response,
+        get_selection_range_response, get_semantic_tokens_full_delta_response,
+        get_semantic_tokens_full_response, get_semantic_tokens_range_response,
+        get_signature_help_response, get_type_definition_response,
+        get_workspace_diagnostics_response, get_workspace_symbol_resolve_response,
+        get_workspace_symbol_response, get_workspace_will_create_files_response,
+        get_workspace_will_delete_files_response,
     },
 };
 
@@ -358,6 +360,18 @@ pub fn handle_request(
                 req,
                 conn,
                 |params: DocumentSymbolParams| -> Uri { params.text_document.uri }
+            )?;
+        }
+        ExecuteCommand::METHOD => {
+            handle_request!(
+                ExecuteCommand,
+                get_execute_command_response,
+                req,
+                conn,
+                |params: ExecuteCommandParams| -> Uri {
+                    let raw_uri = params.arguments[0].as_str().unwrap();
+                    Uri::from_str(raw_uri).unwrap()
+                }
             )?;
         }
         FoldingRangeRequest::METHOD => {

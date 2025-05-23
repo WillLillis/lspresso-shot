@@ -6,8 +6,7 @@ mod test {
     use lspresso_shot::{
         lspresso_shot, test_formatting, test_on_type_formatting, test_range_formatting,
         types::{
-            ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile,
-            formatting::FormattingResult,
+            ResponseMismatchError, ServerStartType, StateOrResponse, TestCase, TestError, TestFile,
         },
     };
     use test_server::{get_dummy_server_path, send_capabiltiies, send_response_num};
@@ -59,7 +58,7 @@ mod test {
             test_case,
             None,
             None,
-            Some(&FormattingResult::EndState(contents.to_string()))
+            Some(&StateOrResponse::State(contents.to_string()))
         ));
     }
 
@@ -121,7 +120,7 @@ mod test {
     #[rstest]
     fn test_server_response_simple_expect_none_got_some(#[values(0, 1, 2, 3)] response_num: u32) {
         let uri = Uri::from_str(&test_server::get_dummy_source_path()).unwrap();
-        let resp = FormattingResult::Response(
+        let resp = StateOrResponse::Response(
             test_server::responses::get_formatting_response(response_num, &uri).unwrap(),
         );
         let source_file =
@@ -186,7 +185,7 @@ mod test {
             test_case,
             None,
             None,
-            Some(&FormattingResult::Response(edits))
+            Some(&StateOrResponse::Response(edits))
         ));
     }
 
@@ -259,7 +258,7 @@ let foo = 5;
             test_case,
             None,
             None,
-            Some(&FormattingResult::EndState(
+            Some(&StateOrResponse::State(
                 "pub fn main() {
     let foo = 5;
 }
@@ -289,7 +288,7 @@ let foo = 5;
             test_case,
             None,
             None,
-            Some(&FormattingResult::Response(vec![
+            Some(&StateOrResponse::Response(vec![
                 TextEdit {
                     new_text: "    ".to_string(),
                     range: Range {
