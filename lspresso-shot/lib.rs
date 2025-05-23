@@ -2048,6 +2048,12 @@ pub fn test_workspace_diagnostic(
     )
 }
 
+// TODO: `workspace/executeCommand` -- Similar approach to `test_formatting`
+//  - Allow comparisons with the raw `LSPAny` response
+//  - Allow comparisons to the final buffer state
+//      -> Maybe we can generericize "invoke" style tests and extend this funcionality
+//      to other test types
+
 pub type WorkspaceSymbolComparator =
     fn(&WorkspaceSymbolResponse, &WorkspaceSymbolResponse, &TestCase) -> bool;
 
