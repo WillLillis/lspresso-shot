@@ -1025,6 +1025,7 @@ fn test_formatting_resp(
                 from: "INVOKE_FORMAT",
                 to: "false".to_string(),
             },
+            LuaReplacement::ParamTextDocument,
             LuaReplacement::ParamDirect {
                 name: "options",
                 json: options_json,
@@ -1054,14 +1055,21 @@ fn test_formatting_state(
     collect_results(
         test_case,
         &mut vec![
-            LuaReplacement::ParamTextDocument,
             LuaReplacement::Other {
                 from: "INVOKE_FORMAT",
                 to: "true".to_string(),
             },
+            LuaReplacement::Other {
+                from: "INVOKE_FN",
+                to: "vim.lsp.buf.format".to_string(),
+            },
             LuaReplacement::ParamDirect {
-                name: "options",
+                name: "formatting_options",
                 json: options_json,
+            },
+            LuaReplacement::ParamDirect {
+                name: "async",
+                json: "false".to_string(),
             },
         ],
         Some(&expected),
