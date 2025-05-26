@@ -484,6 +484,47 @@ impl TestCase {
         Ok(lspresso_dir)
     }
 
+    /// Returns the path to the benchmark file for test `test_id`,
+    /// creating parent directories along the way. Any benchmark
+    /// measurements recorded by the lua code will be recorded here.
+    ///
+    /// `/tmp/lspresso-shot/<test_id>/measurements.txt`
+    ///
+    /// # Errors
+    ///
+    /// Returns `std::io::Error` if the the test directory can't be created
+    pub fn get_benchmark_file_path(&self) -> std::io::Result<PathBuf> {
+        let mut lspresso_dir = self.get_lspresso_dir()?;
+        lspresso_dir.push("measurements.txt");
+        Ok(lspresso_dir)
+    }
+
+    /// Gathers the benchmark results from the benchmark file
+    ///
+    /// # Errors
+    ///
+    /// Rerurns [`BenchmarkError`] if the benchmark file can't be read,
+    ///
+    /// # Panics
+    ///
+    /// Will panic if the benchmark file contains a line that cannot be parsed
+    /// as a `u64`.
+    pub fn get_benchmark_results(&self) -> Result<Vec<Duration>, BenchmarkError> {
+        let file_path = self
+            .get_benchmark_file_path()
+            .map_err(|_| BenchmarkError::NoResults)?;
+        let contents = fs::read_to_string(file_path).map_err(|_| BenchmarkError::NoResults)?;
+        let results: Vec<Duration> = contents
+            .lines()
+            .filter(|line| !line.is_empty())
+            .map(|line| {
+                let time = line.parse::<u64>().unwrap();
+                Duration::from_nanos(time) // `vim.uv.hrtime()` measures in ns
+            })
+            .collect();
+        Ok(results)
+    }
+
     /// Returns the path to the timeout file for test `test_id`,
     /// creating parent directories along the way. If the neovim
     /// instance exited because the timeout was exceeded, this
@@ -549,6 +590,37 @@ impl TestCase {
         }
 
         Ok(source_path)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum EndCondition {
+    /// Run `n` iterations of the benchmark
+    Count(u64),
+    /// Run the benchmark until the specified duration has elapsed
+    Time(Duration),
+}
+
+impl Default for EndCondition {
+    fn default() -> Self {
+        Self::Count(100)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct BenchmarkConfig {
+    /// Determines how the benchmark should end under normal conditions
+    pub end_condition: EndCondition,
+    /// Stop the benchmark on the first error encountered
+    pub fail_fast: bool,
+}
+
+impl Default for BenchmarkConfig {
+    fn default() -> Self {
+        Self {
+            end_condition: EndCondition::default(),
+            fail_fast: true,
+        }
     }
 }
 
@@ -796,6 +868,16 @@ impl std::fmt::Display for TimeoutError {
 
         Ok(())
     }
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum BenchmarkError {
+    #[error("Failed to gather benchmark results")]
+    NoResults,
+    #[error(transparent)]
+    TestExecution(#[from] TestExecutionError),
+    #[error(transparent)]
+    TestSetup(#[from] TestSetupError),
 }
 
 /// Cleans a given `Uri` object of any information internal to the case

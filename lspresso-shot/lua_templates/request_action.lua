@@ -13,7 +13,10 @@ PARAM_ASSIGN
 
     report_log('Params: ' .. tostring(vim.inspect(params)) .. '\n') ---@diagnostic disable-line: undefined-global
     report_log('Issuing REQUEST_METHOD request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
+    local start = vim.uv.hrtime()
     local req_result = vim.lsp.buf_request_sync(0, 'REQUEST_METHOD', params)
+    local elapsed_ns = vim.uv.hrtime() - start
+    record_benchmark_result(elapsed_ns) ---@diagnostic disable-line: undefined-global
 
     if not req_result then
         ---@diagnostic disable-next-line: undefined-global

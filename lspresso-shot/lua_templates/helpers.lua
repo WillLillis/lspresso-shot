@@ -32,6 +32,18 @@ local function mark_empty_file()
     ---@diagnostic enable: need-check-nil
 end
 
+---@param time_ns number
+---@diagnostic disable-next-line: unused-local, unused-function
+local function record_benchmark_result(time_ns)
+    local benchmark_file, err = io.open('BENCHMARK_PATH', 'a')
+    if not benchmark_file then
+        report_error('Could not open benchmark file: ' .. err)
+    else
+        benchmark_file:write(tostring(time_ns) .. '\n')
+        benchmark_file:close()
+    end
+end
+
 local messages = {}
 
 local original_notify = vim.notify
