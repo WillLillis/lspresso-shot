@@ -32,7 +32,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_document_highlight(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             None
@@ -54,8 +54,7 @@ mod test {
         send_capabiltiies(&document_highlight_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result =
-            test_document_highlight(test_case.clone(), Position::default(), None, None);
+        let test_result = test_document_highlight(&test_case, Position::default(), None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -80,7 +79,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_document_highlight(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             Some(&resp)
@@ -104,7 +103,7 @@ mod test {
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_document_highlight(
-            test_case,
+            &test_case,
             Position::new(1, 9),
             None,
             Some(&vec![DocumentHighlight {

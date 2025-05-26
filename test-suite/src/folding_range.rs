@@ -31,7 +31,7 @@ mod test {
         send_capabiltiies(&folding_range_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_folding_range(test_case, None, None));
+        lspresso_shot!(test_folding_range(&test_case, None, None));
     }
 
     #[rstest]
@@ -48,7 +48,7 @@ mod test {
         send_capabiltiies(&folding_range_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_folding_range(test_case.clone(), None, None);
+        let test_result = test_folding_range(&test_case, None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -71,7 +71,7 @@ mod test {
         send_capabiltiies(&folding_range_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_folding_range(test_case, None, Some(&resp)));
+        lspresso_shot!(test_folding_range(&test_case, None, Some(&resp)));
     }
 
     #[test]
@@ -91,7 +91,7 @@ mod test {
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_folding_range(
-            test_case,
+            &test_case,
             None,
             Some(&vec![FoldingRange {
                 start_line: 0,

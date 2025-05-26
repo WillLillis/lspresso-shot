@@ -52,7 +52,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_incoming_calls(
-            test_case.clone(),
+            &test_case,
             &CallHierarchyItem {
                 name: "these fields".to_string(),
                 kind: SymbolKind::EVENT,
@@ -84,7 +84,7 @@ mod test {
 
         let mut call_item = get_prepare_call_hierachy_response(1, &uri).unwrap()[0].clone();
         call_item.uri = get_full_dummy_source_path(&test_case);
-        let test_result = test_incoming_calls(test_case.clone(), &call_item, None, None);
+        let test_result = test_incoming_calls(&test_case, &call_item, None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -110,7 +110,7 @@ mod test {
         let mut call_item = get_prepare_call_hierachy_response(1, &uri).unwrap()[0].clone();
         call_item.uri = get_full_dummy_source_path(&test_case);
         lspresso_shot!(test_incoming_calls(
-            test_case,
+            &test_case,
             &call_item,
             None,
             Some(&resp)
@@ -163,7 +163,7 @@ pub fn main() {
         };
 
         lspresso_shot!(test_incoming_calls(
-            test_case,
+            &test_case,
             &call_item,
             None,
             Some(&vec![CallHierarchyIncomingCall {

@@ -31,7 +31,7 @@ mod test {
         send_capabiltiies(&document_color_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_document_color(test_case, None, &resp));
+        lspresso_shot!(test_document_color(&test_case, None, &resp));
     }
 
     // NOTE: rust-analyzer doesn't support `textDocument/documentColor`

@@ -48,7 +48,7 @@ mod test {
         send_capabiltiies(&hover_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_hover(test_case, Position::default(), None, None));
+        lspresso_shot!(test_hover(&test_case, Position::default(), None, None));
     }
 
     #[rstest]
@@ -65,7 +65,7 @@ mod test {
         send_capabiltiies(&hover_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_hover(test_case.clone(), Position::default(), None, None);
+        let test_result = test_hover(&test_case, Position::default(), None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -89,7 +89,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_hover(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             Some(&resp)
@@ -113,7 +113,7 @@ mod test {
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_hover(
-        test_case,
+        &test_case,
         Position::new(1, 5),
         None,
         Some(&Hover {

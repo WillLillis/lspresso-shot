@@ -43,7 +43,7 @@ mod test {
         let code_lens = get_dummy_code_lens(&test_case);
 
         lspresso_shot!(test_code_lens_resolve(
-            test_case, None, &code_lens, None, None
+            &test_case, None, &code_lens, None, None
         ));
     }
 
@@ -63,7 +63,7 @@ mod test {
             .expect("Failed to send capabilities");
         let code_lens = get_dummy_code_lens(&test_case);
 
-        let test_result = test_code_lens_resolve(test_case.clone(), None, &code_lens, None, None);
+        let test_result = test_code_lens_resolve(&test_case, None, &code_lens, None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -89,7 +89,7 @@ mod test {
         let code_lens = get_dummy_code_lens(&test_case);
 
         lspresso_shot!(test_code_lens_resolve(
-            test_case,
+            &test_case,
             None,
             &code_lens,
             None,

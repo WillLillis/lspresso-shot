@@ -55,7 +55,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_formatting(
-            test_case,
+            &test_case,
             None,
             None,
             Some(&StateOrResponse::State(contents.to_string()))
@@ -73,7 +73,7 @@ mod test {
         send_capabiltiies(&formatting_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_formatting(test_case, None, None, None));
+        lspresso_shot!(test_formatting(&test_case, None, None, None));
     }
 
     #[test]
@@ -88,7 +88,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_on_type_formatting(
-            test_case,
+            &test_case,
             Position::default(),
             "",
             None,
@@ -109,7 +109,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_range_formatting(
-            test_case,
+            &test_case,
             Range::default(),
             None,
             None,
@@ -133,7 +133,7 @@ mod test {
         send_capabiltiies(&formatting_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_formatting(test_case.clone(), None, None, None);
+        let test_result = test_formatting(&test_case, None, None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -158,7 +158,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         let test_result =
-            test_on_type_formatting(test_case.clone(), Position::default(), "", None, None, None);
+            test_on_type_formatting(&test_case, Position::default(), "", None, None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -182,7 +182,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_formatting(
-            test_case,
+            &test_case,
             None,
             None,
             Some(&StateOrResponse::Response(edits))
@@ -205,7 +205,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_range_formatting(
-            test_case,
+            &test_case,
             Range::default(),
             None,
             None,
@@ -229,7 +229,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_on_type_formatting(
-            test_case,
+            &test_case,
             Position::default(),
             "",
             None,
@@ -255,7 +255,7 @@ let foo = 5;
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_formatting(
-            test_case,
+            &test_case,
             None,
             None,
             Some(&StateOrResponse::State(
@@ -285,7 +285,7 @@ let foo = 5;
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_formatting(
-            test_case,
+            &test_case,
             None,
             None,
             Some(&StateOrResponse::Response(vec![
@@ -327,7 +327,7 @@ let foo = 5;
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_on_type_formatting(
-            test_case,
+            &test_case,
             Position::new(1, 18),
             "=",
             None,

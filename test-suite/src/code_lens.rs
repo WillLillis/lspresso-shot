@@ -33,7 +33,7 @@ mod test {
         send_capabiltiies(&code_lens_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_code_lens(test_case, None, None, None));
+        lspresso_shot!(test_code_lens(&test_case, None, None, None));
     }
 
     #[rstest]
@@ -50,7 +50,7 @@ mod test {
         send_capabiltiies(&code_lens_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_code_lens(test_case.clone(), None, None, None);
+        let test_result = test_code_lens(&test_case, None, None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -73,7 +73,7 @@ mod test {
         send_capabiltiies(&code_lens_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_code_lens(test_case, None, None, Some(&resp)));
+        lspresso_shot!(test_code_lens(&test_case, None, None, Some(&resp)));
     }
 
     // NOTE: It's difficult to test for equality with rust-analyzer here, as part
@@ -145,7 +145,7 @@ mod test {
             };
 
         lspresso_shot!(test_code_lens(
-            test_case,
+            &test_case,
             Some(&commands),
             Some(cmp),
             Some(&expected)

@@ -47,7 +47,7 @@ mod test {
         let completion_item = get_dummy_completion(&test_case);
 
         lspresso_shot!(test_completion_resolve(
-            test_case,
+            &test_case,
             &completion_item,
             None,
             None
@@ -70,7 +70,7 @@ mod test {
             .expect("Failed to send capabilities");
         let completion_item = get_dummy_completion(&test_case);
 
-        let test_result = test_completion_resolve(test_case.clone(), &completion_item, None, None);
+        let test_result = test_completion_resolve(&test_case, &completion_item, None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -96,7 +96,7 @@ mod test {
         let completion_item = get_dummy_completion(&test_case);
 
         lspresso_shot!(test_completion_resolve(
-            test_case,
+            &test_case,
             &completion_item,
             None,
             Some(&resp)
@@ -202,7 +202,7 @@ println!("format {local_variable} arguments");
         };
 
         lspresso_shot!(test_completion_resolve(
-            test_case,
+            &test_case,
             &completion_item,
             None,
             Some(&completion_item)

@@ -33,7 +33,7 @@ mod test {
         send_capabiltiies(&document_symbol_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_document_symbol(test_case, None, None));
+        lspresso_shot!(test_document_symbol(&test_case, None, None));
     }
 
     #[rstest]
@@ -50,7 +50,7 @@ mod test {
         send_capabiltiies(&document_symbol_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_document_symbol(test_case.clone(), None, None);
+        let test_result = test_document_symbol(&test_case, None, None);
         let mut expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id.clone(),
             expected: None,
@@ -91,7 +91,7 @@ mod test {
         send_capabiltiies(&document_symbol_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_document_symbol(test_case, None, Some(&syms)));
+        lspresso_shot!(test_document_symbol(&test_case, None, Some(&syms)));
     }
 
     #[test]
@@ -111,7 +111,7 @@ mod test {
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_document_symbol(
-            doc_sym_test_case,
+            &doc_sym_test_case,
             None,
             #[allow(deprecated)]
             Some(&DocumentSymbolResponse::Nested(vec![DocumentSymbol {

@@ -85,7 +85,7 @@ mod test {
         };
 
         lspresso_shot!(test_workspace_will_create_files(
-            test_case, &params, None, None
+            &test_case, &params, None, None
         ));
     }
 
@@ -109,7 +109,7 @@ mod test {
         };
 
         lspresso_shot!(test_workspace_will_delete_files(
-            test_case, &params, None, None
+            &test_case, &params, None, None
         ));
     }
 
@@ -137,7 +137,7 @@ mod test {
         };
 
         lspresso_shot!(test_workspace_will_rename_files(
-            test_case, &params, None, None
+            &test_case, &params, None, None
         ));
     }
 
@@ -169,7 +169,7 @@ mod test {
             files: vec![FileCreate { uri }],
         };
 
-        let test_result = test_workspace_will_create_files(test_case.clone(), &params, None, None);
+        let test_result = test_workspace_will_create_files(&test_case, &params, None, None);
         let resp = WorkspaceEdit::clean_response(resp, &test_case).unwrap();
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
@@ -207,7 +207,7 @@ mod test {
             files: vec![FileDelete { uri }],
         };
 
-        let test_result = test_workspace_will_delete_files(test_case.clone(), &params, None, None);
+        let test_result = test_workspace_will_delete_files(&test_case, &params, None, None);
         let resp = WorkspaceEdit::clean_response(resp, &test_case).unwrap();
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
@@ -248,7 +248,7 @@ mod test {
             }],
         };
 
-        let test_result = test_workspace_will_rename_files(test_case.clone(), &params, None, None);
+        let test_result = test_workspace_will_rename_files(&test_case, &params, None, None);
         let resp = WorkspaceEdit::clean_response(resp, &test_case).unwrap();
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
@@ -290,7 +290,7 @@ mod test {
         };
 
         lspresso_shot!(test_workspace_will_create_files(
-            test_case,
+            &test_case,
             &params,
             None,
             Some(&resp)
@@ -329,7 +329,7 @@ mod test {
         };
 
         lspresso_shot!(test_workspace_will_delete_files(
-            test_case,
+            &test_case,
             &params,
             None,
             Some(&resp)
@@ -372,7 +372,7 @@ mod test {
         };
 
         lspresso_shot!(test_workspace_will_rename_files(
-            test_case,
+            &test_case,
             &params,
             None,
             Some(&resp)

@@ -64,7 +64,7 @@ mod test {
         send_capabiltiies(&workspace_symbol_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_workspace_symbol(test_case, &uri, None, None));
+        lspresso_shot!(test_workspace_symbol(&test_case, &uri, None, None));
     }
 
     #[rstest]
@@ -88,7 +88,7 @@ mod test {
             .expect("Failed to send capabilities");
         let uri = get_dummy_uri(&test_case);
 
-        let test_result = test_workspace_symbol(test_case.clone(), &uri, None, None);
+        let test_result = test_workspace_symbol(&test_case, &uri, None, None);
         let resp = WorkspaceSymbolResponse::clean_response(resp, &test_case).unwrap();
         let mut expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id.clone(),
@@ -146,7 +146,7 @@ mod test {
             .expect("Failed to send capabilities");
         let uri = get_dummy_uri(&test_case);
 
-        lspresso_shot!(test_workspace_symbol(test_case, &uri, None, Some(&resp)));
+        lspresso_shot!(test_workspace_symbol(&test_case, &uri, None, Some(&resp)));
     }
 
     #[rstest]
@@ -172,7 +172,7 @@ mod test {
         let cleaned_resp = resp.clone().clean_response(&test_case).unwrap();
 
         lspresso_shot!(test_workspace_symbol_resolve(
-            test_case,
+            &test_case,
             &resp,
             None,
             &cleaned_resp
@@ -191,7 +191,7 @@ mod test {
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_workspace_symbol(
-            test_case,
+            &test_case,
             "",
             None,
             #[allow(deprecated)]

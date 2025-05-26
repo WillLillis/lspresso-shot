@@ -48,7 +48,7 @@ mod test {
         .expect("Failed to send capabilities");
 
         lspresso_shot!(test_workspace_execute_command(
-            test_case,
+            &test_case,
             Some(&commands),
             "lspresso.testCommand",
             Some(&vec![uri_val]),
@@ -86,7 +86,7 @@ mod test {
         )
         .expect("Failed to send capabilities");
         let test_result = test_workspace_execute_command(
-            test_case.clone(),
+            &test_case,
             Some(&commands),
             "lspresso.testCommand",
             Some(&vec![uri_val]),
@@ -131,7 +131,7 @@ mod test {
         .expect("Failed to send capabilities");
 
         lspresso_shot!(test_workspace_execute_command(
-            test_case,
+            &test_case,
             Some(&commands),
             "lspresso.testCommand",
             Some(&vec![uri_val]),

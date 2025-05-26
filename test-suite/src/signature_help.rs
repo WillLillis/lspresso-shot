@@ -43,7 +43,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_signature_help(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             None,
@@ -65,8 +65,7 @@ mod test {
         send_capabiltiies(&signature_help_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result =
-            test_signature_help(test_case.clone(), Position::default(), None, None, None);
+        let test_result = test_signature_help(&test_case, Position::default(), None, None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -90,7 +89,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_signature_help(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             None,
@@ -116,7 +115,7 @@ pub fn main() {
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_signature_help(
-            test_case,
+            &test_case,
             Position::new(2, 8),
             None,
             None,

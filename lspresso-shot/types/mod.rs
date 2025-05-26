@@ -215,8 +215,6 @@ impl TestFile {
 ///
 /// - `test_id`: internal identifier for a single run of a test case, *not* to be
 ///   set by the user.
-/// - `test_type`: internal marker for the test type to be run, *not to be set by
-///   the user.
 /// - `executable_path`: path to the language server's executable.
 /// - `nvim_path`: path to/command for the Neovim executable. The default is "nvim".
 /// - `source_file`: the source file to be opened by Neovim.
@@ -230,7 +228,6 @@ impl TestFile {
 #[derive(Debug, Clone)]
 pub struct TestCase {
     pub test_id: String,
-    pub test_type: Option<TestType>,
     pub executable_path: PathBuf,
     pub nvim_path: PathBuf,
     pub source_file: TestFile,
@@ -244,13 +241,12 @@ pub struct TestCase {
 impl TestCase {
     /// Create a new `TestCase`. `self.nvim_path` is assigned to the contents of `LSPRESSO_NVIM`
     /// if it is set, otherwise "nvim".
-    pub fn new<P1: Into<PathBuf>>(executable_path: P1, source_file: TestFile) -> Self {
+    pub fn new<P: Into<PathBuf>>(executable_path: P, source_file: TestFile) -> Self {
         let nvim_path = std::env::var("LSPRESSO_NVIM")
             .unwrap_or_else(|_| "nvim".into())
             .into();
         Self {
             test_id: Self::generate_test_id(),
-            test_type: None,
             executable_path: executable_path.into(),
             nvim_path,
             source_file,

@@ -48,7 +48,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_code_action(
-            test_case,
+            &test_case,
             Range::default(),
             &CodeActionContext::default(),
             None,
@@ -71,7 +71,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         let test_result = test_code_action(
-            test_case.clone(),
+            &test_case,
             Range::default(),
             &CodeActionContext::default(),
             None,
@@ -100,7 +100,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_code_action(
-            test_case,
+            &test_case,
             Range::default(),
             &CodeActionContext::default(),
             None,
@@ -143,7 +143,7 @@ mod test {
         };
 
         lspresso_shot!(test_code_action_resolve(
-            test_case,
+            &test_case,
             &code_action,
             None,
             &resp
@@ -252,7 +252,7 @@ mod test {
         };
 
         lspresso_shot!(test_code_action(
-            test_case,
+            &test_case,
             range,
             &CodeActionContext::default(),
             Some(cmp),

@@ -65,7 +65,7 @@ mod tests {
         send_capabiltiies(&diagnostic_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_diagnostic(test_case, None, None, None, &resp));
+        lspresso_shot!(test_diagnostic(&test_case, None, None, None, &resp));
     }
 
     #[rstest]
@@ -85,7 +85,11 @@ mod tests {
         send_capabiltiies(&diagnostic_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_publish_diagnostics(test_case, None, &resp.diagnostics));
+        lspresso_shot!(test_publish_diagnostics(
+            &test_case,
+            None,
+            &resp.diagnostics
+        ));
     }
 
     #[rstest]
@@ -112,7 +116,7 @@ mod tests {
             .to_string();
 
         lspresso_shot!(test_workspace_diagnostic(
-            test_case,
+            &test_case,
             Some(&path),
             &Vec::new(),
             None,
@@ -137,7 +141,7 @@ mod tests {
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_diagnostic(
-            diagnostic_test_case,
+            &diagnostic_test_case,
             None,
             None,
             None,
@@ -184,7 +188,7 @@ mod tests {
             },
         };
         lspresso_shot!(test_publish_diagnostics(
-            diagnostic_test_case,
+            &diagnostic_test_case,
             None,
             &vec![
                 Diagnostic {
@@ -247,7 +251,7 @@ mod tests {
             serde_json::Value::String("error[E0765]: unterminated double quote string\n --> src/main.rs:2:14\n  |\n2 |       println!(\"Hello, world!\n  |  ______________^\n3 | | }\n  | |_^\n\n".to_string()),
         );
         lspresso_shot!(test_publish_diagnostics(
-            diagnostic_test_case,
+            &diagnostic_test_case,
             None,
             &vec![Diagnostic {
                 range: Range {

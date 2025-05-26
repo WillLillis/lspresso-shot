@@ -36,7 +36,7 @@ mod test {
         send_capabiltiies(&document_link_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_document_link(test_case, None, None));
+        lspresso_shot!(test_document_link(&test_case, None, None));
     }
 
     #[rstest]
@@ -53,7 +53,7 @@ mod test {
         send_capabiltiies(&document_link_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_document_link(test_case.clone(), None, None);
+        let test_result = test_document_link(&test_case, None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -76,7 +76,7 @@ mod test {
         send_capabiltiies(&document_link_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_document_link(test_case, None, Some(&resp)));
+        lspresso_shot!(test_document_link(&test_case, None, Some(&resp)));
     }
 
     // NOTE: rust-analyzer doesn't support `textDocument/documentLink`
