@@ -30,7 +30,7 @@ fn it_does_the_hover_thing() {
     let cursor_pos = Position::new(1, 2);
     lspresso_shot!(test_hover(
         hover_test_case,
-        &cursor_pos,
+        cursor_pos,
         Some(&Hover {
             range: Some(Range {
                 start: lsp_types::Position {
@@ -48,6 +48,26 @@ fn it_does_the_hover_thing() {
             })
         })
     ));
+}
+```
+
+Or a benchmark:
+
+```rust
+fn blazingly_fast() {
+    let references_test_case = TestCase::new(
+        "Path to server",
+        TestFile::new("Source file name", "Contents")
+    );
+
+    let cursor_pos = Position::new(1, 2);
+    let include_declaration = true;
+    let measurements: Vec<Duration> = benchmark_references(
+        &test_case,
+        BenchmarkConfig::default(),
+        cursor_pos,
+        include_declaration,
+    );
 }
 ```
 

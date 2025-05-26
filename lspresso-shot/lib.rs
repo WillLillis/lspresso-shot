@@ -8,9 +8,10 @@ use lsp_types::{
     CompletionItem, CompletionResponse, CreateFilesParams, DeleteFilesParams, Diagnostic,
     DocumentDiagnosticReport, DocumentHighlight, DocumentLink, DocumentSymbolResponse,
     FoldingRange, FormattingOptions, GotoDefinitionResponse, Hover, InlayHint, LinkedEditingRanges,
-    Location, Moniker, Position, PrepareRenameResponse, PreviousResultId, Range, RenameFilesParams,
-    SelectionRange, SemanticTokensFullDeltaResult, SemanticTokensRangeResult, SemanticTokensResult,
-    SignatureHelp, SignatureHelpContext, TextEdit, TypeHierarchyItem, WorkspaceDiagnosticReport,
+    Location, Moniker, OneOf, Position, PrepareRenameResponse, PreviousResultId, Range,
+    RelatedFullDocumentDiagnosticReport, RenameFilesParams, SelectionRange,
+    SemanticTokensFullDeltaResult, SemanticTokensRangeResult, SemanticTokensResult, SignatureHelp,
+    SignatureHelpContext, SymbolKind, TextEdit, TypeHierarchyItem, Uri, WorkspaceDiagnosticReport,
     WorkspaceEdit, WorkspaceSymbol, WorkspaceSymbolResponse,
     request::{GotoDeclarationResponse, GotoImplementationResponse, GotoTypeDefinitionResponse},
 };
@@ -19,12 +20,12 @@ use lsp_types::{
 #[allow(unused_imports)]
 use lsp_types::{
     CallHierarchyIncomingCallsParams, CallHierarchyOutgoingCallsParams, CallHierarchyPrepareParams,
-    CodeActionParams, CompletionParams, DocumentDiagnosticParams, DocumentHighlightParams,
-    DocumentOnTypeFormattingParams, DocumentRangeFormattingParams, ExecuteCommandParams,
-    GotoDefinitionParams, HoverParams, InlayHintParams, MonikerParams, ReferenceParams,
-    RenameParams, SelectionRangeParams, SemanticTokensRangeParams, SignatureHelpParams,
-    TextDocumentPositionParams, TypeHierarchyPrepareParams, WorkspaceDiagnosticParams,
-    WorkspaceSymbolParams,
+    CodeActionParams, ColorPresentationParams, CompletionParams, DocumentDiagnosticParams,
+    DocumentHighlightParams, DocumentOnTypeFormattingParams, DocumentRangeFormattingParams,
+    ExecuteCommandParams, GotoDefinitionParams, HoverParams, InlayHintParams, MonikerParams,
+    ReferenceParams, RenameParams, SelectionRangeParams, SemanticTokensRangeParams,
+    SignatureHelpParams, TextDocumentPositionParams, TypeHierarchyPrepareParams,
+    WorkspaceDiagnosticParams, WorkspaceSymbolParams,
     request::{GotoDeclarationParams, GotoImplementationParams, GotoTypeDefinitionParams},
 };
 use serde_json::Value;
@@ -36,13 +37,15 @@ use std::{
     fs,
     path::Path,
     process::{Command, Stdio},
+    str::FromStr as _,
     sync::{Arc, Condvar, Mutex, OnceLock},
+    time::Duration,
 };
 
 use types::{
-    ApproximateEq, CleanResponse, ResponseMismatchError, StateOrResponse, TestCase, TestError,
-    TestExecutionError, TestExecutionResult, TestResult, TestType, TimeoutError,
-    to_parent_err_type,
+    ApproximateEq, BenchmarkConfig, BenchmarkError, CleanResponse, EndCondition,
+    ResponseMismatchError, StateOrResponse, TestCase, TestError, TestExecutionError,
+    TestExecutionResult, TestResult, TestType, TimeoutError, to_parent_err_type,
 };
 
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
@@ -258,6 +261,36 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()>
     }))?
 }
 
+fn benchmark<T>(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    action: impl Fn() -> TestResult<(), T>,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    let handle_result = |res: TestResult<(), T>, fail_fast: bool| -> Result<(), BenchmarkError> {
+        match (fail_fast, res) {
+            (true, Err(TestError::ResponseMismatch(_)) | Ok(())) | (false, _) => Ok(()),
+            (true, Err(TestError::TestSetup(setup))) => Err(BenchmarkError::TestSetup(setup)),
+            (true, Err(TestError::TestExecution(execution))) => {
+                Err(BenchmarkError::TestExecution(execution))
+            }
+        }
+    };
+    match config.end_condition {
+        EndCondition::Time(duration) => {
+            let start = std::time::Instant::now();
+            while start.elapsed() < duration {
+                handle_result(action(), config.fail_fast)?;
+            }
+        }
+        EndCondition::Count(iterations) => {
+            for _ in 0..iterations {
+                handle_result(action(), config.fail_fast)?;
+            }
+        }
+    }
+    test_case.get_benchmark_results()
+}
+
 pub type CodeActionComparator = fn(&CodeActionResponse, &CodeActionResponse, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/codeAction`] request
@@ -302,9 +335,35 @@ pub fn test_code_action(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/codeAction`] request
+///
+/// - `end_condition`: Specifies how long the benchmark should run.
+/// - `range`: Passed to the client via the request's [`CodeActionParams`]
+/// - `context`: Passed to the client via the request's [`CodeActionParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `context` fails
+///
+/// [`textDocument/codeAction`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeAction
+pub fn benchmark_code_action(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    range: Range,
+    context: &CodeActionContext,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_code_action(test_case, range, context, None, None)
+    })
+}
+
 pub type CodeActionResolveComparator = fn(&CodeAction, &CodeAction, &TestCase) -> bool;
 
-/// Tests the server's response to a [`codeLens/resolve`] request
+/// Tests the server's response to a [`codeAction/resolve`] request
 ///
 /// - `params`: Passed to the client via the request's [`CodeAction`] param
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
@@ -319,7 +378,7 @@ pub type CodeActionResolveComparator = fn(&CodeAction, &CodeAction, &TestCase) -
 ///
 /// Panics if JSON serialization of `params` fails
 ///
-/// [`codeLens/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve
+/// [`codeAction/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeAction_resolve
 #[allow(clippy::result_large_err)]
 pub fn test_code_action_resolve(
     test_case: &TestCase,
@@ -349,6 +408,30 @@ pub fn test_code_action_resolve(
         Some(expected),
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`codeAction/resolve`] request
+///
+/// - `config`: Specifies how long the benchmark should run.
+/// - `params`: Passed to the client via the request's [`CodeAction`] param
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `params` fails
+///
+/// [`codeAction/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeAction_resolve
+pub fn benchmark_code_action_resolve(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    params: &CodeAction,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_code_action_resolve(test_case, params, None, &CodeAction::default())
+    })
 }
 
 pub type CodeLensComparator = fn(&Vec<CodeLens>, &Vec<CodeLens>, &TestCase) -> bool;
@@ -390,6 +473,27 @@ pub fn test_code_lens(
         expected,
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`textDocument/codeLens`] request
+///
+/// - `commands`: A list of LSP command names the client should advertise support for in its
+///   capabilities (e.g. "rust-analyzer.runSingle"). This enables command-based `CodeLens`
+///   responses from the server, such as "Run" or "Debug" actions.
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/codeLens`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_codeLens
+pub fn benchmark_code_lens(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    commands: Option<&Vec<String>>,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_code_lens(test_case, commands, None, None)
+    })
 }
 
 pub type CodeLensResolveComparator = fn(&CodeLens, &CodeLens, &TestCase) -> bool;
@@ -446,11 +550,40 @@ pub fn test_code_lens_resolve(
     )
 }
 
+/// Benchmarks the server's response time to a [`codeLens/resolve`] request
+///
+/// - `commands` is a list of LSP command names the client should advertise support for in its
+///   capabilities (e.g. "rust-analyzer.runSingle"). This enables command-based [`CodeLens`]
+///   responses from the server, such as "Run" or "Debug" actions.
+/// - `code_lens`: Passed to the client via the request's [`CodeLens`] param
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `code_lens` fails
+///
+/// [`codeLens/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve
+pub fn benchmark_code_lens_resolve(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    commands: Option<&Vec<String>>,
+    code_lens: &CodeLens,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_code_lens_resolve(test_case, commands, code_lens, None, None)
+    })
+}
+
 pub type ColorPresentationComparator =
     fn(&Vec<ColorPresentation>, &Vec<ColorPresentation>, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/colorPresentation`] request
 ///
+/// - `color`: Passed to the client via the request's [`ColorPresentationParams`] param
+/// - `range`: Passed to the client via the request's [`ColorPresentationParams`] param
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
 ///
@@ -489,6 +622,31 @@ pub fn test_color_presentation(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/colorPresentation`] request
+///
+/// - `color`: Passed to the client via the request's [`ColorPresentationParams`] param
+/// - `range`: Passed to the client via the request's [`ColorPresentationParams`] param
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `color` fails
+///
+/// [`textDocument/colorPresentation`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_colorPresentation
+pub fn benchmark_color_presentation(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    color: Color,
+    range: Range,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_color_presentation(test_case, color, range, None, &vec![])
+    })
+}
+
 pub type CompletionComparator = fn(&CompletionResponse, &CompletionResponse, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/completion`] request
@@ -523,6 +681,26 @@ pub fn test_completion(
         expected,
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`textDocument/completion`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`CompletionParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/completion`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_completion
+pub fn benchmark_completion(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_completion(test_case, cursor_pos, None, None)
+    })
 }
 
 pub type CompletionResolveComparator = fn(&CompletionItem, &CompletionItem, &TestCase) -> bool;
@@ -585,6 +763,29 @@ pub fn test_completion_resolve(
     )
 }
 
+/// Benchmarks the server's response time to a [`completionItem/resolve`] request
+///
+/// - `completion_item`: Passed to the client via the request's [`CompletionItem`] param
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `completion_item` fails
+///
+/// [`completionItem/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve
+pub fn benchmark_completion_resolve(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    completion_item: &CompletionItem,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_completion_resolve(test_case, completion_item, None, None)
+    })
+}
+
 pub type DeclarationComparator =
     fn(&GotoDeclarationResponse, &GotoDeclarationResponse, &TestCase) -> bool;
 
@@ -629,6 +830,26 @@ pub fn test_declaration(
         expected,
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`textDocument/declaration`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`GotoDeclarationParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/declaration`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration
+pub fn benchmark_declaration(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_declaration(test_case, cursor_pos, None, None)
+    })
 }
 
 pub type DefinitionComparator =
@@ -676,6 +897,26 @@ pub fn test_definition(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/definition`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`GotoDefinitionParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/definition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition
+pub fn benchmark_definition(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_definition(test_case, cursor_pos, None, None)
+    })
+}
+
 pub type DiagnosticComparator =
     fn(&DocumentDiagnosticReport, &DocumentDiagnosticReport, &TestCase) -> bool;
 
@@ -700,6 +941,7 @@ pub type DiagnosticComparator =
 pub fn test_diagnostic(
     test_case: &TestCase,
     identifier: Option<&str>,
+    // TODO: Consider removing since we use the first result
     previous_result_id: Option<&str>,
     cmp: Option<DiagnosticComparator>,
     expected: &DocumentDiagnosticReport,
@@ -734,6 +976,37 @@ pub fn test_diagnostic(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/diagnostic`] request
+///
+/// - `identifier`: Passed to the client via the request's [`DocumentDiagnosticParams`]
+/// - `previous_result_id`: Passed to the client via the request's [`DocumentDiagnosticParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `identifier` or `previous_result_id` fails
+///
+/// [`textDocument/diagnostic`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_diagnostic
+pub fn benchmark_diagnostic(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    identifier: Option<&str>,
+    previous_result_id: Option<&str>,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_diagnostic(
+            test_case,
+            identifier,
+            previous_result_id,
+            None,
+            &DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport::default()),
+        )
+    })
+}
+
 pub type DocumentColorComparator =
     fn(&Vec<ColorInformation>, &Vec<ColorInformation>, &TestCase) -> bool;
 
@@ -760,6 +1033,22 @@ pub fn test_document_color(
         Some(expected),
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`textDocument/documentColor`] request
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/documentColor`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentColor
+pub fn benchmark_document_color(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_document_color(test_case, None, &vec![])
+    })
 }
 
 pub type DocumentHighlightComparator =
@@ -799,6 +1088,26 @@ pub fn test_document_highlight(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/documentHighlight`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`DocumentHighlightParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/documentHighlight`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentHighlight
+pub fn benchmark_document_highlight(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_document_highlight(test_case, cursor_pos, None, None)
+    })
+}
+
 pub type DocumentLinkComparator = fn(&Vec<DocumentLink>, &Vec<DocumentLink>, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/documentLink`] request
@@ -824,6 +1133,22 @@ pub fn test_document_link(
         expected,
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`textDocument/documentLink`] request
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/documentLink`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentLink
+pub fn benchmark_document_link(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_document_link(test_case, None, None)
+    })
 }
 
 pub type DocumentLinkResolveComparator = fn(&DocumentLink, &DocumentLink, &TestCase) -> bool;
@@ -866,6 +1191,30 @@ pub fn test_document_link_resolve(
     )
 }
 
+/// Benchmarks the server's response time to a [`documentLink/resolve`] request
+///
+/// - `link`: Passed to the client via the request's [`DocumentLink`] params
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `link` fails
+///
+/// [`documentLink/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve
+pub fn benchmark_document_link_resolve(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    params: &DocumentLink,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_document_link_resolve(test_case, params, None, None)
+    })
+}
+
 pub type DocumentSymbolComparator =
     fn(&DocumentSymbolResponse, &DocumentSymbolResponse, &TestCase) -> bool;
 
@@ -873,6 +1222,8 @@ pub type DocumentSymbolComparator =
 ///
 /// - `cmp`: An optional custom comparator function that can be used to determine equality
 ///   between the expected and actual results.
+///
+/// # Warnings
 ///
 /// Different values of `DocumentSymbolResponse` can be serialized to the same JSON
 /// representation. Because the LSP specification is defined over JSON RPC, this means
@@ -900,6 +1251,23 @@ pub fn test_document_symbol(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/documentSymbol`] request
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// [`textDocument/documentSymbol`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_documentSymbol
+pub fn benchmark_document_symbol(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_document_symbol(test_case, None, None)
+    })
+}
+
 pub type FoldingRangeComparator = fn(&Vec<FoldingRange>, &Vec<FoldingRange>, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/foldingRange`] request
@@ -925,6 +1293,22 @@ pub fn test_folding_range(
         expected,
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`textDocument/foldingRange`] request
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/foldingRange`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_foldingRange
+pub fn benchmark_folding_range(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_folding_range(test_case, None, None)
+    })
 }
 
 fn default_format_opts() -> FormattingOptions {
@@ -1004,6 +1388,41 @@ pub fn test_formatting(
             None,
         )),
     }
+}
+
+/// Benchmarks the server's response time to a [`textDocument/formatting`] request.
+///
+/// - `options`:  The formatting options passed to the LSP client. If `None`, then
+///   the following default is used:
+///
+/// ```rust
+/// lsp_types::FormattingOptions {
+///     tab_size: 4,
+///     insert_spaces: true,
+///     properties: std::collections::HashMap::new(),
+///     trim_trailing_whitespace: Some(true),
+///     insert_final_newline: Some(true),
+///     trim_final_newlines: Some(true),
+/// };
+/// ```
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `options` fails
+///
+/// [`textDocument/formatting`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_formatting
+pub fn benchmark_formatting(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    options: Option<&FormattingOptions>,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_formatting(test_case, options, None, None)
+    })
 }
 
 /// Performs the test for [`test_formatting`] when the expected result is `Some(Vec<TextEdit>)` or
@@ -1123,6 +1542,26 @@ pub fn test_hover(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/hover`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`HoverParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/hover`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover
+pub fn benchmark_hover(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_hover(test_case, cursor_pos, None, None)
+    })
+}
+
 pub type ImplementationComparator =
     fn(&GotoImplementationResponse, &GotoImplementationResponse, &TestCase) -> bool;
 
@@ -1169,6 +1608,27 @@ pub fn test_implementation(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/implementation`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`GotoImplementationParams`]
+///
+/// # Errors
+///
+/// Returns [`TestError`] if the test case is invalid, the expected results don't match,
+/// or some other failure occurs
+///
+/// [`textDocument/implementation`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation
+pub fn benchmark_implementation(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_implementation(test_case, cursor_pos, None, None)
+    })
+}
+
 pub type IncomingCallsComparator =
     fn(&Vec<CallHierarchyIncomingCall>, &Vec<CallHierarchyIncomingCall>, &TestCase) -> bool;
 
@@ -1208,6 +1668,29 @@ pub fn test_incoming_calls(
     )
 }
 
+/// Benchmarks the server's response time to a [`callHierarchy/incomingCalls`] request
+///
+/// - `call_item`: Passed to the client via the request's [`CallHierarchyIncomingCallsParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `call_item` fails
+///
+/// [`callHierarchy/incomingCalls`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_incomingCalls
+pub fn benchmark_incoming_calls(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    call_item: &CallHierarchyItem,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_incoming_calls(test_case, call_item, None, None)
+    })
+}
+
 pub type InlayHintComparator = fn(&Vec<InlayHint>, &Vec<InlayHint>, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/inlayHint`] request
@@ -1238,6 +1721,25 @@ pub fn test_inlay_hint(
         expected,
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`textDocument/inlayHint`] request
+///
+/// - `range`: Passed to the client via the request's [`InlayHintParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/inlayHint`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_inlayHint
+pub fn benchmark_inlay_hint(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    range: Range,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_inlay_hint(test_case, range, None, None)
+    })
 }
 
 pub type LinkedEditingRangeComparator =
@@ -1281,6 +1783,30 @@ pub fn test_linked_editing_range(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/linkedEditingRange`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`MonikerParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `call_item` fails
+///
+/// [`textDocument/moniker`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_linkedEditingRange
+pub fn benchmark_linked_editing_range(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_linked_editing_range(test_case, cursor_pos, None, None)
+    })
+}
+
 pub type MonikerComparator = fn(&Vec<Moniker>, &Vec<Moniker>, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/moniker`] request
@@ -1319,6 +1845,30 @@ pub fn test_moniker(
         expected,
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`textDocument/moniker`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`MonikerParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `call_item` fails
+///
+/// [`textDocument/moniker`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_moniker
+pub fn benchmark_moniker(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_moniker(test_case, cursor_pos, None, None)
+    })
 }
 
 pub type OnTypeFormattingComparator = fn(&Vec<TextEdit>, &Vec<TextEdit>, &TestCase) -> bool;
@@ -1393,6 +1943,46 @@ pub fn test_on_type_formatting(
     )
 }
 
+/// Tests the server's response to a [`textDocument/onTypeFormatting`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`DocumentOnTypeFormattingParams`]
+/// - `character`: Passed to the client via the request's [`DocumentOnTypeFormattingParams`]
+/// - `options`:  The formatting options passed to the LSP client. If `None`, then
+///   the following default is used:
+///
+/// ```rust
+/// lsp_types::FormattingOptions {
+///     tab_size: 4,
+///     insert_spaces: true,
+///     properties: std::collections::HashMap::new(),
+///     trim_trailing_whitespace: Some(true),
+///     insert_final_newline: Some(true),
+///     trim_final_newlines: Some(true),
+/// };
+/// ```
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `character` or `options` fails
+///
+/// [`callHierarchy/outgoingCalls`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_onTypeFormatting
+pub fn benchmark_on_type_formatting(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+    character: &str,
+    options: Option<&FormattingOptions>,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_on_type_formatting(test_case, cursor_pos, character, options, None, None)
+    })
+}
+
 pub type OutgoingCallsComparator =
     fn(&Vec<CallHierarchyOutgoingCall>, &Vec<CallHierarchyOutgoingCall>, &TestCase) -> bool;
 
@@ -1432,6 +2022,29 @@ pub fn test_outgoing_calls(
     )
 }
 
+/// Benchmarks the server's response time to a [`callHierarchy/outgoingCalls`] request
+///
+/// - `call_item`: Passed to the client via the request's [`CallHierarchyOutgoingCallsParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `call_item` fails
+///
+/// [`callHierarchy/outgoingCalls`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#callHierarchy_outgoingCalls
+pub fn benchmark_outgoing_calls(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    call_item: &CallHierarchyItem,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_outgoing_calls(test_case, call_item, None, None)
+    })
+}
+
 pub type PrepareCallHierarchyComparator =
     fn(&Vec<CallHierarchyItem>, &Vec<CallHierarchyItem>, &TestCase) -> bool;
 
@@ -1469,6 +2082,26 @@ pub fn test_prepare_call_hierarchy(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/prepareCallHierarchy`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`CallHierarchyPrepareParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/prepareCallHierarchy`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareCallHierarchy
+pub fn benchmark_prepare_call_hierarchy(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_prepare_call_hierarchy(test_case, cursor_pos, None, None)
+    })
+}
+
 pub type PrepareRenameComparator =
     fn(&PrepareRenameResponse, &PrepareRenameResponse, &TestCase) -> bool;
 
@@ -1504,6 +2137,26 @@ pub fn test_prepare_rename(
         expected,
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`textDocument/prepareRename`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`TextDocumentPositionParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/prepareCallHierarchy`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareRename
+pub fn benchmark_prepare_rename(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_prepare_rename(test_case, cursor_pos, None, None)
+    })
 }
 
 pub type PrepareTypeHierarchyComparator =
@@ -1558,6 +2211,34 @@ pub fn test_prepare_type_hierarchy(
         expected,
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`textDocument/prepareTypeHierarchy`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`TypeHierarchyPrepareParams`]
+/// - `items`: Type hierarchy items provided to the client via [`TypeHierarchyPrepareParams`].
+///   The `uri` field of each item should be *relative* to the test case root, instead of an
+///   absolute path. (i.e. `uri = "file://src/test_file.rs"`)
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `items` fails
+///
+/// [`textDocument/prepareTypeHierarchy`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_prepareTypeHierarchy
+pub fn benchmark_prepare_type_hierarchy(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+    items: Option<&Vec<TypeHierarchyItem>>,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_prepare_type_hierarchy(test_case, cursor_pos, items, None, None)
+    })
 }
 
 pub type PublishDiagnosticsComparator = fn(&Vec<Diagnostic>, &Vec<Diagnostic>, &TestCase) -> bool;
@@ -1661,6 +2342,43 @@ pub fn test_range_formatting(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/rangeFormatting`] request
+///
+/// - `range`: Passed to the client via the request's [`DocumentRangeFormattingParams`]
+/// - `options`:  The formatting options passed to the LSP client. If `None`, then
+///   the following default is used:
+///
+/// ```rust
+/// lsp_types::FormattingOptions {
+///     tab_size: 4,
+///     insert_spaces: true,
+///     properties: std::collections::HashMap::new(),
+///     trim_trailing_whitespace: Some(true),
+///     insert_final_newline: Some(true),
+///     trim_final_newlines: Some(true),
+/// };
+/// ```
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `options` fails
+///
+/// [`textDocument/rangeFormatting`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rangeFormatting
+pub fn benchmark_range_formatting(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    range: Range,
+    options: Option<&FormattingOptions>,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_range_formatting(test_case, range, options, None, None)
+    })
+}
+
 pub type ReferencesComparator = fn(&Vec<Location>, &Vec<Location>, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/references`] request
@@ -1712,6 +2430,32 @@ pub fn test_references(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/references`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`ReferenceParams`]
+/// - `include_declaration`: Passed to the client via the request's [`ReferenceParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `include_declaration` fails
+///
+/// [`textDocument/references`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_references
+pub fn benchmark_references(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+    include_declaration: bool,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_references(test_case, cursor_pos, include_declaration, None, None)
+    })
+}
+
 pub type RenameComparator = fn(&WorkspaceEdit, &WorkspaceEdit, &TestCase) -> bool;
 
 /// Tests the server's response to a [`textDocument/rename`] request
@@ -1761,6 +2505,32 @@ pub fn test_rename(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/rename`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`RenameParams`]
+/// - `new_name`: Passed to the client via the request's [`RenameParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `new_name` fails
+///
+/// [`textDocument/rename`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename
+pub fn benchmark_rename(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+    new_name: &str,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_rename(test_case, cursor_pos, new_name, None, None)
+    })
+}
+
 pub type SelectionRangeComparator =
     fn(&Vec<SelectionRange>, &Vec<SelectionRange>, &TestCase) -> bool;
 
@@ -1803,6 +2573,29 @@ pub fn test_selection_range(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/selectionRange`] request
+///
+/// - `positions`: Passed to the client via the request's [`SelectionRangeParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `positions` fails
+///
+/// [`textDocument/typeDefinition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_selectionRange
+pub fn benchmark_selection_range(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    positions: &Vec<Position>,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_selection_range(test_case, positions, None, None)
+    })
+}
+
 pub type SemanticTokensFullComparator =
     fn(&SemanticTokensResult, &SemanticTokensResult, &TestCase) -> bool;
 
@@ -1837,6 +2630,22 @@ pub fn test_semantic_tokens_full(
         expected,
         cmp,
     )
+}
+
+/// Tests the server's response to a [`textDocument/semanticTokens/full`] request
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/semanticTokens/full`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_fullRequest
+pub fn benchmark_semantic_tokens_full(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_semantic_tokens_full(test_case, None, None)
+    })
 }
 
 pub type SemanticTokensFullDeltaComparator =
@@ -1881,6 +2690,27 @@ pub fn test_semantic_tokens_full_delta(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/semanticTokens/full/delta`] request
+///
+/// First sends a [`textDocument/semanticTokens/full`] request to get the initial state,
+/// and then issues a [`textDocument/semanticTokens/full/delta`] request if the first
+/// response contained a `result_id`.
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/semanticTokens/full`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_fullRequest
+/// [`textDocument/semanticTokens/full/delta`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_deltaRequest
+pub fn benchmark_semantic_tokens_full_delta(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_semantic_tokens_full_delta(test_case, None, None)
+    })
+}
+
 pub type SemanticTokensRangeComparator =
     fn(&SemanticTokensRangeResult, &SemanticTokensRangeResult, &TestCase) -> bool;
 
@@ -1920,6 +2750,25 @@ pub fn test_semantic_tokens_range(
         expected,
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`textDocument/semanticTokens/range`] request
+///
+/// - `range`: Passed to the client via the request's [`SemanticTokensRangeParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/semanticTokens/range`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_rangeRequest
+pub fn benchmark_semantic_tokens_range(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    range: Range,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_semantic_tokens_range(test_case, range, None, None)
+    })
 }
 
 pub type SignatureHelpComparator = fn(&SignatureHelp, &SignatureHelp, &TestCase) -> bool;
@@ -1972,6 +2821,32 @@ pub fn test_signature_help(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/signatureHelp`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`SignatureHelpParams`]
+/// - `context`: Passed to the client via the request's [`SignatureHelpParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `context` fails
+///
+/// [`textDocument/signatureHelp`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_signatureHelp
+pub fn benchmark_signature_help(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+    context: Option<&SignatureHelpContext>,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_signature_help(test_case, cursor_pos, context, None, None)
+    })
+}
+
 pub type TypeDefinitionComparator =
     fn(&GotoTypeDefinitionResponse, &GotoTypeDefinitionResponse, &TestCase) -> bool;
 
@@ -2018,6 +2893,26 @@ pub fn test_type_definition(
     )
 }
 
+/// Benchmarks the server's response time to a [`textDocument/typeDefinition`] request
+///
+/// - `cursor_pos`: The position of the cursor when the request is issued. Passed
+///   to the client via the request's [`GotoTypeDefinitionParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// [`textDocument/typeDefinition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition
+pub fn benchmark_type_definition(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    cursor_pos: Position,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_type_definition(test_case, cursor_pos, None, None)
+    })
+}
+
 pub type WorkspaceDiagnosticComparator =
     fn(&WorkspaceDiagnosticReport, &WorkspaceDiagnosticReport, &TestCase) -> bool;
 
@@ -2041,6 +2936,7 @@ pub type WorkspaceDiagnosticComparator =
 pub fn test_workspace_diagnostic(
     test_case: &TestCase,
     identifier: Option<&str>,
+    // TODO: Consider removing since we use the first result
     previous_result_ids: &Vec<PreviousResultId>,
     cmp: Option<WorkspaceDiagnosticComparator>,
     expected: &WorkspaceDiagnosticReport,
@@ -2068,6 +2964,37 @@ pub fn test_workspace_diagnostic(
         Some(expected),
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`workspace/diagnostic`] request
+///
+/// - `identifier`: Passed to the client via the request's [`WorkspaceDiagnosticParams`]
+/// - `previous_result_id`: Passed to the client via the request's [`WorkspaceDiagnosticParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `identifier` or `previous_result_id` fails
+///
+/// [`workspace/diagnostic`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_diagnostic
+pub fn benchmark_workspace_diagnostic(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    identifier: Option<&str>,
+    previous_result_ids: &Vec<PreviousResultId>,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_workspace_diagnostic(
+            test_case,
+            identifier,
+            previous_result_ids,
+            None,
+            &WorkspaceDiagnosticReport::default(),
+        )
+    })
 }
 
 pub type WorkspaceExecuteCommandComparator = fn(&Value, &Value, &TestCase) -> bool;
@@ -2144,6 +3071,36 @@ pub fn test_workspace_execute_command(
     )
 }
 
+/// Benchmarks the server's response time to a [`workspace/executeCommand`] request
+///
+/// - `commands`: A list of LSP command names the client should advertise support for in its
+///   capabilities (e.g. "rust-analyzer.runSingle"). This enables command-based `CodeLens`
+/// - `command`: The command to be executed. Passed to the client via the request's
+///   [`ExecuteCommandParams`]
+/// - `arguments`: The arguments to be passed to the command. Passed to the client via
+///   the request's [`ExecuteCommandParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `command` or `arguments` fails
+///
+/// [`workspace/executeCommand`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_executeCommand
+pub fn benchmark_workspace_execute_command(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    commands: Option<&Vec<String>>,
+    command: &str,
+    arguments: Option<&Vec<Value>>,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_workspace_execute_command(test_case, commands, command, arguments, None, None)
+    })
+}
+
 pub type WorkspaceSymbolComparator =
     fn(&WorkspaceSymbolResponse, &WorkspaceSymbolResponse, &TestCase) -> bool;
 
@@ -2194,6 +3151,29 @@ pub fn test_workspace_symbol(
     )
 }
 
+/// Benchmarks the server's response time to a [`workspace/symbol`] request
+///
+/// - `query`: Passed to the client via the request's [`WorkspaceSymbolParams`]
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `query` fails
+///
+/// [`workspace/symbol`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbol
+pub fn benchmark_workspace_symbol(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    query: &str,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_workspace_symbol(test_case, query, None, None)
+    })
+}
+
 pub type WorkspaceSymbolResolveComparator =
     fn(&WorkspaceSymbol, &WorkspaceSymbol, &TestCase) -> bool;
 
@@ -2233,6 +3213,44 @@ pub fn test_workspace_symbol_resolve(
         Some(expected),
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`workspaceSymbol/resolve`] request
+///
+/// - `params`: Passed to the client via the request's [`WorkspaceSymbol`] param
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `params` fails
+///
+/// [`workspaceSymbole/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve
+pub fn benchmark_workspace_symbol_resolve(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    params: &WorkspaceSymbol,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_workspace_symbol_resolve(
+            test_case,
+            params,
+            None,
+            &WorkspaceSymbol {
+                name: String::new(),
+                kind: SymbolKind::FILE,
+                tags: None,
+                container_name: None,
+                location: OneOf::Left(Location {
+                    uri: Uri::from_str("").unwrap(),
+                    range: Range::default(),
+                }),
+                data: None,
+            },
+        )
+    })
 }
 
 pub type WorkspaceWillCreateFilesComparator = fn(&WorkspaceEdit, &WorkspaceEdit, &TestCase) -> bool;
@@ -2275,6 +3293,29 @@ pub fn test_workspace_will_create_files(
     )
 }
 
+/// Benchmarks the server's response time to a [`workspace/willCreateFiles`] request
+///
+/// - `params`: Passed to the client via the request's [`CreateFilesParams`] param
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `params` fails
+///
+/// [`workspace/willCreateFiles`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles
+pub fn benchmark_workspace_will_create_files(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    params: &CreateFilesParams,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_workspace_will_create_files(test_case, params, None, None)
+    })
+}
+
 pub type WorkspaceWillDeleteFilesComparator = fn(&WorkspaceEdit, &WorkspaceEdit, &TestCase) -> bool;
 
 /// Tests the server's response to a [`workspace/willDeleteFiles`] request
@@ -2315,6 +3356,29 @@ pub fn test_workspace_will_delete_files(
     )
 }
 
+/// Benchmarks the server's response time to a [`workspace/willDeleteFiles`] request
+///
+/// - `params`: Passed to the client via the request's [`DeleteFilesParams`] param
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `params` fails
+///
+/// [`workspace/willDeleteFiles`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles
+pub fn benchmark_workspace_will_delete_files(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    params: &DeleteFilesParams,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_workspace_will_delete_files(test_case, params, None, None)
+    })
+}
+
 pub type WorkspaceWillRenameFilesComparator = fn(&WorkspaceEdit, &WorkspaceEdit, &TestCase) -> bool;
 
 /// Tests the server's response to a [`workspace/willRenameFiles`] request
@@ -2353,4 +3417,27 @@ pub fn test_workspace_will_rename_files(
         expected,
         cmp,
     )
+}
+
+/// Benchmarks the server's response time to a [`workspace/willRenameFiles`] request
+///
+/// - `params`: Passed to the client via the request's [`RenameFilesParams`] param
+///
+/// # Errors
+///
+/// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
+///
+/// # Panics
+///
+/// Panics if JSON serialization of `params` fails
+///
+/// [`workspace/willRenameFiles`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles
+pub fn benchmark_workspace_will_rename_files(
+    test_case: &TestCase,
+    config: BenchmarkConfig,
+    params: &RenameFilesParams,
+) -> Result<Vec<Duration>, BenchmarkError> {
+    benchmark(test_case, config, || {
+        test_workspace_will_rename_files(test_case, params, None, None)
+    })
 }

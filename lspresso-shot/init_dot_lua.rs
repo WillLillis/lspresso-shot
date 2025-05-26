@@ -40,12 +40,13 @@ fn get_standard_replacements(
     test_case: &TestCase,
     test_type: TestType,
 ) -> TestSetupResult<Vec<LuaReplacement>> {
-    let mut replacements = Vec::with_capacity(13);
+    let mut replacements = Vec::with_capacity(14);
     let results_file_path = test_case.get_results_file_path()?;
     let root_path = test_case.get_lspresso_dir()?;
     let error_path = test_case.get_error_file_path()?;
     let log_path = test_case.get_log_file_path()?;
     let empty_path = test_case.get_empty_file_path()?;
+    let benchmark_path = test_case.get_benchmark_file_path()?;
     let source_extension = test_case
         .source_file
         .path
@@ -89,6 +90,10 @@ fn get_standard_replacements(
     replacements.push(LuaReplacement::Other {
         from: "EMPTY_PATH",
         to: empty_path.to_str().unwrap().to_string(),
+    });
+    replacements.push(LuaReplacement::Other {
+        from: "BENCHMARK_PATH",
+        to: benchmark_path.to_str().unwrap().to_string(),
     });
     replacements.push(LuaReplacement::Other {
         from: "FILE_EXTENSION",

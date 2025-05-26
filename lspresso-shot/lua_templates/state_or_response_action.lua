@@ -23,7 +23,10 @@ local function check_progress_result()
             exit() ---@diagnostic disable-line: undefined-global
         end
 
+        local start = vim.uv.hrtime()
         INVOKE_FN(params) ---@diagnostic disable-line: undefined-global, exp-in-action
+        local elapsed_ns = vim.uv.hrtime() - start
+        record_benchmark_result(elapsed_ns) ---@diagnostic disable-line: undefined-global
         local lines = vim.api.nvim_buf_get_lines(0, 0, -1, true)
         local final_state = table.concat(lines, "\\n")
         ---@diagnostic disable: need-check-nil
@@ -32,7 +35,10 @@ local function check_progress_result()
         ---@diagnostic enable: need-check-nil
     else
         report_log('Requesting') ---@diagnostic disable-line: undefined-global
+        local start = vim.uv.hrtime()
         local resp = vim.lsp.buf_request_sync(0, 'REQUEST_METHOD', params)
+        local elapsed_ns = vim.uv.hrtime() - start
+        record_benchmark_result(elapsed_ns) ---@diagnostic disable-line: undefined-global
         if not resp then
             ---@diagnostic disable-next-line: undefined-global
             report_log('No valid formatting result returned: ' .. vim.inspect(resp) .. '\n')
