@@ -32,7 +32,7 @@ mod test {
         send_capabiltiies(&selection_range_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_selection_range(test_case, &Vec::new(), None, None));
+        lspresso_shot!(test_selection_range(&test_case, &Vec::new(), None, None));
     }
 
     #[rstest]
@@ -50,7 +50,7 @@ mod test {
             .expect("Failed to send capabilities");
         let positions = vec![Position::default()];
 
-        let test_result = test_selection_range(test_case.clone(), &positions, None, None);
+        let test_result = test_selection_range(&test_case, &positions, None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -75,7 +75,7 @@ mod test {
         let positions = vec![Position::default(); 3];
 
         lspresso_shot!(test_selection_range(
-            test_case,
+            &test_case,
             &positions,
             None,
             Some(&resp)
@@ -104,7 +104,7 @@ mod test {
         let positions = vec![Position::new(0, 8)];
 
         lspresso_shot!(test_selection_range(
-            test_case,
+            &test_case,
             &positions,
             None,
             Some(&vec![SelectionRange {

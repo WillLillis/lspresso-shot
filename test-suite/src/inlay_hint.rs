@@ -32,7 +32,7 @@ mod test {
         send_capabiltiies(&inlay_hint_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_inlay_hint(test_case, Range::default(), None, None));
+        lspresso_shot!(test_inlay_hint(&test_case, Range::default(), None, None));
     }
 
     #[rstest]
@@ -48,7 +48,7 @@ mod test {
         send_capabiltiies(&inlay_hint_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_inlay_hint(test_case.clone(), Range::default(), None, None);
+        let test_result = test_inlay_hint(&test_case, Range::default(), None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -71,7 +71,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_inlay_hint(
-            test_case,
+            &test_case,
             Range::default(),
             None,
             Some(&resp)
@@ -127,7 +127,7 @@ mod test {
         };
 
         lspresso_shot!(test_inlay_hint(
-            test_case,
+            &test_case,
             Range::new(
                 Position {
                     line: 0,

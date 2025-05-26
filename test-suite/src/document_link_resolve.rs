@@ -57,7 +57,7 @@ mod test {
             data: None,
         };
 
-        lspresso_shot!(test_document_link_resolve(test_case, &link, None, None));
+        lspresso_shot!(test_document_link_resolve(&test_case, &link, None, None));
     }
 
     #[rstest]
@@ -94,7 +94,7 @@ mod test {
             data: None,
         };
 
-        let test_result = test_document_link_resolve(test_case.clone(), &link, None, None);
+        let test_result = test_document_link_resolve(&test_case, &link, None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -138,7 +138,7 @@ mod test {
         };
 
         lspresso_shot!(test_document_link_resolve(
-            test_case,
+            &test_case,
             &link,
             None,
             Some(&resp)

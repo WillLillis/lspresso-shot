@@ -38,7 +38,7 @@ mod test {
         .expect("Failed to send capabilities");
 
         lspresso_shot!(test_prepare_call_hierarchy(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             None
@@ -63,8 +63,7 @@ mod test {
         )
         .expect("Failed to send capabilities");
 
-        let test_result =
-            test_prepare_call_hierarchy(test_case.clone(), Position::default(), None, None);
+        let test_result = test_prepare_call_hierarchy(&test_case, Position::default(), None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -92,7 +91,7 @@ mod test {
         .expect("Failed to send capabilities");
 
         lspresso_shot!(test_prepare_call_hierarchy(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             Some(&resp)
@@ -116,7 +115,7 @@ mod test {
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_prepare_call_hierarchy(
-            test_case,
+            &test_case,
             Position::new(0, 8),
             None,
             Some(&vec![CallHierarchyItem {

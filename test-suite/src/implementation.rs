@@ -34,7 +34,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_implementation(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             None
@@ -54,7 +54,7 @@ mod test {
         send_capabiltiies(&implementation_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_implementation(test_case.clone(), Position::default(), None, None);
+        let test_result = test_implementation(&test_case, Position::default(), None, None);
         let mut expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id.clone(),
             expected: None,
@@ -95,7 +95,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_implementation(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             Some(&resp)
@@ -132,7 +132,7 @@ pub fn main() {
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_implementation(
-            test_case,
+            &test_case,
             Position::new(14, 10),
             None,
             Some(&GotoDefinitionResponse::Link(vec![LocationLink {

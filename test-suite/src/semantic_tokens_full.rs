@@ -43,7 +43,7 @@ mod test {
         send_capabiltiies(&semantic_tokens_full_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_semantic_tokens_full(test_case, None, None));
+        lspresso_shot!(test_semantic_tokens_full(&test_case, None, None));
     }
 
     #[rstest]
@@ -65,7 +65,7 @@ mod test {
         send_response_num(response_num, &test_case_root).expect("Failed to send response num");
         send_capabiltiies(&semantic_tokens_full_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
-        let test_result = test_semantic_tokens_full(test_case.clone(), None, None);
+        let test_result = test_semantic_tokens_full(&test_case, None, None);
         #[allow(clippy::useless_let_if_seq)]
         let mut expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id.clone(),
@@ -103,6 +103,6 @@ mod test {
         send_capabiltiies(&semantic_tokens_full_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_semantic_tokens_full(test_case, None, Some(&resp)));
+        lspresso_shot!(test_semantic_tokens_full(&test_case, None, Some(&resp)));
     }
 }

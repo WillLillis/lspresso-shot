@@ -42,7 +42,7 @@ mod test {
         };
 
         lspresso_shot!(test_color_presentation(
-            test_case,
+            &test_case,
             color,
             Range::default(),
             None,

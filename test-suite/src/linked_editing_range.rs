@@ -32,7 +32,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_linked_editing_range(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             None
@@ -54,8 +54,7 @@ mod test {
         send_capabiltiies(&linked_editing_range_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result =
-            test_linked_editing_range(test_case.clone(), Position::default(), None, None);
+        let test_result = test_linked_editing_range(&test_case, Position::default(), None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -80,7 +79,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_linked_editing_range(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             Some(&resp)

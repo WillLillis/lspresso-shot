@@ -31,7 +31,7 @@ mod test {
         send_capabiltiies(&moniker_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        lspresso_shot!(test_moniker(test_case, Position::default(), None, None));
+        lspresso_shot!(test_moniker(&test_case, Position::default(), None, None));
     }
 
     #[rstest]
@@ -48,7 +48,7 @@ mod test {
         send_capabiltiies(&moniker_capabilities_simple(), &test_case_root)
             .expect("Failed to send capabilities");
 
-        let test_result = test_moniker(test_case.clone(), Position::default(), None, None);
+        let test_result = test_moniker(&test_case, Position::default(), None, None);
         let expected_err = TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id,
             expected: None,
@@ -72,7 +72,7 @@ mod test {
             .expect("Failed to send capabilities");
 
         lspresso_shot!(test_moniker(
-            test_case,
+            &test_case,
             Position::default(),
             None,
             Some(&resp)
