@@ -12,7 +12,12 @@ env:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+      fail-fast: false
 
     steps:
     - uses: actions/checkout@v4
@@ -27,9 +32,19 @@ jobs:
         echo "$HOME/nvim-linux-x86_64/bin" >> $GITHUB_PATH
 
     # Need a fresh install of rust and all its components for rust-analyzer to function properly
-    - name: Rust toolchain clean install
+    - name: Rust toolchain uninstall (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
       run: |
         command -v rustup >/dev/null && rustup self uninstall -y
+
+    - name: Rust toolchain uninstall (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        rm -rf ~/.cargo ~/.rustup
+        brew uninstall rustup-init || true
+
+    - name: Rust toolchain install
+      run: |
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
@@ -52,17 +67,36 @@ jobs:
     - name: fmt
       run: cargo fmt --check
 
-    # Tests have to be wrapped in `script` because GH runners are headless.
-    # For some reason, we need the appearance of a tty for things to work.
-    # HACK: We also need some means of propagating the test runner's exit
-    # code. Using this hack for now, but there may be a better way
-    - name: Run tests
+    - name: Run tests (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
       run: cargo test
 
-    - name: Install luals
+    - name: Run tests (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: brew install expect
+
+    - name: Run tests (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        unbuffer -noecho cargo test
+
+    - name: Run tests (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        unbuffer -leaveopen cargo test
+
+    - name: Install luals (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
       run: |
         mkdir "$HOME/luals"
         curl -LSs https://github.com/LuaLS/lua-language-server/releases/download/3.13.6/lua-language-server-3.13.6-linux-x64.tar.gz | tar xzf - -C "$HOME/luals"
+        echo "$HOME/luals/bin" >> $GITHUB_PATH
+
+    - name: Install luals (MacOS)
+      if: matrix.os == 'macos-latest'
+      run: |
+        mkdir "$HOME/luals"
+        curl -LSs https://github.com/LuaLS/lua-language-server/releases/download/3.13.6/lua-language-server-3.13.6-darwin-arm64.tar.gz | tar xzf - -C "$HOME/luals"
         echo "$HOME/luals/bin" >> $GITHUB_PATH
 
     - name: Lua lint
