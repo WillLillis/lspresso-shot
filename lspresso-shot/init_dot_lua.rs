@@ -164,36 +164,54 @@ fn invoke_lsp_action(start_type: &ServerStartType) -> String {
     }
 }
 
-/// The type of replacement to be made in the `init.lua` file. Several common replacements
-/// are specified in their own variants, while others are specified via fields.
+// Associate params only with a function invokcation
+// Function invocation is marked in the file, arguments are not
+// Associate *NO* table names with the arguments themselves, instead
+// just collect the names with the args as tuples inside the table param
+// type
+//
+// Make sure we return an error if Other is passed as a param
+
+/// Represents parameters that can be passed to `LuaReplacement::FunctionInvocation`.
 #[derive(Debug, Clone)]
-pub enum LuaReplacement {
-    /// `textDocument = vim.lsp.util.make_text_document_params(0)`
-    ParamTextDocument,
-    /// `<name> = { line = <line>, character = <character> }`
-    /// If `name` is `None`, the default name of `position` is used.
-    ParamPosition {
-        pos: Position,
-        name: Option<&'static str>,
-    },
+pub enum LuaValue {
+    Number(f64), // TODO: Revisit this, maybe split up between floats and ints
+    String(String),
+    /// `{ line = <line>, character = <character> }`
+    Position(Position),
     /// Equivalent of `range = { start = { line = <start-line>, character = <start-character> }, ["end"] = { line = <end-line>, character = <end-character> } }`
-    ParamRange(Range),
-    /// An object that is converted to JSON in order to pass to the lua side. This
-    /// object can be inserted directly into `params`.
-    ParamDirect { name: &'static str, json: String },
+    Range(Range),
+    /// `vim.lsp.util.make_text_document_params(0)`
+    TextDocument,
+    Table(Vec<(&'static str, LuaValue)>),
+    /// An object that is converted to JSON in order to pass to the lua side as a
+    /// table.
+    ObjectDirect(String),
     /// An object that is converted to JSON in order to pass to the lua side. After
-    /// conversion from JSON into a lua table, each field is inserted into `params`
-    /// individually.
-    ParamDestructure {
-        name: &'static str,
+    /// conversion from JSON into a lua table, each field is inserted into the parent
+    /// table individually.
+    // TODO: See if we can iterate over the fields on the lua side, eliminating the need
+    // for 'fields'
+    ObjectDestructure {
         fields: Vec<&'static str>,
         json: String,
     },
-    /// An object that needs to contain other nested objects. Each replacement in
-    /// `fields` is stored in a parent object `name`.
-    ParamNested {
+}
+
+/// The type of replacement to be made in the `init.lua` file. This currently only supports
+/// function invocations and raw string substitutions. We can look into expanding this later
+/// if need be.
+#[derive(Debug, Clone)]
+pub enum LuaReplacement {
+    /// Represents a function invocation
+    FunctionInvocation {
+        /// Placeholder text in the init.lua file template, indicating where this
+        /// function invocation should be placed.
+        placeholder: &'static str,
+        /// The name of the function to invoke.
         name: &'static str,
-        fields: Vec<LuaReplacement>,
+        /// The parameters to pass to the function.
+        params: Option<Vec<LuaValue>>,
     },
     /// Performs raw string substitution on the lua file. These subsituions are
     /// made before any other type to prevent conflicts with user-supplied values.
@@ -201,74 +219,112 @@ pub enum LuaReplacement {
 }
 
 impl LuaReplacement {
+    /// Creates a new `LuaReplacement` to invoke `vim.lsp.buf_reqeust_sync`
+    pub fn lsp_request(
+        test_type: TestType,
+        lsp_params: Option<Vec<(&'static str, LuaValue)>>,
+    ) -> Self {
+        let mut params = vec![
+            LuaValue::Number(0f64), // current buffer
+            LuaValue::String(test_type.to_string()), // invoke this lsp method
+        ];
+        params.push(LuaValue::Table(lsp_params.unwrap_or_default()));
+
+        Self::FunctionInvocation {
+            placeholder: "REQUEST_INVOKE",
+            name: "vim.lsp.buf_request_sync",
+            params: Some(params),
+        }
+    }
+
     fn perform_replacement(&self, doc: &mut LuaDocumentReplacement, parent_name: Option<&str>) {
         let parent_name = parent_name.unwrap_or("params");
         match self {
-            Self::ParamTextDocument => {
-                writeln!(
-                    &mut doc.params,
-                    "\tassert(not {parent_name}['textDocument'], \"{parent_name}['textDocument'] already set\")
-\t{parent_name}['textDocument'] = vim.lsp.util.make_text_document_params(0)"
-                )
-                .unwrap();
-            }
-            Self::ParamPosition { pos, name } => {
-                let name = name.unwrap_or("position");
-                writeln!(
-                    &mut doc.params,
-                    "\tassert(not {parent_name}['{name}'], \"{parent_name}['{name}'] already set\")
-\t{parent_name}['{name}'] = {{ line = {}, character = {} }}",
-                    pos.line, pos.character
-                )
-                .unwrap();
-            }
-            Self::ParamRange(range) => {
-                let range = Self::ParamNested {
-                    name: "range",
-                    fields: vec![
-                        Self::ParamPosition {
-                            pos: range.start,
-                            name: Some("start"),
-                        },
-                        Self::ParamPosition {
-                            pos: range.end,
-                            name: Some("end"),
-                        },
-                    ],
-                };
-                range.perform_replacement(doc, Some(parent_name));
-            }
-            Self::ParamDirect { name, json } => {
-                writeln!(
-                    &mut doc.params,
-                    "\tlocal {name}_json = [[\n{json}\n]]
-\tassert(not {parent_name}['{name}'], \"{parent_name}['{name}'] already set\")
-\t{parent_name}['{name}'] = vim.json.decode({name}_json)"
-                )
-                .unwrap();
-            }
-            Self::ParamDestructure { name, fields, json } => {
-                writeln!(&mut doc.params, "\tlocal {name}_json = [[\n{json}\n]]\n\tlocal {name} = vim.json.decode({name}_json)").unwrap();
-                for field in fields {
-                    writeln!(
-                        &mut doc.params,
-                        "\tassert(not {parent_name}['{field}'], \"{parent_name}['{field}'] already set\")
-\t{parent_name}['{field}'] = {name}['{field}']"
-                    )
-                    .unwrap();
+//             Self::ParamTextDocument => {
+//                 writeln!(
+//                     &mut doc.params,
+//                     "\tassert(not {parent_name}['textDocument'], \"{parent_name}['textDocument'] already set\")
+// \t{parent_name}['textDocument'] = vim.lsp.util.make_text_document_params(0)"
+//                 )
+//                 .unwrap();
+//             }
+//             Self::ParamPosition { pos, name } => {
+//                 let name = name.unwrap_or("position");
+//                 writeln!(
+//                     &mut doc.params,
+//                     "\tassert(not {parent_name}['{name}'], \"{parent_name}['{name}'] already set\")
+// \t{parent_name}['{name}'] = {{ line = {}, character = {} }}",
+//                     pos.line, pos.character
+//                 )
+//                 .unwrap();
+//             }
+//             Self::ParamRange(range) => {
+//                 let range = Self::ParamNested {
+//                     name: "range",
+//                     fields: vec![
+//                         Self::ParamPosition {
+//                             pos: range.start,
+//                             name: Some("start"),
+//                         },
+//                         Self::ParamPosition {
+//                             pos: range.end,
+//                             name: Some("end"),
+//                         },
+//                     ],
+//                 };
+//                 range.perform_replacement(doc, Some(parent_name));
+//             }
+//             Self::ParamDirect { name, json } => {
+//                 writeln!(
+//                     &mut doc.params,
+//                     "\tlocal {name}_json = [[\n{json}\n]]
+// \tassert(not {parent_name}['{name}'], \"{parent_name}['{name}'] already set\")
+// \t{parent_name}['{name}'] = vim.json.decode({name}_json)"
+//                 )
+//                 .unwrap();
+//             }
+//             Self::ParamDestructure { name, fields, json } => {
+//                 writeln!(&mut doc.params, "\tlocal {name}_json = [[\n{json}\n]]\n\tlocal {name} = vim.json.decode({name}_json)").unwrap();
+//                 for field in fields {
+//                     writeln!(
+//                         &mut doc.params,
+//                         "\tassert(not {parent_name}['{field}'], \"{parent_name}['{field}'] already set\")
+// \t{parent_name}['{field}'] = {name}['{field}']"
+//                     )
+//                     .unwrap();
+//                 }
+//             }
+//             Self::ParamNested { name, fields } => {
+//                 writeln!(
+//                     &mut doc.params,
+//                     "\tassert(not {parent_name}['{name}'], \"{parent_name}['{name}'] already set\")"
+//                 )
+//                 .unwrap();
+//                 writeln!(&mut doc.params, "\tlocal {name} = {{}}").unwrap();
+//                 for field in fields {
+//                     field.perform_replacement(doc, Some(name));
+//                 }
+//                 writeln!(&mut doc.params, "\t{parent_name}['{name}'] = {name}").unwrap();
+//             }
+            Self::FunctionInvocation { placeholder, name, params } => {
+                let mut final_invocation = name.to_string() + "(";
+                if let Some(params) = params {
+                    for (i, value) in params.iter().enumerate() {
+                        if i > 0 && i < params.len().saturating_sub(1) {
+                            final_invocation.push_str(", ");
+                        }
+                        match value {
+                            LuaValue::Number(_) => todo!(),
+                            LuaValue::String(_) => todo!(),
+                            LuaValue::Position(position) => todo!(),
+                            LuaValue::Range(range) => todo!(),
+                            LuaValue::TextDocument => todo!(),
+                            LuaValue::Table(items) => todo!(),
+                            LuaValue::ObjectDirect(_) => todo!(),
+                            LuaValue::ObjectDestructure { fields, json } => todo!(),
+                        }
                 }
-            }
-            Self::ParamNested { name, fields } => {
-                writeln!(
-                    &mut doc.params,
-                    "\tassert(not {parent_name}['{name}'], \"{parent_name}['{name}'] already set\")"
-                )
-                .unwrap();
-                writeln!(&mut doc.params, "\tlocal {name} = {{}}").unwrap();
-                for field in fields {
-                    field.perform_replacement(doc, Some(name));
-                }
-                writeln!(&mut doc.params, "\t{parent_name}['{name}'] = {name}").unwrap();
+                doc.raw.push((placeholder.to_string(), final_invocation));
             }
             Self::Other { from, to } => doc.raw.push(((*from).to_string(), to.to_string())),
         }
