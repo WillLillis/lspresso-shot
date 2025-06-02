@@ -212,10 +212,12 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()>
         .arg(init_dot_lua_path)
         .arg("--noplugin")
         .arg(source_path)
-        .arg("--headless")
+        // NOTE: Running with `--headless` would be better, but this causes *all* tests
+        // to fail on GH's runners, likely due to the lack of appearance of a tty.
+        // .arg("--headless")
         .arg("-n") // disable swap files
-        .stdout(Stdio::null()) // Commenting these out can be helpful for local
-        .stderr(Stdio::null()) // debugging, can print some logs from the server
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| TestExecutionError::Neovim(test_case.test_id.clone(), e.to_string()))?;
 

@@ -57,8 +57,7 @@ jobs:
     # HACK: We also need some means of propagating the test runner's exit
     # code. Using this hack for now, but there may be a better way
     - name: Run tests
-      run: |
-        script -q -c "cargo test -- --nocapture; echo \$? > exitcode" && exit $(cat exitcode)
+      run: cargo test
 
     - name: Install luals
       run: |
