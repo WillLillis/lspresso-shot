@@ -23,6 +23,7 @@ impl From<TestError<String>> for TestError<StateOrResponse<Vec<TextEdit>>> {
             }
             TestError::TestExecution(e) => Self::TestExecution(e),
             TestError::TestSetup(e) => Self::TestSetup(e),
+            TestError::TTY => Self::TTY,
         }
     }
 }

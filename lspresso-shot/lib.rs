@@ -35,6 +35,7 @@ use types::ServerStartType;
 use std::{
     collections::HashMap,
     fs,
+    io::IsTerminal as _,
     path::Path,
     process::{Command, Stdio},
     str::FromStr as _,
@@ -51,12 +52,25 @@ use types::{
 /// Intended to be used as a wrapper for `lspresso-shot` testing functions. If the
 /// result is `Ok`, the value is returned. If `Err`, pretty-prints the error via
 /// `panic`
+///
+/// # Warnings
+///
+/// If `TestError::TTY` is returned, the error is ignored. This is done to
+/// ease issues with the lack of a tty in certain CI environments (`MacOS` and `Windows`)
+/// In order to surface this error, manually unwrap the given `TestResult` rather
+/// than using this macro
+/// See <https://github.com/WillLillis/lspresso-shot/issues/70>
 #[macro_export]
 macro_rules! lspresso_shot {
     ($result:expr) => {
         match $result {
             Ok(value) => value,
-            Err(err) => panic!("{err}"),
+            Err(err) => match err {
+                lspresso_shot::types::TestError::TTY => {
+                    eprintln!("Test Skipped: No tty detected -- See https://github.com/WillLillis/lspresso-shot/issues/70");
+                }
+                _ => panic!("{err}"),
+            },
         }
     };
 }
@@ -206,6 +220,13 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()>
     let (lock, cvar) = &*get_runner_count();
     let _guard = RunnerGuard::new(lock, cvar); // Ensures proper decrement on exit
 
+    // NOTE: Tests running on Windows and MacOS GH runners currently lack the appearance
+    // of a tty, causing the neovim invocation to fail. We return a specific error in this
+    // case, allowing for detection at the top level call site.
+    if !std::io::stdout().is_terminal() {
+        return Err(TestExecutionError::TTY);
+    }
+
     let start = std::time::Instant::now();
     let mut child = Command::new(&test_case.nvim_path)
         .arg("-u")
@@ -275,6 +296,7 @@ fn benchmark<T>(
             (true, Err(TestError::TestExecution(execution))) => {
                 Err(BenchmarkError::TestExecution(execution))
             }
+            (true, Err(TestError::TTY)) => Err(BenchmarkError::TTY),
         }
     };
     match config.end_condition {
