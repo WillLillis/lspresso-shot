@@ -731,6 +731,7 @@ impl<T> From<TestError<T>> for TestError<StateOrResponse<T>> {
             }
             TestError::TestSetup(e) => Self::TestSetup(e),
             TestError::TestExecution(e) => Self::TestExecution(e),
+            TestError::TTY => Self::TTY,
         }
     }
 }
@@ -829,6 +830,8 @@ pub enum TestError<T> {
     TestExecution(#[from] TestExecutionError),
     #[error(transparent)]
     TestSetup(#[from] TestSetupError),
+    #[error("No tty detected. See https://github.com/WillLillis/lspresso-shot/issues/70")]
+    TTY,
 }
 
 pub type TestExecutionResult<T> = Result<T, TestExecutionError>;
@@ -849,6 +852,8 @@ pub enum TestExecutionError {
     Serialization(String, String),
     #[error(transparent)]
     TimeoutExceeded(TimeoutError),
+    #[error("No tty detected. See https://github.com/WillLillis/lspresso-shot/issues/70")]
+    TTY,
 }
 
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -878,6 +883,8 @@ pub enum BenchmarkError {
     TestExecution(#[from] TestExecutionError),
     #[error(transparent)]
     TestSetup(#[from] TestSetupError),
+    #[error("No tty detected. See https://github.com/WillLillis/lspresso-shot/issues/70")]
+    TTY,
 }
 
 /// Cleans a given `Uri` object of any information internal to the case
