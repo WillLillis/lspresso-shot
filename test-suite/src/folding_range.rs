@@ -2,7 +2,7 @@
 mod test {
     use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
-    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
+    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml, rust_analyzer_path};
     use lspresso_shot::{
         lspresso_shot, test_folding_range,
         types::{ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile},
@@ -82,7 +82,7 @@ mod test {
     println!("Hello, world!");
 }"#,
         );
-        let test_case = TestCase::new("rust-analyzer", source_file)
+        let test_case = TestCase::new(rust_analyzer_path(), source_file)
             .start_type(ServerStartType::Progress(
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),

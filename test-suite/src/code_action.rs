@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
+    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml, rust_analyzer_path};
     use lsp_types::{
         CodeAction, CodeActionContext, CodeActionKind, CodeActionOptions, CodeActionOrCommand,
         CodeActionProviderCapability, CodeActionResponse, Position, Range, ServerCapabilities,
@@ -159,7 +159,7 @@ mod test {
     let x = 5;
 }",
         );
-        let test_case = TestCase::new("rust-analyzer", source_file)
+        let test_case = TestCase::new(rust_analyzer_path(), source_file)
             .start_type(ServerStartType::Progress(
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
