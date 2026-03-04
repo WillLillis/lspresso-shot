@@ -21,6 +21,7 @@ path = "lib.rs"
 anstyle.workspace = true
 # lsp-types.workspace = true
 lsp-types = { path = "../lsp-types" }
+portable-pty.workspace = true
 rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -223,7 +223,7 @@ impl TestFile {
 /// - `other_files`: other files to be placed in the mock directory (e.g. other source
 ///   files, server configuration, etc.).
 /// - `start_type`: indicates when the server is ready to service requests
-/// - `timeout`: timeout for the test's run in Neovim. The default is 1000ms.
+/// - `timeout`: timeout for the test's run in Neovim. The default is 3000ms.
 /// - `cleanup`: whether to delete the temporary directory on test completion.
 #[derive(Debug, Clone)]
 pub struct TestCase {
@@ -253,7 +253,7 @@ impl TestCase {
             cursor_pos: None,
             other_files: Vec::new(),
             start_type: ServerStartType::Simple,
-            timeout: Duration::from_secs(1),
+            timeout: Duration::from_secs(3),
             cleanup: false,
         }
     }

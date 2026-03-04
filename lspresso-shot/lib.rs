@@ -35,12 +35,14 @@ use types::ServerStartType;
 use std::{
     collections::HashMap,
     fs,
+    io::Read as _,
     path::Path,
-    process::{Command, Stdio},
     str::FromStr as _,
     sync::{Arc, Condvar, Mutex, OnceLock},
     time::Duration,
 };
+
+use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
 use types::{
     ApproximateEq, BenchmarkConfig, BenchmarkError, CleanResponse, EndCondition,
@@ -207,19 +209,48 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()>
     let _guard = RunnerGuard::new(lock, cvar); // Ensures proper decrement on exit
 
     let start = std::time::Instant::now();
-    let mut child = Command::new(&test_case.nvim_path)
-        .arg("-u")
-        .arg(init_dot_lua_path)
-        .arg("--noplugin")
-        .arg(source_path)
-        // NOTE: Running with `--headless` would be better, but this causes *all* tests
-        // to fail on GH's runners, likely due to the lack of appearance of a tty.
-        // .arg("--headless")
-        .arg("-n") // disable swap files
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+
+    let pty_system = native_pty_system();
+    let pair = pty_system
+        .openpty(PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
         .map_err(|e| TestExecutionError::Neovim(test_case.test_id.clone(), e.to_string()))?;
+
+    let mut cmd = CommandBuilder::new(&test_case.nvim_path);
+    cmd.env("TERM", "xterm-256color");
+    cmd.arg("-u");
+    cmd.arg(&init_dot_lua_path);
+    cmd.arg("--noplugin");
+    cmd.arg("--headless");
+    cmd.arg(source_path);
+    cmd.arg("-n"); // disable swap files
+
+    let mut child = pair
+        .slave
+        .spawn_command(cmd)
+        .map_err(|e| TestExecutionError::Neovim(test_case.test_id.clone(), e.to_string()))?;
+
+    // Close the slave side so the child gets EOF when the master drops
+    drop(pair.slave);
+
+    // Drain the PTY master output in a background thread to prevent buffer saturation
+    // from Neovim TUI output
+    let mut reader = pair
+        .master
+        .try_clone_reader()
+        .map_err(|e| TestExecutionError::Neovim(test_case.test_id.clone(), e.to_string()))?;
+    std::thread::spawn(move || {
+        let mut buf = [0u8; 4096];
+        while let Ok(n) = reader.read(&mut buf) {
+            if n == 0 {
+                break;
+            }
+        }
+    });
 
     // In theory, the timeout set in `init.lua` should be sufficient to prevent
     // the neovim process from hanging. However, if `init.lua` is malformed (an
@@ -244,6 +275,11 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()>
             ))?,
         }
     }
+
+    // Kill the child process on timeout for clean PTY cleanup
+    let _ = child.kill();
+    // Drop the master side so the drain thread can exit
+    drop(pair.master);
 
     // A test can also timeout due to neovim encountering an error (i.e. a malformed
     // `init.lua` file). If we have an error recorded, it's better to report that
