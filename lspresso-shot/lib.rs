@@ -1380,7 +1380,7 @@ pub fn test_formatting(
             TestType::Formatting,
             options_json,
             cmp,
-            state.to_string(),
+            state.clone(),
         )),
         None => to_parent_err_type(test_formatting_resp(
             test_case,
@@ -1474,8 +1474,8 @@ fn test_formatting_state(
     expected: String,
 ) -> TestResult<(), String> {
     let outer_cmp = |expected: &String, actual: &String, test_case: &TestCase| -> bool {
-        let result_expected = StateOrResponse::State(expected.to_string());
-        let result_actual = StateOrResponse::State(actual.to_string());
+        let result_expected = StateOrResponse::State(expected.clone());
+        let result_actual = StateOrResponse::State(actual.clone());
         cmp.as_ref().map_or_else(
             || result_expected == result_actual,
             |cmp_fn| cmp_fn(&result_expected, &result_actual, test_case),

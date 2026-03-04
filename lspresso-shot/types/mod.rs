@@ -332,10 +332,11 @@ impl TestCase {
                 return;
             }
         };
-        if self.cleanup && test_dir.exists() {
-            if let Err(e) = fs::remove_dir_all(test_dir) {
-                eprintln!("Test cleanup error (dir removal): {e}");
-            }
+        if self.cleanup
+            && test_dir.exists()
+            && let Err(e) = fs::remove_dir_all(test_dir)
+        {
+            eprintln!("Test cleanup error (dir removal): {e}");
         }
     }
 
