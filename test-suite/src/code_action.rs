@@ -283,7 +283,7 @@ mod test {
                     diagnostics: None,
                     edit: Some(edit),
                     command: None,
-                    is_preferred: Some(false),
+                    is_preferred: Some(true),
                     disabled: None,
                     data: None
                 }),

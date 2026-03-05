@@ -143,52 +143,43 @@ mod test {
             ))
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
-        let possible_results = vec![
-            SemanticTokensRangeResult::Tokens(SemanticTokens {
-                result_id: Some("3".to_string()),
-                data: vec![SemanticToken {
-                    delta_line: 0,
-                    delta_start: 7,
-                    length: 4,
-                    token_type: 4,
-                    token_modifiers_bitset: 262_148,
-                }],
-            }),
-            SemanticTokensRangeResult::Tokens(SemanticTokens {
-                result_id: Some("4".to_string()),
-                data: vec![SemanticToken {
-                    delta_line: 0,
-                    delta_start: 7,
-                    length: 4,
-                    token_type: 4,
-                    token_modifiers_bitset: 262_148,
-                }],
-            }),
-            SemanticTokensRangeResult::Tokens(SemanticTokens {
-                result_id: Some("5".to_string()),
-                data: vec![SemanticToken {
-                    delta_line: 0,
-                    delta_start: 7,
-                    length: 4,
-                    token_type: 4,
-                    token_modifiers_bitset: 262_148,
-                }],
-            }),
-        ];
+        let expected = SemanticTokensRangeResult::Tokens(SemanticTokens {
+            result_id: None, // result_id varies between runs, ignored by comparator
+            data: vec![SemanticToken {
+                delta_line: 0,
+                delta_start: 7,
+                length: 4,
+                token_type: 4,
+                token_modifiers_bitset: 262_148,
+            }],
+        });
         let range = Range {
             start: Position::new(0, 7),
             end: Position::new(0, 10),
         };
-        for result in &possible_results {
-            if test_semantic_tokens_range(&test_case, range, None, Some(result)).is_ok() {
-                return;
+        // result_id is a server-internal counter that varies between runs,
+        // so we compare only the token data
+        let cmp = |expected: &SemanticTokensRangeResult,
+                   actual: &SemanticTokensRangeResult,
+                   _test_case: &TestCase|
+         -> bool {
+            match (expected, actual) {
+                (
+                    SemanticTokensRangeResult::Tokens(exp),
+                    SemanticTokensRangeResult::Tokens(act),
+                ) => exp.data == act.data,
+                (
+                    SemanticTokensRangeResult::Partial(exp),
+                    SemanticTokensRangeResult::Partial(act),
+                ) => exp.data == act.data,
+                _ => false,
             }
-        }
+        };
         lspresso_shot!(test_semantic_tokens_range(
             &test_case,
             range,
-            None,
-            Some(&possible_results[1]),
+            Some(cmp),
+            Some(&expected),
         ));
     }
 }

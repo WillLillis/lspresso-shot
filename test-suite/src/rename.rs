@@ -171,11 +171,17 @@ mod test {
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
 
+        // change_annotations varies between rust-analyzer versions, so ignore it
+        let cmp =
+            |expected: &WorkspaceEdit, actual: &WorkspaceEdit, _test_case: &TestCase| -> bool {
+                expected.changes == actual.changes
+                    && expected.document_changes == actual.document_changes
+            };
         lspresso_shot!(test_rename(
             &test_case,
             Position::new(1, 9),
             "bar",
-            None,
+            Some(cmp),
             Some(&WorkspaceEdit {
                 changes: None,
                 document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {

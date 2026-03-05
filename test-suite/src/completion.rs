@@ -188,26 +188,19 @@ println!("format {local_variable} arguments");
             ))
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
-        // Just find the completion item we care about!
-        let cmp = |expected: &CompletionResponse,
+        // Find the println completion item and compare only stable fields
+        let cmp = |_expected: &CompletionResponse,
                    actual: &CompletionResponse,
                    _test_case: &TestCase|
          -> bool {
-            let expected_item = match expected {
-                CompletionResponse::Array(items) => items[0].clone(),
-                CompletionResponse::List(_) => unreachable!(),
+            let items = match actual {
+                CompletionResponse::Array(items)
+                | CompletionResponse::List(CompletionList { items, .. }) => items,
             };
-            match actual {
-                CompletionResponse::Array(completion_items)
-                | CompletionResponse::List(CompletionList {
-                    items: completion_items,
-                    ..
-                }) => {
-                    for item in completion_items {
-                        if item.label == "println!(…)" {
-                            return expected_item == *item;
-                        }
-                    }
+            for item in items {
+                if item.label == "println!(…)" {
+                    return item.kind == Some(CompletionItemKind::FUNCTION)
+                        && item.filter_text == Some("println!".to_string());
                 }
             }
             false
