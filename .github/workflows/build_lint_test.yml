@@ -12,7 +12,21 @@ env:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            nvim_archive: nvim-linux-x86_64.tar.gz
+            nvim_dir: nvim-linux-x86_64
+            luals_archive: lua-language-server-3.13.6-linux-x64.tar.gz
+          - os: macos-latest
+            nvim_archive: nvim-macos-arm64.tar.gz
+            nvim_dir: nvim-macos-arm64
+            luals_archive: lua-language-server-3.13.6-darwin-arm64.tar.gz
+
+    runs-on: ${{ matrix.os }}
 
     steps:
     - uses: actions/checkout@v4
@@ -20,28 +34,38 @@ jobs:
     - name: init submodules
       run: git submodule update --init --recursive
 
-    - name: Install Neovim
+    - name: Install Neovim (v0.11.6)
       run: |
-        # TODO: Pin to 11.0 once it's released
-        curl -LSs https://github.com/neovim/neovim/releases/download/nightly/nvim-linux-x86_64.tar.gz | tar xzf - -C "$HOME"
-        echo "$HOME/nvim-linux-x86_64/bin" >> $GITHUB_PATH
+        curl -LSs "https://github.com/neovim/neovim/releases/download/v0.11.6/${{ matrix.nvim_archive }}" | tar xzf - -C "$HOME"
+        echo "$HOME/${{ matrix.nvim_dir }}/bin" >> $GITHUB_PATH
+
+    - name: Remove macOS quarantine attributes
+      if: runner.os == 'macOS'
+      run: xattr -cr "$HOME/${{ matrix.nvim_dir }}"
 
     # Need a fresh install of rust and all its components for rust-analyzer to function properly
     - name: Rust toolchain clean install
       run: |
-        command -v rustup >/dev/null && rustup self uninstall -y
+        if command -v rustup >/dev/null; then
+          rustup self uninstall -y || rm -rf "$HOME/.rustup" "$HOME/.cargo"
+        fi
         curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
         echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
-    # NOTE: There's nothing particularly special about 1.87, we just pin to a
-    # specific version to avoid unexpected breakages with each update. We *should*
-    # keep the project in sync with rustc/rust-analyzer as they release new versions
-    - name: Pin Rust to 1.87
-      run: rustup default '1.87'
+    # Install the pinned toolchain and grab its rust-analyzer before switching
+    # to the latest stable for building. We pin rust-analyzer to a specific
+    # version to avoid unexpected test breakages with each update.
+    - name: Install pinned rust-analyzer (1.87)
+      run: |
+        rustup toolchain install '1.87' -c rust-analyzer,rust-src
+        echo "LSPRESSO_RUST_ANALYZER=$(rustup run 1.87 rustup which rust-analyzer)" >> $GITHUB_ENV
+
+    - name: Set default toolchain to latest stable
+      run: rustup default stable
 
     - name: Add rust components
       run: |
-        rustup component add rust-src rustfmt clippy rust-analyzer
+        rustup component add rustfmt clippy
 
     - name: Build
       run: cargo build --workspace
@@ -52,17 +76,13 @@ jobs:
     - name: fmt
       run: cargo fmt --check
 
-    # Tests have to be wrapped in `script` because GH runners are headless.
-    # For some reason, we need the appearance of a tty for things to work.
-    # HACK: We also need some means of propagating the test runner's exit
-    # code. Using this hack for now, but there may be a better way
     - name: Run tests
       run: cargo test
 
     - name: Install luals
       run: |
         mkdir "$HOME/luals"
-        curl -LSs https://github.com/LuaLS/lua-language-server/releases/download/3.13.6/lua-language-server-3.13.6-linux-x64.tar.gz | tar xzf - -C "$HOME/luals"
+        curl -LSs "https://github.com/LuaLS/lua-language-server/releases/download/3.13.6/${{ matrix.luals_archive }}" | tar xzf - -C "$HOME/luals"
         echo "$HOME/luals/bin" >> $GITHUB_PATH
 
     - name: Lua lint
