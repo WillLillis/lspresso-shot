@@ -174,7 +174,7 @@ mod tests {
         let mut data_map = Map::new();
         data_map.insert(
             "rendered".to_string(),
-            serde_json::Value::String("warning: unused variable: `bar`\n --> src/main.rs:2:9\n  |\n2 |     let bar = 1;\n  |         ^^^ help: if this is intentional, prefix it with an underscore: `_bar`\n  |\n  = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default\n\n".to_string()),
+            serde_json::Value::String("warning: unused variable: `bar`\n --> src/main.rs:2:9\n  |\n2 |     let bar = 1;\n  |         ^^^ help: if this is intentional, prefix it with an underscore: `_bar`\n  |\n  = note: `#[warn(unused_variables)]` on by default\n\n".to_string()),
         );
         let uri = Uri::from_str("src/main.rs").unwrap();
         let range = Range {
@@ -197,7 +197,7 @@ mod tests {
                     code: Some(NumberOrString::String("unused_variables".to_string())),
                     code_description: None,
                     source: Some("rustc".to_string()),
-                    message: "unused variable: `bar`\n`#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default"
+                    message: "unused variable: `bar`\n`#[warn(unused_variables)]` on by default"
                         .to_string(),
                     related_information: Some(vec![DiagnosticRelatedInformation {
                         location: Location {
