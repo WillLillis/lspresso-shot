@@ -270,6 +270,11 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()>
 
     let mut cmd = CommandBuilder::new(&test_case.nvim_path);
     cmd.env("TERM", "xterm-256color");
+    // If set, pass the Rust toolchain to the LSP server so it uses the correct
+    // sysroot and proc-macro server (avoids version mismatches in CI).
+    if let Ok(toolchain) = std::env::var("LSPRESSO_RUST_TOOLCHAIN") {
+        cmd.env("RUSTUP_TOOLCHAIN", toolchain);
+    }
     cmd.arg("-u");
     cmd.arg(&init_dot_lua_path);
     cmd.arg("--noplugin");

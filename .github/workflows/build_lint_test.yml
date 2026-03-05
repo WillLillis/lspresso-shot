@@ -77,6 +77,8 @@ jobs:
       run: cargo fmt --check
 
     - name: Run tests
+      env:
+        LSPRESSO_RUST_TOOLCHAIN: '1.87'
       run: cargo test
 
     - name: Install luals
