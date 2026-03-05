@@ -168,7 +168,7 @@ mod test {
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
 
         // change_annotations varies between rust-analyzer versions, so ignore it
@@ -215,7 +215,7 @@ mod test {
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_prepare_rename(

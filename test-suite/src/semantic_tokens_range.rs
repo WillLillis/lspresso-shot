@@ -141,7 +141,7 @@ mod test {
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
         let expected = SemanticTokensRangeResult::Tokens(SemanticTokens {
             result_id: None, // result_id varies between runs, ignored by comparator

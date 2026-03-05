@@ -137,7 +137,7 @@ mod tests {
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_diagnostic(
@@ -168,7 +168,7 @@ mod tests {
                 NonZeroU32::new(2).unwrap(),
                 String::new(),
             ))
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
 
         let mut data_map = Map::new();
@@ -242,7 +242,7 @@ mod tests {
                 NonZeroU32::new(2).unwrap(),
                 String::new(),
             ))
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
 
         let mut data_map = Map::new();
