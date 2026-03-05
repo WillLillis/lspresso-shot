@@ -123,6 +123,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "75b325c5dbd37f80359721ad39aca5a29fb04c89279657cffdda8736d0c0b9d2"
 
 [[package]]
+name = "dunce"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -325,6 +331,7 @@ name = "lspresso-shot"
 version = "0.1.0"
 dependencies = [
  "anstyle",
+ "dunce",
  "lsp-types",
  "portable-pty",
  "rand",
@@ -673,6 +680,7 @@ name = "test-server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "dunce",
  "flexi_logger",
  "log",
  "lsp-server",

@@ -393,7 +393,9 @@ impl TestCase {
         tmp_dir.push("lspresso-shot");
         tmp_dir.push(&self.test_id);
         fs::create_dir_all(&tmp_dir)?;
-        Ok(tmp_dir)
+        // Canonicalize to resolve symlinks (e.g. macOS /var -> /private/var) so
+        // all derived paths are consistent with the canonical URIs Neovim generates.
+        Ok(dunce::canonicalize(&tmp_dir).unwrap_or(tmp_dir))
     }
 
     /// Returns the path to the result file for test `self.test_id`,
@@ -901,7 +903,10 @@ pub fn clean_uri(uri: &Uri, test_case: &TestCase) -> TestExecutionResult<Uri> {
         .ok_or_else(|| TestSetupError::InvalidFilePath(format!("{}", root.display())))?
         .to_string();
     let path = uri.path().to_string();
-    let cleaned = path.strip_prefix(&test_case_root).unwrap_or(&path);
+    let cleaned = path
+        .strip_prefix(&test_case_root)
+        .unwrap_or(&path)
+        .trim_start_matches(std::path::MAIN_SEPARATOR);
     Ok(Uri::from_str(cleaned).map_err(|_| TestSetupError::InvalidFilePath(path))?)
 }
 

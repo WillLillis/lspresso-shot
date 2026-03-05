@@ -19,6 +19,7 @@ path = "lib.rs"
 
 [dependencies]
 anstyle.workspace = true
+dunce.workspace = true
 # lsp-types.workspace = true
 lsp-types = { path = "../lsp-types" }
 portable-pty.workspace = true

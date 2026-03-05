@@ -31,7 +31,7 @@ fn get_project_root(params: &InitializeParams) -> Option<PathBuf> {
         // If there's multiple, just visit in order until we find a valid folder
         for folder in folders {
             let Ok(parsed) = PathBuf::from_str(folder.uri.path().as_str());
-            if let Ok(parsed_path) = parsed.canonicalize() {
+            if let Ok(parsed_path) = dunce::canonicalize(&parsed) {
                 info!("Detected project root: {}", parsed_path.display());
                 return Some(parsed_path);
             }
@@ -42,7 +42,7 @@ fn get_project_root(params: &InitializeParams) -> Option<PathBuf> {
     #[allow(deprecated)]
     if let Some(root_uri) = &params.root_uri {
         let Ok(parsed) = PathBuf::from_str(root_uri.path().as_str());
-        if let Ok(parsed_path) = parsed.canonicalize() {
+        if let Ok(parsed_path) = dunce::canonicalize(&parsed) {
             info!("Detected project root: {}", parsed_path.display());
             return Some(parsed_path);
         }
@@ -52,7 +52,7 @@ fn get_project_root(params: &InitializeParams) -> Option<PathBuf> {
     #[allow(deprecated)]
     if let Some(root_path) = &params.root_path {
         let Ok(parsed) = PathBuf::from_str(root_path.as_str());
-        if let Ok(parsed_path) = parsed.canonicalize() {
+        if let Ok(parsed_path) = dunce::canonicalize(&parsed) {
             info!("Detected project root: {}", parsed_path.display());
             return Some(parsed_path);
         }
