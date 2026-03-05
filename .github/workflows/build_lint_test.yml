@@ -76,6 +76,16 @@ jobs:
     - name: fmt
       run: cargo fmt --check
 
+    # Warm up rust-analyzer's caches (sysroot, proc-macro server, cargo
+    # metadata) so the first test doesn't pay the full cold-start cost.
+    - name: Warm up rust-analyzer
+      run: |
+        dir=$(mktemp -d)
+        echo -e '[package]\nname = "warmup"\nversion = "0.1.0"\nedition = "2021"' > "$dir/Cargo.toml"
+        mkdir "$dir/src" && echo 'fn main() {}' > "$dir/src/main.rs"
+        RUSTUP_TOOLCHAIN=1.87 "$LSPRESSO_RUST_ANALYZER" analysis-stats "$dir" 2>/dev/null || true
+        rm -rf "$dir"
+
     - name: Run tests
       env:
         LSPRESSO_RUST_TOOLCHAIN: '1.87'
