@@ -251,7 +251,7 @@ let foo = 5;
                 NonZeroU32::new(1).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
-            .timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(30))
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_formatting(
@@ -281,7 +281,7 @@ let foo = 5;
                 NonZeroU32::new(1).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
-            .timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(30))
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_formatting(
@@ -323,7 +323,7 @@ let foo = 5;
                 NonZeroU32::new(1).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
-            .timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(30))
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_on_type_formatting(

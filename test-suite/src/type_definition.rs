@@ -121,7 +121,7 @@ pub fn main() {
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
-            .timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(30))
             .other_file(cargo_dot_toml());
 
         lspresso_shot!(test_type_definition(

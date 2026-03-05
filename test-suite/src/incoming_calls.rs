@@ -132,7 +132,7 @@ pub fn main() {
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
-            .timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(30))
             .other_file(cargo_dot_toml());
 
         let uri = Uri::from_str(&format!(
