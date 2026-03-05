@@ -13,7 +13,7 @@ local function check_progress_result()
 
     report_log('Issuing semantic tokens full request (Attempt ' .. tostring(progress_count) .. ')\n') ---@diagnostic disable-line: undefined-global
     local start = vim.uv.hrtime()
-    local semantic_tokens_full_result = vim.lsp.buf_request_sync(0, 'textDocument/semanticTokens/full', params)
+    local semantic_tokens_full_result = vim.lsp.buf_request_sync(0, 'textDocument/semanticTokens/full', params, TIMEOUT_MS) ---@diagnostic disable-line: undefined-global
 
     local result_id = nil
     if not semantic_tokens_full_result then
@@ -37,7 +37,7 @@ local function check_progress_result()
     local semantic_tokens_full_delta_result = vim.lsp.buf_request_sync(0, 'textDocument/semanticTokens/full/delta', {
         textDocument = vim.lsp.util.make_text_document_params(0),
         previousResultId = result_id,
-    })
+    }, TIMEOUT_MS) ---@diagnostic disable-line: undefined-global
     local elapsed_ns = vim.uv.hrtime() - start
     record_benchmark_result(elapsed_ns) ---@diagnostic disable-line: undefined-global
     if not semantic_tokens_full_delta_result then
