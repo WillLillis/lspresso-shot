@@ -63,17 +63,23 @@ macro_rules! lspresso_shot {
     };
 }
 
-/// The parallelism utilized in Cargo's test runner and the concrete timeout values
-/// used in our test cases do not play nicely together, leading to intermittent failures.
-/// We use `RUNNER_COUNT` to restrict the number of concurrent test cases, treating
-/// each case's "neovim portion" inside `run_test` as a critical section. Another
-/// approach that works is to manually limit the number of threads used by the test
-/// runner via `--test-threads x`, but it isn't realistic to expect consumers to do this.
+/// Maximum number of concurrent Neovim processes. Running too many LSP server
+/// instances in parallel leads to resource contention and flaky timeouts.
 ///
-/// It looks like this value needs to be 1, so we could replace the `u32` with a `bool`,
-/// but I'll leave it as is for now in case I come up with some other workaround
-static RUNNER_LIMIT: u32 = 1;
+/// Defaults to 1 (sequential execution). Override via the `LSPRESSO_RUNNER_LIMIT`
+/// environment variable.
+static RUNNER_LIMIT: OnceLock<u32> = OnceLock::new();
 static RUNNER_COUNT: OnceLock<Arc<(Mutex<u32>, Condvar)>> = OnceLock::new();
+
+fn get_runner_limit() -> u32 {
+    *RUNNER_LIMIT.get_or_init(|| {
+        std::env::var("LSPRESSO_RUNNER_LIMIT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1)
+            .max(1)
+    })
+}
 
 fn get_runner_count() -> Arc<(Mutex<u32>, Condvar)> {
     #[allow(clippy::mutex_integer)]
@@ -82,7 +88,8 @@ fn get_runner_count() -> Arc<(Mutex<u32>, Condvar)> {
         .clone()
 }
 
-/// Helper struct to automatically decrement `n_jobs` when dropped.
+/// RAII guard that increments the runner count on creation (blocking if at the
+/// limit) and decrements it on drop.
 struct RunnerGuard<'a> {
     lock: &'a Mutex<u32>,
     cvar: &'a Condvar,
@@ -90,9 +97,10 @@ struct RunnerGuard<'a> {
 
 impl<'a> RunnerGuard<'a> {
     fn new(lock: &'a Mutex<u32>, cvar: &'a Condvar) -> Self {
+        let limit = get_runner_limit();
         let mut n_jobs = lock.lock().expect("Mutex poisoned");
 
-        while *n_jobs >= RUNNER_LIMIT {
+        while *n_jobs >= limit {
             n_jobs = cvar.wait(n_jobs).expect("Condition variable poisoned");
         }
 
@@ -252,9 +260,10 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()>
         .get_init_lua_file_path()
         .map_err(|e| TestExecutionError::IO(test_case.test_id.clone(), e.to_string()))?;
 
-    // Restrict the number of tests invoking neovim at a given time to prevent timeout issues
+    // Restrict the number of concurrent neovim invocations to prevent resource
+    // contention from causing flaky timeouts. Controlled by LSPRESSO_RUNNER_LIMIT.
     let (lock, cvar) = &*get_runner_count();
-    let _guard = RunnerGuard::new(lock, cvar); // Ensures proper decrement on exit
+    let _guard = RunnerGuard::new(lock, cvar);
 
     let start = std::time::Instant::now();
 

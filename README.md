@@ -126,13 +126,14 @@ rustup toolchain install 1.87 -c rust-analyzer,rust-src
 
 ### Running the test suite
 
-The test suite uses rust-analyzer 1.87 as a reference language server. Two
-environment variables control which binary and toolchain are used:
+The test suite uses rust-analyzer 1.87 as a reference language server. The
+following environment variables are available:
 
-| Variable | Purpose |
-|---|---|
-| `LSPRESSO_RUST_ANALYZER` | Path to the rust-analyzer binary |
-| `LSPRESSO_RUST_TOOLCHAIN` | Rust toolchain passed to the LSP server (sets `RUSTUP_TOOLCHAIN`) |
+| Variable | Purpose | Default |
+|---|---|---|
+| `LSPRESSO_RUST_ANALYZER` | Path to the rust-analyzer binary | `"rust-analyzer"` |
+| `LSPRESSO_RUST_TOOLCHAIN` | Rust toolchain passed to the LSP server (sets `RUSTUP_TOOLCHAIN`) | unset |
+| `LSPRESSO_RUNNER_LIMIT` | Max concurrent Neovim processes | `1` |
 
 To run the full test suite:
 
@@ -141,6 +142,12 @@ LSPRESSO_RUST_ANALYZER="$(rustup which --toolchain 1.87 rust-analyzer)" \
 LSPRESSO_RUST_TOOLCHAIN=1.87 \
 cargo test
 ```
+
+`LSPRESSO_RUNNER_LIMIT` controls how many Neovim + LSP server instances run
+simultaneously. The default of 1 is the safest but slowest option. Higher
+values speed up the suite at the risk of flaky timeouts from resource
+contention. On a 32-core machine, a limit of 8 has been reliable (~7x faster
+than sequential).
 
 [lsp-spec]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/
 [progress-token]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#progress
