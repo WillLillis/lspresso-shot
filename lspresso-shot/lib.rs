@@ -118,7 +118,7 @@ impl Drop for RunnerGuard<'_> {
 /// Note that even if a given request doesn't support an `Option` response, `expected`
 /// is always an `Option` here. For these cases, the expected result should be passed
 /// as `Some(expected)` unconditionally in the caller
-#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
 fn collect_results<T>(
     test_case: &TestCase,
     test_type: TestType,
@@ -172,7 +172,55 @@ where
         // Invariant: `results.json` and `empty` should never both exist
         (_, true, true) => unreachable!(),
         // No results
-        (_, false, false) => Err(TestExecutionError::NoResults(test_case.test_id.clone()))?,
+        (_, false, false) => {
+            // Debug: dump the init.lua
+            if let Ok(init_lua_path) = test_case.get_init_lua_file_path()
+                && init_lua_path.exists()
+                && let Ok(init_contents) = fs::read_to_string(&init_lua_path)
+            {
+                eprintln!(
+                    "DEBUG [{}]: init.lua contents:\n{}",
+                    test_case.test_id, init_contents
+                );
+            }
+            // Debug: dump the lua log file if it exists
+            if let Ok(log_path) = test_case.get_log_file_path() {
+                if log_path.exists() {
+                    if let Ok(log_contents) = fs::read_to_string(&log_path) {
+                        eprintln!(
+                            "DEBUG [{}]: Lua log file contents:\n{}",
+                            test_case.test_id, log_contents
+                        );
+                    }
+                } else {
+                    eprintln!(
+                        "DEBUG [{}]: No lua log file at {}",
+                        test_case.test_id,
+                        log_path.display()
+                    );
+                }
+            }
+            if let Ok(error_path) = test_case.get_error_file_path()
+                && error_path.exists()
+                && let Ok(err_contents) = fs::read_to_string(&error_path)
+            {
+                eprintln!(
+                    "DEBUG [{}]: Error file contents:\n{}",
+                    test_case.test_id, err_contents
+                );
+            }
+            // Also list the test directory contents
+            if let Ok(lspresso_dir) = test_case.get_lspresso_dir()
+                && let Ok(entries) = fs::read_dir(&lspresso_dir)
+            {
+                let files: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+                eprintln!(
+                    "DEBUG [{}]: Test dir contents: {:?}",
+                    test_case.test_id, files
+                );
+            }
+            Err(TestExecutionError::NoResults(test_case.test_id.clone()))?
+        }
         // Expected some results, got none
         (Some(_), true, false) => Err(TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id.clone(),
