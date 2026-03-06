@@ -524,6 +524,7 @@ pub fn test_code_action_resolve(
 /// Panics if JSON serialization of `params` fails
 ///
 /// [`codeAction/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeAction_resolve
+#[allow(clippy::result_large_err)]
 pub fn benchmark_code_action_resolve(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -666,6 +667,7 @@ pub fn test_code_lens_resolve(
 /// Panics if JSON serialization of `code_lens` fails
 ///
 /// [`codeLens/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve
+#[allow(clippy::result_large_err)]
 pub fn benchmark_code_lens_resolve(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -876,6 +878,7 @@ pub fn test_completion_resolve(
 /// Panics if JSON serialization of `completion_item` fails
 ///
 /// [`completionItem/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve
+#[allow(clippy::result_large_err)]
 pub fn benchmark_completion_resolve(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -942,6 +945,7 @@ pub fn test_declaration(
 /// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
 ///
 /// [`textDocument/declaration`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration
+#[allow(clippy::result_large_err)]
 pub fn benchmark_declaration(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -1007,6 +1011,7 @@ pub fn test_definition(
 /// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
 ///
 /// [`textDocument/definition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition
+#[allow(clippy::result_large_err)]
 pub fn benchmark_definition(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -1090,6 +1095,7 @@ pub fn test_diagnostic(
 /// Panics if JSON serialization of `identifier` or `previous_result_id` fails
 ///
 /// [`textDocument/diagnostic`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_diagnostic
+#[allow(clippy::result_large_err)]
 pub fn benchmark_diagnostic(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -1305,6 +1311,7 @@ pub fn test_document_link_resolve(
 /// Panics if JSON serialization of `link` fails
 ///
 /// [`documentLink/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve
+#[allow(clippy::result_large_err)]
 pub fn benchmark_document_link_resolve(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -1652,6 +1659,7 @@ pub fn test_hover(
 /// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
 ///
 /// [`textDocument/hover`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover
+#[allow(clippy::result_large_err)]
 pub fn benchmark_hover(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -1719,6 +1727,7 @@ pub fn test_implementation(
 /// or some other failure occurs
 ///
 /// [`textDocument/implementation`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation
+#[allow(clippy::result_large_err)]
 pub fn benchmark_implementation(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -2620,6 +2629,7 @@ pub fn test_rename(
 /// Panics if JSON serialization of `new_name` fails
 ///
 /// [`textDocument/rename`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename
+#[allow(clippy::result_large_err)]
 pub fn benchmark_rename(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -2802,6 +2812,7 @@ pub fn test_semantic_tokens_full_delta(
 ///
 /// [`textDocument/semanticTokens/full`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_fullRequest
 /// [`textDocument/semanticTokens/full/delta`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_deltaRequest
+#[allow(clippy::result_large_err)]
 pub fn benchmark_semantic_tokens_full_delta(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -3003,6 +3014,7 @@ pub fn test_type_definition(
 /// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
 ///
 /// [`textDocument/typeDefinition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition
+#[allow(clippy::result_large_err)]
 pub fn benchmark_type_definition(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -3328,6 +3340,7 @@ pub fn test_workspace_symbol_resolve(
 /// Panics if JSON serialization of `params` fails
 ///
 /// [`workspaceSymbole/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve
+#[allow(clippy::result_large_err)]
 pub fn benchmark_workspace_symbol_resolve(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -3406,6 +3419,7 @@ pub fn test_workspace_will_create_files(
 /// Panics if JSON serialization of `params` fails
 ///
 /// [`workspace/willCreateFiles`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles
+#[allow(clippy::result_large_err)]
 pub fn benchmark_workspace_will_create_files(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -3469,6 +3483,7 @@ pub fn test_workspace_will_delete_files(
 /// Panics if JSON serialization of `params` fails
 ///
 /// [`workspace/willDeleteFiles`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles
+#[allow(clippy::result_large_err)]
 pub fn benchmark_workspace_will_delete_files(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -3532,6 +3547,7 @@ pub fn test_workspace_will_rename_files(
 /// Panics if JSON serialization of `params` fails
 ///
 /// [`workspace/willRenameFiles`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles
+#[allow(clippy::result_large_err)]
 pub fn benchmark_workspace_will_rename_files(
     test_case: &TestCase,
     config: BenchmarkConfig,
