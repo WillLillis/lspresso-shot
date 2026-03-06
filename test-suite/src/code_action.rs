@@ -152,6 +152,10 @@ mod test {
 
     #[allow(clippy::too_many_lines)]
     #[test]
+    #[cfg_attr(
+        target_os = "macos",
+        ignore = "rust-analyzer codeAction too slow on macOS CI"
+    )]
     fn rust_analyzer() {
         let source_file = TestFile::new(
             "src/main.rs",
