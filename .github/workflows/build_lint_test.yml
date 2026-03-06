@@ -89,6 +89,7 @@ jobs:
     - name: Run tests
       env:
         LSPRESSO_RUST_TOOLCHAIN: '1.87'
+        RUST_TEST_THREADS: '1'
       run: cargo test
 
     - name: Install luals

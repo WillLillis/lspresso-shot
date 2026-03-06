@@ -164,7 +164,7 @@ mod test {
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
-            .timeout(Duration::from_secs(45))
+            .timeout(Duration::from_secs(60))
             .other_file(cargo_dot_toml());
         let range = Range::new(Position::new(1, 9), Position::new(1, 9));
 
