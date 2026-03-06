@@ -2,7 +2,7 @@
 mod test {
     use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
-    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
+    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml, rust_analyzer_path};
     use lspresso_shot::{
         lspresso_shot, test_prepare_rename, test_rename,
         types::{ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile},
@@ -163,7 +163,7 @@ mod test {
     let foo = 5;
 }",
         );
-        let test_case = TestCase::new("rust-analyzer", source_file)
+        let test_case = TestCase::new(rust_analyzer_path(), source_file)
             .start_type(ServerStartType::Progress(
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
@@ -171,11 +171,17 @@ mod test {
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
 
+        // change_annotations varies between rust-analyzer versions, so ignore it
+        let cmp =
+            |expected: &WorkspaceEdit, actual: &WorkspaceEdit, _test_case: &TestCase| -> bool {
+                expected.changes == actual.changes
+                    && expected.document_changes == actual.document_changes
+            };
         lspresso_shot!(test_rename(
             &test_case,
             Position::new(1, 9),
             "bar",
-            None,
+            Some(cmp),
             Some(&WorkspaceEdit {
                 changes: None,
                 document_changes: Some(DocumentChanges::Edits(vec![TextDocumentEdit {
@@ -204,7 +210,7 @@ mod test {
     let foo = 5;
 }",
         );
-        let test_case = TestCase::new("rust-analyzer", source_file)
+        let test_case = TestCase::new(rust_analyzer_path(), source_file)
             .start_type(ServerStartType::Progress(
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),

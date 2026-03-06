@@ -12,6 +12,7 @@ edition.workspace = true
 
 [dependencies]
 # lsp-types.workspace = true
+dunce.workspace = true
 lsp-types = { path = "../lsp-types" }
 serde.workspace = true
 serde_json.workspace = true

@@ -193,7 +193,7 @@ pub enum LuaReplacement {
     /// `fields` is stored in a parent object `name`.
     ParamNested {
         name: &'static str,
-        fields: Vec<LuaReplacement>,
+        fields: Vec<Self>,
     },
     /// Performs raw string substitution on the lua file. These subsituions are
     /// made before any other type to prevent conflicts with user-supplied values.
@@ -270,7 +270,7 @@ impl LuaReplacement {
                 }
                 writeln!(&mut doc.params, "\t{parent_name}['{name}'] = {name}").unwrap();
             }
-            Self::Other { from, to } => doc.raw.push(((*from).to_string(), to.to_string())),
+            Self::Other { from, to } => doc.raw.push(((*from).to_string(), to.clone())),
         }
     }
 }

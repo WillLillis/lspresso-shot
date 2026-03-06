@@ -35,12 +35,14 @@ use types::ServerStartType;
 use std::{
     collections::HashMap,
     fs,
+    io::Read as _,
     path::Path,
-    process::{Command, Stdio},
     str::FromStr as _,
     sync::{Arc, Condvar, Mutex, OnceLock},
     time::Duration,
 };
+
+use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
 use types::{
     ApproximateEq, BenchmarkConfig, BenchmarkError, CleanResponse, EndCondition,
@@ -61,17 +63,23 @@ macro_rules! lspresso_shot {
     };
 }
 
-/// The parallelism utilized in Cargo's test runner and the concrete timeout values
-/// used in our test cases do not play nicely together, leading to intermittent failures.
-/// We use `RUNNER_COUNT` to restrict the number of concurrent test cases, treating
-/// each case's "neovim portion" inside `run_test` as a critical section. Another
-/// approach that works is to manually limit the number of threads used by the test
-/// runner via `--test-threads x`, but it isn't realistic to expect consumers to do this.
+/// Maximum number of concurrent Neovim processes. Running too many LSP server
+/// instances in parallel leads to resource contention and flaky timeouts.
 ///
-/// It looks like this value needs to be 1, so we could replace the `u32` with a `bool`,
-/// but I'll leave it as is for now in case I come up with some other workaround
-static RUNNER_LIMIT: u32 = 1;
+/// Defaults to 1 (sequential execution). Override via the `LSPRESSO_RUNNER_LIMIT`
+/// environment variable.
+static RUNNER_LIMIT: OnceLock<u32> = OnceLock::new();
 static RUNNER_COUNT: OnceLock<Arc<(Mutex<u32>, Condvar)>> = OnceLock::new();
+
+fn get_runner_limit() -> u32 {
+    *RUNNER_LIMIT.get_or_init(|| {
+        std::env::var("LSPRESSO_RUNNER_LIMIT")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1)
+            .max(1)
+    })
+}
 
 fn get_runner_count() -> Arc<(Mutex<u32>, Condvar)> {
     #[allow(clippy::mutex_integer)]
@@ -80,7 +88,8 @@ fn get_runner_count() -> Arc<(Mutex<u32>, Condvar)> {
         .clone()
 }
 
-/// Helper struct to automatically decrement `n_jobs` when dropped.
+/// RAII guard that increments the runner count on creation (blocking if at the
+/// limit) and decrements it on drop.
 struct RunnerGuard<'a> {
     lock: &'a Mutex<u32>,
     cvar: &'a Condvar,
@@ -88,9 +97,10 @@ struct RunnerGuard<'a> {
 
 impl<'a> RunnerGuard<'a> {
     fn new(lock: &'a Mutex<u32>, cvar: &'a Condvar) -> Self {
+        let limit = get_runner_limit();
         let mut n_jobs = lock.lock().expect("Mutex poisoned");
 
-        while *n_jobs >= RUNNER_LIMIT {
+        while *n_jobs >= limit {
             n_jobs = cvar.wait(n_jobs).expect("Condition variable poisoned");
         }
 
@@ -116,7 +126,7 @@ impl Drop for RunnerGuard<'_> {
 /// Note that even if a given request doesn't support an `Option` response, `expected`
 /// is always an `Option` here. For these cases, the expected result should be passed
 /// as `Some(expected)` unconditionally in the caller
-#[allow(clippy::needless_pass_by_value)]
+#[allow(clippy::needless_pass_by_value, clippy::too_many_lines)]
 fn collect_results<T>(
     test_case: &TestCase,
     test_type: TestType,
@@ -170,7 +180,55 @@ where
         // Invariant: `results.json` and `empty` should never both exist
         (_, true, true) => unreachable!(),
         // No results
-        (_, false, false) => Err(TestExecutionError::NoResults(test_case.test_id.clone()))?,
+        (_, false, false) => {
+            // Debug: dump the init.lua
+            if let Ok(init_lua_path) = test_case.get_init_lua_file_path()
+                && init_lua_path.exists()
+                && let Ok(init_contents) = fs::read_to_string(&init_lua_path)
+            {
+                eprintln!(
+                    "DEBUG [{}]: init.lua contents:\n{}",
+                    test_case.test_id, init_contents
+                );
+            }
+            // Debug: dump the lua log file if it exists
+            if let Ok(log_path) = test_case.get_log_file_path() {
+                if log_path.exists() {
+                    if let Ok(log_contents) = fs::read_to_string(&log_path) {
+                        eprintln!(
+                            "DEBUG [{}]: Lua log file contents:\n{}",
+                            test_case.test_id, log_contents
+                        );
+                    }
+                } else {
+                    eprintln!(
+                        "DEBUG [{}]: No lua log file at {}",
+                        test_case.test_id,
+                        log_path.display()
+                    );
+                }
+            }
+            if let Ok(error_path) = test_case.get_error_file_path()
+                && error_path.exists()
+                && let Ok(err_contents) = fs::read_to_string(&error_path)
+            {
+                eprintln!(
+                    "DEBUG [{}]: Error file contents:\n{}",
+                    test_case.test_id, err_contents
+                );
+            }
+            // Also list the test directory contents
+            if let Ok(lspresso_dir) = test_case.get_lspresso_dir()
+                && let Ok(entries) = fs::read_dir(&lspresso_dir)
+            {
+                let files: Vec<_> = entries.filter_map(|e| e.ok()).map(|e| e.path()).collect();
+                eprintln!(
+                    "DEBUG [{}]: Test dir contents: {:?}",
+                    test_case.test_id, files
+                );
+            }
+            Err(TestExecutionError::NoResults(test_case.test_id.clone()))?
+        }
         // Expected some results, got none
         (Some(_), true, false) => Err(TestError::ResponseMismatch(ResponseMismatchError {
             test_id: test_case.test_id.clone(),
@@ -202,24 +260,59 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()>
         .get_init_lua_file_path()
         .map_err(|e| TestExecutionError::IO(test_case.test_id.clone(), e.to_string()))?;
 
-    // Restrict the number of tests invoking neovim at a given time to prevent timeout issues
+    // Restrict the number of concurrent neovim invocations to prevent resource
+    // contention from causing flaky timeouts. Controlled by LSPRESSO_RUNNER_LIMIT.
     let (lock, cvar) = &*get_runner_count();
-    let _guard = RunnerGuard::new(lock, cvar); // Ensures proper decrement on exit
+    let _guard = RunnerGuard::new(lock, cvar);
 
     let start = std::time::Instant::now();
-    let mut child = Command::new(&test_case.nvim_path)
-        .arg("-u")
-        .arg(init_dot_lua_path)
-        .arg("--noplugin")
-        .arg(source_path)
-        // NOTE: Running with `--headless` would be better, but this causes *all* tests
-        // to fail on GH's runners, likely due to the lack of appearance of a tty.
-        // .arg("--headless")
-        .arg("-n") // disable swap files
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()
+
+    let pty_system = native_pty_system();
+    let pair = pty_system
+        .openpty(PtySize {
+            rows: 24,
+            cols: 80,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
         .map_err(|e| TestExecutionError::Neovim(test_case.test_id.clone(), e.to_string()))?;
+
+    let mut cmd = CommandBuilder::new(&test_case.nvim_path);
+    cmd.env("TERM", "xterm-256color");
+    // If set, pass the Rust toolchain to the LSP server so it uses the correct
+    // sysroot and proc-macro server (avoids version mismatches in CI).
+    if let Ok(toolchain) = std::env::var("LSPRESSO_RUST_TOOLCHAIN") {
+        cmd.env("RUSTUP_TOOLCHAIN", toolchain);
+    }
+    cmd.arg("-u");
+    cmd.arg(&init_dot_lua_path);
+    cmd.arg("--noplugin");
+    cmd.arg("--headless");
+    cmd.arg(source_path);
+    cmd.arg("-n"); // disable swap files
+
+    let mut child = pair
+        .slave
+        .spawn_command(cmd)
+        .map_err(|e| TestExecutionError::Neovim(test_case.test_id.clone(), e.to_string()))?;
+
+    // Close the slave side so the child gets EOF when the master drops
+    drop(pair.slave);
+
+    // Drain the PTY master output in a background thread to prevent buffer saturation
+    // from Neovim TUI output
+    let mut reader = pair
+        .master
+        .try_clone_reader()
+        .map_err(|e| TestExecutionError::Neovim(test_case.test_id.clone(), e.to_string()))?;
+    std::thread::spawn(move || {
+        let mut buf = [0u8; 4096];
+        while let Ok(n) = reader.read(&mut buf) {
+            if n == 0 {
+                break;
+            }
+        }
+    });
 
     // In theory, the timeout set in `init.lua` should be sufficient to prevent
     // the neovim process from hanging. However, if `init.lua` is malformed (an
@@ -244,6 +337,11 @@ fn run_test(test_case: &TestCase, source_path: &Path) -> TestExecutionResult<()>
             ))?,
         }
     }
+
+    // Kill the child process on timeout for clean PTY cleanup
+    let _ = child.kill();
+    // Drop the master side so the drain thread can exit
+    drop(pair.master);
 
     // A test can also timeout due to neovim encountering an error (i.e. a malformed
     // `init.lua` file). If we have an error recorded, it's better to report that
@@ -426,6 +524,7 @@ pub fn test_code_action_resolve(
 /// Panics if JSON serialization of `params` fails
 ///
 /// [`codeAction/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeAction_resolve
+#[allow(clippy::result_large_err)]
 pub fn benchmark_code_action_resolve(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -568,6 +667,7 @@ pub fn test_code_lens_resolve(
 /// Panics if JSON serialization of `code_lens` fails
 ///
 /// [`codeLens/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#codeLens_resolve
+#[allow(clippy::result_large_err)]
 pub fn benchmark_code_lens_resolve(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -778,6 +878,7 @@ pub fn test_completion_resolve(
 /// Panics if JSON serialization of `completion_item` fails
 ///
 /// [`completionItem/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#completionItem_resolve
+#[allow(clippy::result_large_err)]
 pub fn benchmark_completion_resolve(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -844,6 +945,7 @@ pub fn test_declaration(
 /// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
 ///
 /// [`textDocument/declaration`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_declaration
+#[allow(clippy::result_large_err)]
 pub fn benchmark_declaration(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -909,6 +1011,7 @@ pub fn test_definition(
 /// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
 ///
 /// [`textDocument/definition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_definition
+#[allow(clippy::result_large_err)]
 pub fn benchmark_definition(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -992,6 +1095,7 @@ pub fn test_diagnostic(
 /// Panics if JSON serialization of `identifier` or `previous_result_id` fails
 ///
 /// [`textDocument/diagnostic`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_diagnostic
+#[allow(clippy::result_large_err)]
 pub fn benchmark_diagnostic(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -1207,6 +1311,7 @@ pub fn test_document_link_resolve(
 /// Panics if JSON serialization of `link` fails
 ///
 /// [`documentLink/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#documentLink_resolve
+#[allow(clippy::result_large_err)]
 pub fn benchmark_document_link_resolve(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -1380,7 +1485,7 @@ pub fn test_formatting(
             TestType::Formatting,
             options_json,
             cmp,
-            state.to_string(),
+            state.clone(),
         )),
         None => to_parent_err_type(test_formatting_resp(
             test_case,
@@ -1474,8 +1579,8 @@ fn test_formatting_state(
     expected: String,
 ) -> TestResult<(), String> {
     let outer_cmp = |expected: &String, actual: &String, test_case: &TestCase| -> bool {
-        let result_expected = StateOrResponse::State(expected.to_string());
-        let result_actual = StateOrResponse::State(actual.to_string());
+        let result_expected = StateOrResponse::State(expected.clone());
+        let result_actual = StateOrResponse::State(actual.clone());
         cmp.as_ref().map_or_else(
             || result_expected == result_actual,
             |cmp_fn| cmp_fn(&result_expected, &result_actual, test_case),
@@ -1554,6 +1659,7 @@ pub fn test_hover(
 /// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
 ///
 /// [`textDocument/hover`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_hover
+#[allow(clippy::result_large_err)]
 pub fn benchmark_hover(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -1621,6 +1727,7 @@ pub fn test_implementation(
 /// or some other failure occurs
 ///
 /// [`textDocument/implementation`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_implementation
+#[allow(clippy::result_large_err)]
 pub fn benchmark_implementation(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -2522,6 +2629,7 @@ pub fn test_rename(
 /// Panics if JSON serialization of `new_name` fails
 ///
 /// [`textDocument/rename`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_rename
+#[allow(clippy::result_large_err)]
 pub fn benchmark_rename(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -2704,6 +2812,7 @@ pub fn test_semantic_tokens_full_delta(
 ///
 /// [`textDocument/semanticTokens/full`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_fullRequest
 /// [`textDocument/semanticTokens/full/delta`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokens_deltaRequest
+#[allow(clippy::result_large_err)]
 pub fn benchmark_semantic_tokens_full_delta(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -2905,6 +3014,7 @@ pub fn test_type_definition(
 /// Returns [`BenchmarkError`] if the test case is invalid or if benchmarking fails
 ///
 /// [`textDocument/typeDefinition`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#textDocument_typeDefinition
+#[allow(clippy::result_large_err)]
 pub fn benchmark_type_definition(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -3230,6 +3340,7 @@ pub fn test_workspace_symbol_resolve(
 /// Panics if JSON serialization of `params` fails
 ///
 /// [`workspaceSymbole/resolve`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_symbolResolve
+#[allow(clippy::result_large_err)]
 pub fn benchmark_workspace_symbol_resolve(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -3308,6 +3419,7 @@ pub fn test_workspace_will_create_files(
 /// Panics if JSON serialization of `params` fails
 ///
 /// [`workspace/willCreateFiles`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willCreateFiles
+#[allow(clippy::result_large_err)]
 pub fn benchmark_workspace_will_create_files(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -3371,6 +3483,7 @@ pub fn test_workspace_will_delete_files(
 /// Panics if JSON serialization of `params` fails
 ///
 /// [`workspace/willDeleteFiles`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willDeleteFiles
+#[allow(clippy::result_large_err)]
 pub fn benchmark_workspace_will_delete_files(
     test_case: &TestCase,
     config: BenchmarkConfig,
@@ -3434,6 +3547,7 @@ pub fn test_workspace_will_rename_files(
 /// Panics if JSON serialization of `params` fails
 ///
 /// [`workspace/willRenameFiles`]: https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#workspace_willRenameFiles
+#[allow(clippy::result_large_err)]
 pub fn benchmark_workspace_will_rename_files(
     test_case: &TestCase,
     config: BenchmarkConfig,

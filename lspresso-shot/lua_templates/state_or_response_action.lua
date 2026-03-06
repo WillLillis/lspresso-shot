@@ -36,7 +36,7 @@ local function check_progress_result()
     else
         report_log('Requesting') ---@diagnostic disable-line: undefined-global
         local start = vim.uv.hrtime()
-        local resp = vim.lsp.buf_request_sync(0, 'REQUEST_METHOD', params)
+        local resp = vim.lsp.buf_request_sync(0, 'REQUEST_METHOD', params, TIMEOUT_MS) ---@diagnostic disable-line: undefined-global
         local elapsed_ns = vim.uv.hrtime() - start
         record_benchmark_result(elapsed_ns) ---@diagnostic disable-line: undefined-global
         if not resp then

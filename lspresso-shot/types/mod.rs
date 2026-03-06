@@ -223,7 +223,7 @@ impl TestFile {
 /// - `other_files`: other files to be placed in the mock directory (e.g. other source
 ///   files, server configuration, etc.).
 /// - `start_type`: indicates when the server is ready to service requests
-/// - `timeout`: timeout for the test's run in Neovim. The default is 1000ms.
+/// - `timeout`: timeout for the test's run in Neovim. The default is 3000ms.
 /// - `cleanup`: whether to delete the temporary directory on test completion.
 #[derive(Debug, Clone)]
 pub struct TestCase {
@@ -253,7 +253,7 @@ impl TestCase {
             cursor_pos: None,
             other_files: Vec::new(),
             start_type: ServerStartType::Simple,
-            timeout: Duration::from_secs(1),
+            timeout: Duration::from_secs(3),
             cleanup: false,
         }
     }
@@ -332,10 +332,11 @@ impl TestCase {
                 return;
             }
         };
-        if self.cleanup && test_dir.exists() {
-            if let Err(e) = fs::remove_dir_all(test_dir) {
-                eprintln!("Test cleanup error (dir removal): {e}");
-            }
+        if self.cleanup
+            && test_dir.exists()
+            && let Err(e) = fs::remove_dir_all(test_dir)
+        {
+            eprintln!("Test cleanup error (dir removal): {e}");
         }
     }
 
@@ -392,7 +393,9 @@ impl TestCase {
         tmp_dir.push("lspresso-shot");
         tmp_dir.push(&self.test_id);
         fs::create_dir_all(&tmp_dir)?;
-        Ok(tmp_dir)
+        // Canonicalize to resolve symlinks (e.g. macOS /var -> /private/var) so
+        // all derived paths are consistent with the canonical URIs Neovim generates.
+        Ok(dunce::canonicalize(&tmp_dir).unwrap_or(tmp_dir))
     }
 
     /// Returns the path to the result file for test `self.test_id`,
@@ -900,7 +903,10 @@ pub fn clean_uri(uri: &Uri, test_case: &TestCase) -> TestExecutionResult<Uri> {
         .ok_or_else(|| TestSetupError::InvalidFilePath(format!("{}", root.display())))?
         .to_string();
     let path = uri.path().to_string();
-    let cleaned = path.strip_prefix(&test_case_root).unwrap_or(&path);
+    let cleaned = path
+        .strip_prefix(&test_case_root)
+        .unwrap_or(&path)
+        .trim_start_matches(std::path::MAIN_SEPARATOR);
     Ok(Uri::from_str(cleaned).map_err(|_| TestSetupError::InvalidFilePath(path))?)
 }
 

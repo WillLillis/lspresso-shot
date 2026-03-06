@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod test {
-    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
+    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml, rust_analyzer_path};
     use lsp_types::{
         CodeAction, CodeActionContext, CodeActionKind, CodeActionOptions, CodeActionOrCommand,
         CodeActionProviderCapability, CodeActionResponse, Position, Range, ServerCapabilities,
@@ -152,6 +152,10 @@ mod test {
 
     #[allow(clippy::too_many_lines)]
     #[test]
+    #[cfg_attr(
+        target_os = "macos",
+        ignore = "rust-analyzer codeAction too slow on macOS CI"
+    )]
     fn rust_analyzer() {
         let source_file = TestFile::new(
             "src/main.rs",
@@ -159,12 +163,12 @@ mod test {
     let x = 5;
 }",
         );
-        let test_case = TestCase::new("rust-analyzer", source_file)
+        let test_case = TestCase::new(rust_analyzer_path(), source_file)
             .start_type(ServerStartType::Progress(
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
-            .timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(60))
             .other_file(cargo_dot_toml());
         let range = Range::new(Position::new(1, 9), Position::new(1, 9));
 

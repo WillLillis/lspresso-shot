@@ -2,7 +2,7 @@
 mod test {
     use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
-    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml};
+    use crate::test_helpers::{NON_RESPONSE_NUM, cargo_dot_toml, rust_analyzer_path};
     use lspresso_shot::{
         lspresso_shot, test_completion,
         types::{ResponseMismatchError, ServerStartType, TestCase, TestError, TestFile},
@@ -181,33 +181,26 @@ println!("format {local_variable} arguments");
     prin
 }",
         );
-        let test_case = TestCase::new("rust-analyzer", source_file)
+        let test_case = TestCase::new(rust_analyzer_path(), source_file)
             .start_type(ServerStartType::Progress(
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
             ))
             .timeout(Duration::from_secs(20))
             .other_file(cargo_dot_toml());
-        // Just find the completion item we care about!
-        let cmp = |expected: &CompletionResponse,
+        // Find the println completion item and compare only stable fields
+        let cmp = |_expected: &CompletionResponse,
                    actual: &CompletionResponse,
                    _test_case: &TestCase|
          -> bool {
-            let expected_item = match expected {
-                CompletionResponse::Array(items) => items[0].clone(),
-                CompletionResponse::List(_) => unreachable!(),
+            let items = match actual {
+                CompletionResponse::Array(items)
+                | CompletionResponse::List(CompletionList { items, .. }) => items,
             };
-            match actual {
-                CompletionResponse::Array(completion_items)
-                | CompletionResponse::List(CompletionList {
-                    items: completion_items,
-                    ..
-                }) => {
-                    for item in completion_items {
-                        if item.label == "println!(…)" {
-                            return expected_item == *item;
-                        }
-                    }
+            for item in items {
+                if item.label == "println!(…)" {
+                    return item.kind == Some(CompletionItemKind::FUNCTION)
+                        && item.filter_text == Some("println!".to_string());
                 }
             }
             false

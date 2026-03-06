@@ -2,7 +2,7 @@
 mod tests {
     use std::{num::NonZeroU32, str::FromStr as _, time::Duration};
 
-    use crate::test_helpers::cargo_dot_toml;
+    use crate::test_helpers::{cargo_dot_toml, rust_analyzer_path};
     use lspresso_shot::{
         lspresso_shot, test_diagnostic, test_publish_diagnostics, test_workspace_diagnostic,
         types::{ServerStartType, TestCase, TestFile},
@@ -132,7 +132,7 @@ mod tests {
     let bar = 1;
 }",
         );
-        let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
+        let diagnostic_test_case = TestCase::new(rust_analyzer_path(), source_file)
             .start_type(ServerStartType::Progress(
                 NonZeroU32::new(4).unwrap(),
                 "rustAnalyzer/cachePriming".to_string(),
@@ -163,7 +163,7 @@ mod tests {
     let bar = 1;
 }",
         );
-        let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
+        let diagnostic_test_case = TestCase::new(rust_analyzer_path(), source_file)
             .start_type(ServerStartType::Progress(
                 NonZeroU32::new(2).unwrap(),
                 String::new(),
@@ -237,7 +237,7 @@ mod tests {
     println!("Hello, world!
 }"#,
         );
-        let diagnostic_test_case = TestCase::new("rust-analyzer", source_file)
+        let diagnostic_test_case = TestCase::new(rust_analyzer_path(), source_file)
             .start_type(ServerStartType::Progress(
                 NonZeroU32::new(2).unwrap(),
                 String::new(),
